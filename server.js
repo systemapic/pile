@@ -10,6 +10,7 @@ var compression = require('compression')
 var http 	= require('http');
 var config 	= require('./config/pile-config'); // config
 var port 	= config.port; // port for tileserver (nginx proxied)
+var request 	= require('request');
 
 
 // #########################################
@@ -24,10 +25,17 @@ module.exports = function (pile) {
 	app.use(express.static(path.join(__dirname, 'public'))); 	// not secured
 
 
-	// // import geojson
-	// app.post('/import/geojson', function (req, res) {
-	// 	vile.importGeojson(req, res);
-	// });
+	// import geojson
+	app.get('/api/data/export/test', checkAccess, function (req, res) {
+		pile.test(req, res);
+	});
+
+
+	app.get('/api/data/file', checkAccess, function (req, res) {
+
+		// pile.
+
+	});
 
 	// // import cartocss
 	// app.post('/import/cartocss', function (req, res) {
@@ -54,6 +62,8 @@ module.exports = function (pile) {
 
 	console.log('PostGIS tileserver is up @ ', port);
 
+
+
 }
 
 
@@ -72,6 +82,42 @@ r.on('error', function (err) { console.error(err); });
 // #########################################
 // ###  Helper fn's for auth             ###
 // #########################################
+function checkAccess (req, res, next) {
+	console.time('checkAccess');
+	var access_token = req.query.access_token || req.body.access_token;
+
+	// do request to wu for checking access tokens
+	var verifyUrl = 'http://wu:3001/api/token/check?access_token=' + access_token;
+	request(verifyUrl, function (error, response, body) {
+		console.timeEnd('checkAccess');
+		
+		// allowed
+		if (response.statusCode == 200 && !error && body == 'OK') return next();
+
+		// not allowed
+		res.json({access : 'Unauthorized'});
+	});
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // helper function: if has token
 function hasToken(req, res, next) {
 

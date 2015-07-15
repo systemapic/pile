@@ -13,6 +13,7 @@ var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
 var mapnikOmnivore = require('mapnik-omnivore');
 
+
 // modules
 var server = require('./server');
 var config = require('./config/pile-config');
@@ -46,7 +47,41 @@ if (process.argv[2] == 'production') {
 module.exports = pile = { 
 
 
+	test : function (req, res) {
+
+		console.log('TEST!!!');
+
+		res.end(JSON.stringify({
+			get : 'low'
+		}));
+
+	},
+
+
+	getFile : function (req, res) {
+
+		console.log('req.query', req.query);
+		
+		var fileUuid = req.query.fileUuid,
+		    ops = [];
+
+		// check for missing info
+		if (!fileUuid) return api.error.missingInformation(req, res);
+
+		// todo: check permission to access file
+		
+		// get file
+		File
+		.findOne({uuid : fileUuid})
+		.exec(function (err, file) {
+			if (err) return api.error.general(req, res, err);
+
+			res.end(JSON.stringify(file));
+		});
+
+	},
 	
+
 	// // entry point for /raster/*
 	// requestRasterTile : function (req, res) {
 
