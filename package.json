@@ -5,11 +5,18 @@
   "main": "pile.js",
   "dependencies": {
     "async": "^1.3.0",
+    "body-parser": "^1.13.2",
+    "carto": "^0.14.1",
     "colors": "^1.1.2",
+    "compression": "^1.5.1",
+    "cors": "^2.7.1",
     "express": "^4.13.0",
+    "fs-extra": "^0.22.1",
     "grainstore": "^1.0.0",
+    "kue": "^0.9.3",
     "lodash": "^3.10.0",
     "mapnik": "^3.4.0",
+    "mapnik-omnivore": "^6.1.4",
     "redis": "^0.12.1"
   },
   "devDependencies": {},

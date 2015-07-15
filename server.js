@@ -8,7 +8,7 @@ var fs 		= require('fs');
 var path 	= require('path');
 var compression = require('compression')
 var http 	= require('http');
-var config 	= require('./config/vile-config'); // config
+var config 	= require('./config/pile-config'); // config
 var port 	= config.port; // port for tileserver (nginx proxied)
 
 
