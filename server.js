@@ -15,7 +15,7 @@ var port 	= config.port; // port for tileserver (nginx proxied)
 // #########################################
 // ###  Server, routes                   ###	// runs on 1 cpu
 // #########################################
-module.exports = function (vile) {
+module.exports = function (pile) {
 
 	// configure server
 	var app = express();
@@ -24,35 +24,35 @@ module.exports = function (vile) {
 	app.use(express.static(path.join(__dirname, 'public'))); 	// not secured
 
 
-	// import geojson
-	app.post('/import/geojson', function (req, res) {
-		vile.importGeojson(req, res);
-	});
+	// // import geojson
+	// app.post('/import/geojson', function (req, res) {
+	// 	vile.importGeojson(req, res);
+	// });
 
-	// import cartocss
-	app.post('/import/cartocss', function (req, res) {
-		vile.importCartoCSS(req, res);
-	});
+	// // import cartocss
+	// app.post('/import/cartocss', function (req, res) {
+	// 	vile.importCartoCSS(req, res);
+	// });
 
-	// request tiles
-	app.get('/r/*', hasToken, function(req, res) {								// todo: checks. security.
-		vile.requestRasterTile(req, res);
-	});
+	// // request tiles
+	// app.get('/r/*', hasToken, function(req, res) {								// todo: checks. security.
+	// 	vile.requestRasterTile(req, res);
+	// });
 
-	// request tiles
-	app.get('/v/*', hasToken, function(req, res) {								// todo: checks. security.
-		vile.requestVectorTile(req, res);
-	});
+	// // request tiles
+	// app.get('/v/*', hasToken, function(req, res) {								// todo: checks. security.
+	// 	vile.requestVectorTile(req, res);
+	// });
 
-	// request utfgrid tiles
-	app.get('/u/*', hasToken, function(req, res) {								// todo: checks. security.
-		vile.requestUTFGrid(req, res);
-	});
+	// // request utfgrid tiles
+	// app.get('/u/*', hasToken, function(req, res) {								// todo: checks. security.
+	// 	vile.requestUTFGrid(req, res);
+	// });
 
 	// revv
 	app.listen(port);
 
-	console.log('Vile is up @ ', port);
+	console.log('PostGIS tileserver is up @ ', port);
 
 }
 
@@ -65,9 +65,7 @@ module.exports = function (vile) {
 var redis = require('redis');
 var r = redis.createClient(config.tokenRedis.port, config.tokenRedis.host)
 r.auth(config.tokenRedis.auth);
-r.on('error', function (err) {
-	console.error(err);
-});
+r.on('error', function (err) { console.error(err); });
 
 
 
@@ -124,6 +122,7 @@ function hasToken(req, res, next) {
 				token : token
 			});
 		}
+		
 		// console.log('token: ', token);
 		// console.log('value: ', value);
 
