@@ -167,17 +167,21 @@ module.exports = pile = {
 
 	getTile : function (req, res) {
 
+		console.time('getTile');
 		// parse url into layerUuid, zxy, type
 		var ops = [],
 		    parsed = req._parsedUrl.pathname.split('/'), // https://dev.systemapic.com/api/tiles/layerUuid/z/x/y.png || .pbf
 		    params = {
 			layerUuid : parsed[2],
-			z : parsed[3],
-			x : parsed[4],
-			y : parsed[5].split('.')[0],
+			z : parseInt(parsed[3]),
+			x : parseInt(parsed[4]),
+			y : parseInt(parsed[5].split('.')[0]),
 			type : parsed[5].split('.')[1],
-		    }
-		
+		    },
+		    map,
+		    layer,
+		    postgis,
+		    bbox;
 
 		// check params
 		console.log('params', params);
@@ -188,40 +192,123 @@ module.exports = pile = {
 		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
 
 
-
 		// look for stored layerUuid
 		ops.push(function (callback) {
 			layerStore.get(params.layerUuid, callback);
 		});
 
-
+		// define settings, xml
 		ops.push(function (storedLayer, callback) {
 			if (!storedLayer) return callback('No such layerUuid.');
 
-			var layer = JSON.parse(storedLayer);
+			var storedLayer = JSON.parse(storedLayer);
 
-			console.log('layer: ', layer);
+			console.log('storedLayer: ', storedLayer);
 
-			// send to raster/vector tile creation
-			if (params.type == 'png') return pile.getRasterTile(layer, params, callback); 		// todo: jpeg
-			if (params.type == 'pbf') return pile.getVectorTile(layer, params, callback); 	// todo: svg, geojson, topojson vector tiles
+			// default settings // todo: put in config
+			var default_postgis_settings = {
+				user : 'docker',
+				password : 'docker',
+				host : 'postgis',
+				type : 'postgis'
+			}
 
-			callback('Not valid type.');
+			// insert layer settings 
+			var postgis_settings 	= default_postgis_settings;
+			postgis_settings.dbname = storedLayer.options.database_name;
+			postgis_settings.table 	= storedLayer.options.sql;
+			postgis_settings.geometry_field = storedLayer.options.geom_column;
+			postgis_settings.srid 	= storedLayer.options.srid;
+			
+			// everything in spherical mercator (3857)!
+			try {
+			map = new mapnik.Map(256, 256, mercator.proj4);
+			layer = new mapnik.Layer('layer', mercator.proj4);
+			postgis = new mapnik.Datasource(postgis_settings);
+			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+			} catch (e) {
+				return callback(e.message);
+			}
+
+			// set buffer
+			map.bufferSize = 64;
+
+			// set datasource
+			layer.datasource = postgis;
+
+			// add styles
+			layer.styles = ['layer']; // style names in xml
+			
+			// add layer to map
+			map.add_layer(layer);
+
+			// parse xml from cartocss
+			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+
+		});
+
+		// load xml to map
+		ops.push(function (xml, callback) {
+			map.fromString(xml, {strict : true}, callback);
+		});
+
+		// render vector/raster tile
+		ops.push(function (map, callback) {
+
+			// console.log(map.toXML()); // Debug settings
+
+			// set extent
+			map.extent = bbox; // must have extent!
+
+			// raster
+			if (params.type == 'png') {
+				var im = new mapnik.Image(map.width, map.height);
+			}
+			
+			// vector
+			if (params.type == 'pbf') {
+				var im = new mapnik.VectorTile(params.z, params.x, params.y);
+			}
+
+			// check
+			if (!im) return callback('Unsupported type.')
+
+			// render
+			map.render(im, callback);
+
+		});
+
+		// send tile to client
+		ops.push(function (tile, callback) {
+
+			// return raster
+			if (params.type == 'png') {
+				res.writeHead(200, {'Content-Type': 'image/png'});
+	               		res.end(tile.encodeSync('png'));
+	               		return callback(null);
+	               	}
+
+	               	// return vector
+	               	if (params.type == 'pbf') {
+				res.setHeader('Content-Encoding', 'deflate')
+				res.setHeader('Content-Type', 'application/x-protobuf')
+				return zlib.deflate(tile.getData(), function(err, pbf) {
+					res.send(pbf)
+					callback(err);
+				});
+	               	}
+
+	               	callback('Unsupported tile format.')
 		});
 
 
-		async.waterfall(ops, function (err, tile) {
-			console.log('async done, err, result', err, tile);
+		// run ops
+		async.waterfall(ops, function (err) {
+			console.log('async done, err, result', err);
+			if (err) return res.json({error : err.message});
+			console.timeEnd('getTile');
 
-			// return error
-			if (err) return res.json({
-				err : err,
-				tile : tile
-			});
-
-			res.json({png : 'coming'});
 		});
-
 
 	},
 
@@ -306,97 +393,100 @@ module.exports = pile = {
 		console.log('layer: ', layer);
 		console.log('params: ', params);
 
-		// default settings // todo: put in config
-		var default_postgis_settings = {
-			user : 'docker',
-			password : 'docker',
-			host : 'postgis',
-			type : 'postgis'
-		}
+		// // default settings // todo: put in config
+		// var default_postgis_settings = {
+		// 	user : 'docker',
+		// 	password : 'docker',
+		// 	host : 'postgis',
+		// 	type : 'postgis'
+		// }
 
-		// insert layer settings 
-		var postgis_settings = default_postgis_settings;
-		postgis_settings.dbname = storedLayer.options.database_name;
-		postgis_settings.table = storedLayer.options.sql;
-		postgis_settings.geometry_field = storedLayer.options.geom_column;
-		postgis_settings.srid = storedLayer.options.srid;
+		// // insert layer settings 
+		// var postgis_settings = default_postgis_settings;
+		// postgis_settings.dbname = storedLayer.options.database_name;
+		// postgis_settings.table = storedLayer.options.sql;
+		// postgis_settings.geometry_field = storedLayer.options.geom_column;
+		// postgis_settings.srid = storedLayer.options.srid;
 		
-		// everything in spherical mercator (3857)!
-		var map = new mapnik.Map(256, 256, mercator.proj4);
-		var layer = new mapnik.Layer('layer', mercator.proj4);
-		var postgis = new mapnik.Datasource(postgis_settings);
-		var bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+		// // everything in spherical mercator (3857)!
+		// var map = new mapnik.Map(256, 256, mercator.proj4);
+		// var layer = new mapnik.Layer('layer', mercator.proj4);
+		// var postgis = new mapnik.Datasource(postgis_settings);
+		// var bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
-		// set datasource
-		layer.datasource = postgis;
+		// // set buffer
+		// map.bufferSize = 64;
+
+		// // set datasource
+		// layer.datasource = postgis;
 
 
 
-		// |
-		// |
-		// v
-		// everything down to here is same for vector/raster
-		// ----------------------------------------------------------------------
+		// // |
+		// // |
+		// // v
+		// // everything down to here is same for vector/raster
+		// // ----------------------------------------------------------------------
 
-		layer.styles = ['layer']; // style names in xml
-		map.add_layer(layer);
-		map.bufferSize = 64;
+		// layer.styles = ['layer']; // style names in xml
+		// map.add_layer(layer);
 
 		var ops = [];
 
 		ops.push(function (callback) {
-			pile.cartoRenderer(storedLayer.options.cartocss, layer, function (err, xml) {
-				console.log('cartoRendeerer err xml', err, xml);
-
-				callback(err, xml);
-			});
+			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
 		});
 
 		
 		ops.push(function (xml, callback) {
-
-			
 			map.fromString(xml, {strict : true}, callback);
 		});
 
 		ops.push(function (map, callback) {
 
-			// map.add_layer(layer);
-
-			console.log('---------map.toXML()----------')
-			console.log(map.toXML()); // Debug settings
-			console.log('----ebd-----map.toXML()-------end ---')
+			// console.log(map.toXML()); // Debug settings
 
 			map.extent = bbox; // must have extent!
-			var im = new mapnik.Image(map.width, map.height);
 
-			// var im = new mapnik.VectorTile(0,0,0);
+			// raster
+			if (params.type == 'png') {
+				var im = new mapnik.Image(map.width, map.height);
+			}
+			
+			// vector
+			if (params.type == 'pbf') {
+				var im = new mapnik.VectorTile(params.z, params.x, params.y);
+			}
 
+			// render
 			map.render(im, callback);
 
 		});
 
+		// return buffer
+		async.waterfall(ops, done);
 
-		async.waterfall(ops, function (err, im) {
 
-			console.log('map.render err, im', err, im);
-			fs.outputFile('./raster_1.png', im.encodeSync('png'));
-			// fs.writeFileSync("./cetin3.pbf", im.getData());
+		// async.waterfall(ops, function (err, im) {
 
-			// console.log('vector_tile: ', im.names(), im.toJSON());
-			// var json = im.toJSON();
-			// console.log('json.features');
-			// console.log(json[0].features);
+		// 	console.log('map.render err, im', err, im);
+		// 	fs.outputFile('./raster_1.png', im.encodeSync('png'));
+		// 	// fs.writeFileSync("./cetin3.pbf", im.getData());
+
+		// 	// console.log('vector_tile: ', im.names(), im.toJSON());
+		// 	// var json = im.toJSON();
+		// 	// console.log('json.features');
+		// 	// console.log(json[0].features);
 		
 
-			// console.timeEnd('CREATE RASTER');
+		// 	// console.timeEnd('CREATE RASTER');
 
-			// callback(err, im);
+		// 	// callback(err, im);
 
-			// res.end('ok');
-			done();
+		// 	// res.end('ok');
+		// 	done();
 
-		});
+		// });
 
 
 		// return done();
