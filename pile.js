@@ -12,7 +12,7 @@ var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
-var mapnikOmnivore = require('mapnik-omnivore');
+// var mapnikOmnivore = require('mapnik-omnivore');
 var mercator = require('./sphericalmercator');
 var request = require('request');
 
@@ -317,7 +317,7 @@ module.exports = pile = {
 		// insert layer settings 
 		var postgis_settings = default_postgis_settings;
 		postgis_settings.dbname = storedLayer.options.database_name;
-		postgis_settings.table = storedLayer.options.table_name;
+		postgis_settings.table = storedLayer.options.sql;
 		postgis_settings.geometry_field = storedLayer.options.geom_column;
 		postgis_settings.srid = storedLayer.options.srid;
 		
