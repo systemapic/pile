@@ -4,6 +4,7 @@ var fs = require('fs-extra');
 var kue = require('kue');
 var path = require('path');
 var zlib = require('zlib');
+var uuid = require('uuid');
 var async = require('async');
 var redis = require('redis');
 var carto = require('carto');
@@ -12,7 +13,8 @@ var colors = require('colors');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
 var mapnikOmnivore = require('mapnik-omnivore');
-
+var mercator = require('./sphericalmercator');
+var request = require('request');
 
 // modules
 var server = require('./server');
@@ -21,7 +23,7 @@ var config = require('./config/pile-config');
 // register mapnik plugions
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
-mapnik.register_datasource(path.join(mapnik.settings.paths.input_plugins,'ogr.input'));
+// mapnik.register_datasource(path.join(mapnik.settings.paths.input_plugins,'ogr.input'));
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
@@ -47,1154 +49,570 @@ if (process.argv[2] == 'production') {
 module.exports = pile = { 
 
 
+
+	createLayer : function (req, res) {
+		var options 	= req.body,
+		    file_id 	= options.file_id,
+		    sql 	= options.sql,
+		    cartocss 	= options.cartocss,
+		    cartocss_version = options.cartocss_version,
+		    geom_column = options.geom_column,
+		    geom_type 	= options.geom_type,
+		    raster_band = options.raster_band,
+		    srid 	= options.srid,
+		    affected_tables = options.affected_tables,
+		    interactivity = options.interactivity,
+		    attributes 	= options.attributes,
+		    access_token = req.body.access_token;
+
+		// verify query
+		if (!file_id) 	return pile.error.missingInformation(res, 'Please provide a file_id.')
+		if (!sql) 	return pile.error.missingInformation(res, 'Please provide a SQL statement.')
+		if (!cartocss) 	return pile.error.missingInformation(res, 'Please provide CartoCSS.')
+
+		var ops = [];
+
+		ops.push(function (callback) {
+
+			console.log('file_id:::::', file_id);
+
+			// get upload status object from wu
+			// check if upload is done, processing is done
+			pile.request.get('/api/import/status', {
+				file_id : file_id, 
+				access_token : access_token
+			}, callback);
+
+
+		});
+
+		ops.push(function (upload_status, callback) {
+			if (!upload_status) return callback('No such upload_status.');
+
+			var upload_status = JSON.parse(upload_status);
+
+			// check that done importing to postgis
+			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
+
+			// check that done importing to postgis
+			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
+
+			// all good
+			callback(null, upload_status);
+		});
+
+		ops.push(function (options, callback) {
+
+			// inject table name into sql
+			var done_sql = sql.replace('table', options.table_name);
+
+			// create layer object
+			var layer = { 	
+
+				layerUuid : 'layer-' + uuid.v4(),	
+				options : {			
+					
+					// required
+					sql : done_sql,
+					cartocss : cartocss,
+					file_id : file_id, 	
+					database_name : options.database_name, 
+					table_name : options.table_name, 	
+
+					// optional				// defaults
+					cartocss_version : cartocss_version 	|| '2.0.1',
+					geom_column : geom_column 		|| 'geom',
+					geom_type : geom_type 			|| 'geometry',
+					raster_band : raster_band 		|| 0,
+					srid : srid 				|| 3857,
+					affected_tables : affected_tables 	|| [],
+					attributes : attributes 		|| {}
+				}
+			}
+
+			// save layer to layerStore
+			layerStore.set(layer.layerUuid, JSON.stringify(layer), function (err) {
+				if (err) return callback(err);
+
+				callback(null, layer);
+			});
+
+		});
+
+
+		async.waterfall(ops, function (err, layer) {
+
+			// return layer to client
+			res.json(layer);
+		});
+
+
+	},
+
+	getLayer : function (req, res) {
+
+		// get layerUuid
+		var layerUuid = req.body.layerUuid || req.query.layerUuid;
+		if (!layerUuid) return pile.error.missingInformation(res, 'Please provide layerUuid.');
+
+		// retrieve layer and return it to client
+		layerStore.get(layerUuid, function (err, layer) {
+			res.end(layer);
+		});
+	},
+
+
+
+
+
+	getTile : function (req, res) {
+
+		// parse url into layerUuid, zxy, type
+		var ops = [],
+		    parsed = req._parsedUrl.pathname.split('/'), // https://dev.systemapic.com/api/tiles/layerUuid/z/x/y.png || .pbf
+		    params = {
+			layerUuid : parsed[2],
+			z : parsed[3],
+			x : parsed[4],
+			y : parsed[5].split('.')[0],
+			type : parsed[5].split('.')[1],
+		    }
+		
+
+		// check params
+		console.log('params', params);
+		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
+		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
+
+
+
+		// look for stored layerUuid
+		ops.push(function (callback) {
+			layerStore.get(params.layerUuid, callback);
+		});
+
+
+		ops.push(function (storedLayer, callback) {
+			if (!storedLayer) return callback('No such layerUuid.');
+
+			var layer = JSON.parse(storedLayer);
+
+			console.log('layer: ', layer);
+
+			// send to raster/vector tile creation
+			if (params.type == 'png') return pile.getRasterTile(layer, params, callback); 		// todo: jpeg
+			if (params.type == 'pbf') return pile.getVectorTile(layer, params, callback); 	// todo: svg, geojson, topojson vector tiles
+
+			callback('Not valid type.');
+		});
+
+
+		async.waterfall(ops, function (err, tile) {
+			console.log('async done, err, result', err, tile);
+
+			// return error
+			if (err) return res.json({
+				err : err,
+				tile : tile
+			});
+
+			res.json({png : 'coming'});
+		});
+
+
+	},
+
+
+
+	getRasterTile : function (storedLayer, params, done) {
+
+		// flow: 
+		// 
+		// 1. check for existing png 
+		// 2. create xml from cartocss
+		// 3. create raster from xml + postgis
+		// 4. save to disk
+		// 5. serve
+
+		
+		// layer:  { 
+		// 	layerUuid: 'layer-1d34666c-d8a8-4fce-994e-e042a17bbe7d',
+		// 	options: { 
+		// 		sql: 'SELECT * FROM file_suhrcucstpmtxqgtpyyc',
+		// 		cartocss: '#layer {}',
+		// 		file_id: 'file_suhrcucstpmtxqgtpyyc',
+		// 		database_name: 'zzjihbcpqm',
+		// 		table_name: 'file_suhrcucstpmtxqgtpyyc',
+		// 		cartocss_version: '2.0.1',
+		// 		geom_column: 'geom',
+		// 		geom_type: 'geometry',
+		// 		raster_band: 0,
+		// 		srid: 3857,
+		// 		affected_tables: [],
+		// 		attributes: {} 
+		// 	} 
+		// }
+		// params:  { 
+		// 	layerUuid: 'layer-1d34666c-d8a8-4fce-994e-e042a17bbe7d',
+		// 	z: '0',
+		// 	x: '0',
+		// 	y: '0',
+		// 	type: 'png' 
+		// }
+
+		// return done();
+
+		// // 14/10124/6322
+		// var params = {
+		// 	// z : 13, // cadastral
+		// 	// x : 7533,
+		// 	// y : 4915,
+		// 	z : 14,
+		// 	x : 10124,
+		// 	y : 6322,
+		// 	style : 'points'
+		// 	// z : 0,
+		// 	// x : 0,
+		// 	// y : 0,
+		// }
+
+		// var postgis_settings = {
+		// 	'dbname' 	: 'zzjihbcpqm',
+		// 	// 'table' 	: '(select * from shape_nsziadryou where area > 100000) as mysubquery', // works!!
+		// 	// 'table' 	: '(select * from shape_nsziadryou where area > 300000) as mysubquery',
+		// 	// 'table' 	: 'shape_ozpnkswisx',
+		// 	// 'table' 	: '(select * from shape_ozpnkswisx where area_m2 > 1000) as sub', // works!
+		// 	// 'table' 	: '(select * from shape_ozpnkswisx where area_m2 > 1000) as sub', // works!
+		// 	// 'table' 	: 'shape_ubpdiiswel',
+		// 	// 'table' 	: '(select * from shape_ubpdiiswel where vel < -50) as sub',
+		// 	'table' 	: '(select * from shape_ubpdiiswel where ST_Intersects(geom, !bbox!)) as sub',
+		// 	'user' 		: 'docker',
+		// 	'password' 	: 'docker',
+		// 	'host' 		: 'postgis',
+		// 	'type' 		: 'postgis',
+		// 	'geometry_field': 'geom',
+		// 	'srid' 		: '3857',
+		// 	// 'extent' 	: '16813700.23783365, -4011415.24440605, 16818592.2076439, -4006523.2745957985'  //change this if not merc
+		// 	// 'extent' 	: '-20005048.4188,-9039211.13765,19907487.2779,17096598.5401'
+		// }
+
+		// debug
+		console.log('============ pile.getRasterTile ============');
+		console.log('============ pile.getRasterTile ============');
+		console.log('============ pile.getRasterTile ============');
+		console.log('layer: ', layer);
+		console.log('params: ', params);
+
+		// default settings // todo: put in config
+		var default_postgis_settings = {
+			user : 'docker',
+			password : 'docker',
+			host : 'postgis',
+			type : 'postgis'
+		}
+
+		// insert layer settings 
+		var postgis_settings = default_postgis_settings;
+		postgis_settings.dbname = storedLayer.options.database_name;
+		postgis_settings.table = storedLayer.options.table_name;
+		postgis_settings.geometry_field = storedLayer.options.geom_column;
+		postgis_settings.srid = storedLayer.options.srid;
+		
+		// everything in spherical mercator (3857)!
+		var map = new mapnik.Map(256, 256, mercator.proj4);
+		var layer = new mapnik.Layer('layer', mercator.proj4);
+		var postgis = new mapnik.Datasource(postgis_settings);
+		var bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+
+		// set datasource
+		layer.datasource = postgis;
+
+
+
+		// |
+		// |
+		// v
+		// everything down to here is same for vector/raster
+		// ----------------------------------------------------------------------
+
+		layer.styles = ['layer']; // style names in xml
+		map.add_layer(layer);
+		map.bufferSize = 64;
+
+		var ops = [];
+
+		ops.push(function (callback) {
+			pile.cartoRenderer(storedLayer.options.cartocss, layer, function (err, xml) {
+				console.log('cartoRendeerer err xml', err, xml);
+
+				callback(err, xml);
+			});
+		});
+
+		
+		ops.push(function (xml, callback) {
+
+			
+			map.fromString(xml, {strict : true}, callback);
+		});
+
+		ops.push(function (map, callback) {
+
+			// map.add_layer(layer);
+
+			console.log('---------map.toXML()----------')
+			console.log(map.toXML()); // Debug settings
+			console.log('----ebd-----map.toXML()-------end ---')
+
+			map.extent = bbox; // must have extent!
+			var im = new mapnik.Image(map.width, map.height);
+
+			// var im = new mapnik.VectorTile(0,0,0);
+
+			map.render(im, callback);
+
+		});
+
+
+		async.waterfall(ops, function (err, im) {
+
+			console.log('map.render err, im', err, im);
+			fs.outputFile('./raster_1.png', im.encodeSync('png'));
+			// fs.writeFileSync("./cetin3.pbf", im.getData());
+
+			// console.log('vector_tile: ', im.names(), im.toJSON());
+			// var json = im.toJSON();
+			// console.log('json.features');
+			// console.log(json[0].features);
+		
+
+			// console.timeEnd('CREATE RASTER');
+
+			// callback(err, im);
+
+			// res.end('ok');
+			done();
+
+		});
+
+
+		// return done();
+
+		// layer.styles = [params.style]; // todo!
+
+		// todo here: 	cartocss -> xml
+		// 		insert names for layer.styles (polygon, point, whatever.. must match stylesheet layer name?)
+		// 		save rasters to folder structure
+		//		save in redis which rasters have been made? (faster lookup than on disk?)
+
+		// map.load(path.join(__dirname, params.style + '.xml'), { strict: true }, function(err,map) {
+		// 	if (err) throw err;
+		// 	map.add_layer(layer);
+
+		// 	console.log(map.toXML()); // Debug settings
+
+		// 	map.extent = bbox; // must have extent!
+		// 	var im = new mapnik.Image(map.width, map.height);
+
+		// 	// var im = new mapnik.VectorTile(0,0,0);
+
+		// 	map.render(im, function(err, im) {
+		// 		console.log('map.render err, im', err, im);
+		// 		fs.outputFile('./cetin3.png', im.encodeSync('png'))
+		// 		// fs.writeFileSync("./cetin3.pbf", im.getData());
+
+		// 		// console.log('vector_tile: ', im.names(), im.toJSON());
+		// 		// var json = im.toJSON();
+		// 		// console.log('json.features');
+		// 		// console.log(json[0].features);
+			
+
+		// 		console.timeEnd('CREATE RASTER');
+
+		// 	});
+		// });
+	},
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	// convert CartoCSS to Mapnik XML
+	cartoRenderer : function (css, layer, callback) {
+
+		console.log('>>>>>>>>>>>>>>>>>> layer', layer);
+
+		var options = {
+			// srid 3857
+			"srs": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
+
+			"Stylesheet": [{
+				"id" : 'tile_style',
+				"data" : css
+			}],
+			// "Layer": [{
+			// 	// "id" : "tile_id",	// not reflected anywhere in xml
+			// 	"name" : "tile" 	// name of <Layer>
+			// }]
+			"Layer" : [layer]
+		}
+
+		try  {
+
+			// carto renderer
+			var xml = new carto.Renderer().render(options);
+
+			// get xml from 
+			// var xml = cr.render(options);
+
+			callback(null, xml);
+
+		} catch (e) {
+			console.log('ERR 17'.red, e);
+			
+			var err = {
+				message : e
+			}
+			callback(err);
+		}
+
+
+	},
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	test : function (req, res) {
-
 		console.log('TEST!!!');
-
 		res.end(JSON.stringify({
 			get : 'low'
 		}));
-
 	},
 
 
 	getFile : function (req, res) {
-
 		console.log('req.query', req.query);
 		
-		var fileUuid = req.query.fileUuid,
+		// get access token
+		var access_token = pile._getAccessToken(req),
+		    file_id = req.query.file_id,
 		    ops = [];
 
+		// no access
+		if (!access_token) return pile.error.noAccess(res);
+
 		// check for missing info
-		if (!fileUuid) return api.error.missingInformation(req, res);
+		if (!file_id) return pile.error.missingInformation(res, 'file_id');
 
 		// todo: check permission to access file
 		
-		// get file
-		File
-		.findOne({uuid : fileUuid})
-		.exec(function (err, file) {
-			if (err) return api.error.general(req, res, err);
-
-			res.end(JSON.stringify(file));
+		// get from wu
+		pile.request.get('/api/bridge/getFile', {
+			file_id : file_id,
+			access_token : access_token
+		}, function (err, results) {
+			console.log('pile.request.get: ', err, results);
 		});
 
+	
+	},
+
+	request : {
+
+		get : function (endpoint, options, callback) {
+
+			var baseUrl = 'http://wu:3001',
+			    params = '';
+
+			if (_.size(options)) {
+				
+				params += '?';
+				
+				var n = _.size(options);
+
+				for (o in options) {
+					params += o + '=' + options[o];
+					n--;
+					if (n) params += '&'
+				}
+			}
+
+			console.log('params:=====>>>', params);
+
+
+			request({
+				method : 'GET',
+				uri : baseUrl + endpoint + params
+				// json : options
+			}, function (err, response, body) {
+				callback(err, body);
+			}); 
+
+
+		},
 	},
 	
 
-	// // entry point for /raster/*
-	// requestRasterTile : function (req, res) {
-
-	// 	// parse params
-	// 	var params 	= req.url.split('/');
-	// 	var fileUuid 	= params[2];
-	// 	var cartoid 	= params[3];
-	// 	var z 		= parseInt(params[4]); 
-	// 	var x 		= parseInt(params[5]);
-	// 	var last 	= params[6].split('.');
-	// 	var y 		= parseInt(last[0]);
-	// 	var ext 	= last[1];
-
-	// 	// console.log('rasterTile', fileUuid, cartoid, z, x, y);
-
-	// 	// async ops
-	// 	var ops = [];
-
-	// 	// OP: check for raster, serve  
-	// 	ops.push(function (callback) {
-
-	// 		vile.findRasterTile(fileUuid, cartoid, z, x, y, function (raster_tile) {
-			
-	// 			// if no raster, next op
-	// 			if (!raster_tile) return callback(null);
-
-	// 			// serve raster
-	// 			res.set({'Content-Type': 'image/png' });
-	// 			res.send(raster_tile);
-	// 			res.end();
-
-	// 			return callback({error : false});
-			
-	// 		});
-	// 	});
-
-
-	// 	// OP: check for vector
-	// 	ops.push(function (callback) {
-
-	// 		vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-
-	// 			// if no vector, next op
-	// 			if (!vector_tile) return callback(null);
-				
-
-	// 			// KUE: create raster tile
-	// 			var job = jobs.create('raster_render', {
-	// 				fileUuid : fileUuid, 
-	// 				z : z, 
-	// 				x : x, 
-	// 				y : y,
-	// 				// vector_tile : vector_tile,
-	// 				cartoid : cartoid
-	// 			}).priority('high').attempts(5).save();
-
-
-	// 			// KUE DONE: raster created
-	// 			job.on('complete', function (result) {
-
-	// 				vile.findRasterTile(fileUuid, cartoid, z, x, y, function (raster_tile) {
-
-	// 					// if no raster, weird!
-	// 					if (!raster_tile) return callback(null);
-
-	// 					// serve raster
-	// 					res.set({'Content-Type': 'image/png' })
-	// 					res.send(raster_tile);	
-	// 					res.end();
-
-	// 					return callback({error : false});
-	// 				});
-	// 			});
-	// 		});
-	// 	});
-		
-
-	// 	// OP: create vector tile
-	// 	ops.push(function (callback) {
-
-
-	// 		// no vector tile, so look for geojson above
-	// 		// if no geojson above, grinder is not finished, serve waitingTile
-	// 		// if geojson above, make vector tile from it
-
-	// 		vile.findGeoJson(fileUuid, z, x, y, function (geojsonData, geojsonPath) {
-
-				
-	// 			// if no data and layer is a raster (eg. geotiff)
-	// 			if (!geojsonData && cartoid == 'raster') { // todo: refactor! 
-
-	// 				res.end();
-	// 				return callback({error : false});
-
-	// 			} else if (!geojsonData) {
-
-	// 				vile.findProcessingTile(function (err, raster_tile) {
-
-	// 					console.log('foundProcessinTile!', raster_tile);
-
-
-	// 					// serve raster
-	// 					res.set({'Content-Type': 'image/png' })
-	// 					res.send(raster_tile);	
-	// 					res.end();
-
-	// 					return callback({error : false});
-	// 				});
-
-	// 			} else {
-
-	// 				// create vector render job
-	// 				var job = jobs.create('vector_render', {
-	// 					geojsonPath : geojsonPath, 
-	// 					fileUuid : fileUuid,
-	// 					z : z, 
-	// 					x : x, 
-	// 					y : y
-	// 				}).priority('high').attempts(5).save();
-
-	// 				// KUE DONE: vector created
-	// 				job.on('complete', function (result) {
-
-	// 					// find vector tile
-	// 					vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-
-	// 						// create raster
-	// 						vile.createRasterTile(vector_tile, fileUuid, cartoid, z, x, y, function (err, raster_tile) {
-	// 							if (err) console.log('ERR 21'.red, err);
-
-	// 							// catch err
-	// 							if (err) return callback({error:true});
-
-	// 							// serve raster
-	// 							res.set({ 'Content-Type' : 'image/png' })
-	// 							res.send(raster_tile);
-	// 							res.end();
-	// 							return callback({error:false});
-	// 						});
-	// 					});
-	// 				});
-	// 			};
-	// 		});
-	// 	});
-
-	// 	// ASYNC SERIES: run ops
-	// 	async.series(ops, function (err) {
-
-	// 		// catch errors,
-	// 		if (err.error) {
-	// 			res.set({ 'Content-Type' : 'text/plain' });				// todo: create error tile
-	// 			res.send('Error: No shape data to create vector tiles from!');
-	// 			res.end();
-	// 		} 
-	// 	});
-	// },
-
-
-
-	//  // No vector tile found, look for nearest geojson file
- //        findGeoJson : function (fileUuid, z,x,y, callback) {
-
- //                // Get tile coordinates one up
- //                var tileAbove = vile.getTileAbove(z,x,y);
-
- //                if (!tileAbove) return callback(false);
-
- //                var z = tileAbove.z,
- //                    x = tileAbove.x,
- //                    y = tileAbove.y;
-
- //                vile.locateGeoJson(fileUuid, z, x, y, callback);
- //        },
-
-
-
- //        // Find nearest geojson file up
- //        locateGeoJson : function (fileUuid, z,x,y, callback) {
-
- //        	// geojson path
- //                var geojsonPath = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.geojson';
-
- //                // read geojson (if exists)
- //                fs.readFile(geojsonPath, function (err, data) { // just check if exist instead of readfile
-
- //                	// got data
- //                	if (data && !err) return callback(data, geojsonPath);
-
-	// 		// keep looking
-	// 		vile.findGeoJson(fileUuid, z,x,y, callback);
- //                });
- //        },
-
-
- //        // Tile number one up
- //        getTileAbove : function  (fromZ, fromX, fromY) {
-
- //                // hit ceiling, no tile above
- //                if (fromZ <= 0) return false;
-
- //                // calc tile above
- //                var tileAbove = {
- //                        z : fromZ-1,
- //                        x : Math.floor(fromX/2),
- //                        y : Math.floor(fromY/2)
- //                }
-
- //                return (tileAbove);
- //        },
-
-
-	// createVectorRenderJob : function (fileUuid, z, x, y) {
-
-	// 	// KUE: create vector tile
-	// 	var job = jobs.create('vector_render', {
-	// 		fileUuid : fileUuid, 
-	// 		z : z, 
-	// 		x : x, 
-	// 		y : y
-	// 	}).priority('high').attempts(5).save();
-
-	// 	return job;
-	// },
-
-
-
-
-	// requestUTFGrid : function (req, res) {
-	// 	// return res.end(vile.emptyUTFGrid);
-
-	// 	// set params
-	// 	var params 	= req.url.split('/');
-	// 	var fileUuid 	= params[2];
-	// 	var z 		= parseInt(params[3]); 
-	// 	var x 		= parseInt(params[4]);
-	// 	var last 	= params[5].split('.');
-	// 	var y 		= parseInt(last[0]);
-	// 	var ext 	= last[1] + '.' + last[2];
-
-	// 	var ops = [];
-
-
-	// 	// console.log('requestUTFGrid'.red, z, x, y);
-
-	// 	// ops.push(function (callback) {
-
-	// 	// 	// find existing UTFGrid
-	// 	// 	vile.findUTFGrid(fileUuid, z, x, y, function (utf) {
-
-	// 	// 		// debug (nothing found, create)
-	// 	// 		return callback(null);
-
-	// 	// 		// do next op
-	// 	// 		if (!utf) return callback(null);
-				
-	// 	// 		// return utf
-	// 	// 		res.end(JSON.stringify(utf));
-	// 	// 		return callback({error:false});
-	// 	// 	});
-	// 	// });
-
-
-	// 	ops.push(function (callback) {
-
-	// 		// get vector tile
-	// 		vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-
-	// 			// return if no vector tile
-	// 			if (!vector_tile) return callback({error:true}); // was null
-
-	// 			// create utf from vector tile
-	// 			vile.createUTFGrid(vector_tile, fileUuid, z, x, y, function (utf) {
-
-	// 				// if (!utf) return callback({error:true});
-	// 				if (!utf) return callback({error:true});
-
-	// 				// return utf;
-	// 				res.end(utf);
-	// 				return callback({error:false});
-	// 			});
-	// 		});
-	// 	});
-
-	// 	// OP: create vector tile
-	// 	ops.push(function (callback) {
-
-	// 		var job = vile.createVectorRenderJob(fileUuid, z, x, y);
-
-	// 		// KUE DONE: vector created
-	// 		job.on('complete', function (result) {
-
-	// 			// find vector tile
-	// 			vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-	// 				if (!vector_tile) console.error('no vector tile created!?');
-	// 				if (!vector_tile) return callback({error:true});
-						
-	// 				// create utf from vector tile
-	// 				vile.createUTFGrid(vector_tile, fileUuid, z, x, y, function (utf) {
-
-	// 					if (!utf) console.log('no utf');
-	// 					if (!utf) return callback({error:true});
-
-	// 					// return utf;
-	// 					res.end(utf);
-	// 					return callback({error:false});
-
-	// 				});
-	// 			});
-	// 		});
-	// 	});
-
-	// 	async.series(ops, function (err) {
-	// 		// catch errors
-	// 		if (err.error) console.log('errrrr'.red, err);
-	// 		if (err.error) res.end(vile.emptyUTFGrid);
-	// 	});
-
-	// },
-
-
-	// findUTFGrid : function (fileUuid, z, x, y, callback) {
-	// 	var path = UTFGRIDPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.grid.json';
-	// 	fs.readJson(path, function (err, data) {
-	// 		if (err) return callback(null);
-	// 		callback(data);
-	// 	});
-	// },
-
-	// findProcessingTile : function (callback) {
-
-	// 	// debug: no processing file
-	// 	return callback(null, null);
-
-	// 	fs.readFile(config.processingTile, function (err, data) {
-	// 		callback(null, data);
-	// 	});
-	// },
-
-
-	// findRasterTile : function (fileUuid, cartoid, z, x, y, callback) {
-	// 	var path = RASTERPATH + fileUuid + '/' + cartoid + '/' + z + '/' + x + '/' + y + '.png';
-
-	// 	// console.log('checking path: ', path);
-		
-	// 	fs.readFile(path, function (err, data) {
-	// 		if (err) return callback(null);
-	// 		callback(data);
-	// 	});
-	// },
-
-	// findVectorTile : function (fileUuid, z, x, y, callback) {
-	// 	var path = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.pbf';
-
-	// 	fs.readFile(path, function (err, data) {
-	// 		if (err) return callback(null)
-
-	// 		// parse vtile
-	// 		var vtile = new mapnik.VectorTile(z, x, y);
-	// 		if (data.length) vtile.setData(data);
-	// 		vtile.parse();	
-
-	// 		return callback(vtile);
-	// 	});
-	// },
-
-	// _getFields : function (vtile) {
-	// 	var info = vtile.names();
-	// 	var fields = [];
-	// 	if (info.length) {
-	// 		var gj = vtile.toGeoJSON(0);
-	// 		if (!gj) return vile._doneFields(fields, gj);
-	// 		var geo = JSON.parse(gj);
-	// 		if (!geo.features) return vile._doneFields(fields, geo);
-	// 		geo.features.forEach(function (p) {
-	// 			for (p in p.properties) {
-	// 				if (fields.indexOf(p) == -1) {
-	// 					fields.push(p);		// properties in geojson
-	// 				} 
-	// 			}			
-	// 		});
-	// 	}
-	// 	return fields;
-	// },
-
-	// _doneFields : function (fields, geo) {
-	// 	return fields;
-	// },
-
-	// createUTFGrid : function (vtile, fileUuid, z, x, y, callback) {
-	// 	var map = new mapnik.Map(256, 256);
-	// 	var stylepath = config.defaultStylesheets.utfgrid; // todo?
-	// 	map.loadSync(stylepath);
-	// 	map.extent = [-20037508.34, -20037508.34, 20037508.34, 20037508.34];
-
-
-	// 	// console.log('creating grid tile'.yellow, z, x, y);
-
-	// 	// get fields of geojson
-	// 	var fields = vile._getFields(vtile);
-
-	// 	var grid = new mapnik.Grid(256, 256);
-
-	// 	var options = {
-	// 		layer : 0,
-	// 		fields : fields,
-	// 		buffer_size : 64
-	// 	}
-
-	// 	vtile.render(map, grid, options, function(err, vtile_utfgrid) {
-	// 		if (err) { 
-	// 			if (err) console.log('ERR 27'.red, err);
-	// 			return callback(err);
-	// 		}
-
-	// 		vtile_utfgrid.encode({features : true}, function (err, utf) {
-	// 			if (err) console.log('ERR 28'.red, err);
-
-	// 			if (!utf) {
-	// 				console.log('ERR 30'.yellow, err);
-	// 			}
-
-	// 			// set paths and stringify
-	// 			var folder = UTFGRIDPATH + fileUuid + '/' + z + '/' + x + '/';
-	// 			var utfgrid_path = folder + y + '.grid.json';
-	// 			var utf = JSON.stringify(utf,null,1);
-				
-	// 			if (utf.length == 4529) {
-	// 				// console.log('empty utf!'.red, z, x, y);
-	// 				// console.log(vtile.names());
-	// 			}
-
-	// 			// write to disk
-	// 			fs.outputFile(utfgrid_path, utf, function(err) {
-	// 				if (err) console.log('ERR 29'.red, err);
-	// 				// callback with utf
-	// 				// console.log('grid tile success'.yellow, z, x, y);
-	// 				callback(utf); 
-	// 			});
-	// 		});
-	// 	});
-			
-	// },
-
-
-
-	// createRasterTile : function (vtile, fileUuid, cartoid, z, x, y, callback) {
-
-	// 	var defaultstyle = false;
-
-	// 	var map = new mapnik.Map(vtile.width(), vtile.height());	// 256, 256
-		
-
-	// 	if (cartoid == 'cartoid') {
-	// 		var stylepath = config.defaultStylesheets.raster;
-	// 		map.loadSync(stylepath);
-	// 	} else {
-	// 		try {
-	// 			// will throw error if stylesheet not found (or invalid, or empty);
-	// 			var stylepath = STYLEPATH + cartoid + '.xml';
-	// 			map.loadSync(stylepath);
-	// 		} catch (e) { 
-	// 			var stylepath = config.defaultStylesheets.raster;
-	// 			map.loadSync(stylepath);
-	// 		}
-	// 	}
-
-	// 	var base = 18;
-	// 	var baseX = 4;
-	// 	var ratio = 0.5;
-
-	// 	// console.log('sTYELPAYT', stylepath);
-		
-	// 	// get variables if exists
-	// 	var inVariablesPath = VECTORPATH + fileUuid + '/' + 'variables.json';
-	// 	console.log('VARIABLES PATH:', inVariablesPath);
-	// 	fs.readJson(inVariablesPath, function (err, metadata) {
-	// 		if (err) console.log('read vars err', err);
-	// 		// console.log('metadata: ', metadata);
-	// 		// console.log('typeof', typeof(metadata));
-		
-	// 		var options = {
-	// 			buffer_size : 10,
-	// 		};
-
-	// 		if (metadata) {
-	// 			metadata.loko = 135;
-
-	// 			// for (var key in metadata) {
-	// 			// 	console.log('key type=>', key,  typeof(metadata[key]));
-	// 			// }
-
-	// 			options.variables = metadata;
-
-	// 		}
-
-	// 		// console.log('@options: ', options);
-
-	// 		// console.time('Rendered Raster Tile');
-	// 		vtile.render(map, new mapnik.Image(256,256), options, function(err, raster_tile) {
-	// 		// vtile.render(map, new mapnik.Image(1024,1024), options, function(err, raster_tile) {
-	// 			if (err) console.log('ERR 8'.red, err);
-
-	// 			var folder = RASTERPATH + fileUuid + '/' + cartoid + '/' + z + '/' + x + '/';
-
-	// 			fs.ensureDir(folder, function (err) {
-	// 				if (err) console.log('ERR 6'.red, err);
-
-	// 				var raster_path = folder + y + '.png';
-	// 				raster_tile.save(raster_path, 'png32');  
-
-	// 				fs.readFile(raster_path, function(err, raster_image) {
-	// 					if (err) console.log('ERR 7'.red, err);
-						
-	// 					callback(err, raster_image); 
-	// 				});
-	// 			});
-	// 		});
-
-	// 	});
-
-	// },
-
-
-	// // create vector tile from geojson
-	// createVectorTile : function (fileUuid, z, x, y, done) {
-
-	// 	console.log('createVectorTile!');
-
-	// 	var geopath = GEOJSONPATH + fileUuid + '.geojson';
-
-	// 	var ops = [],
-	// 	outside,
-	// 	extent;
-
-	// 	// console.log('.'.yellow);
-
-	// 	ops.push(function (callback) {
-
-	// 		// get meta
-	// 		console.log('getmeta');
-	// 		vile.getMeta(fileUuid, function (err, metadata) {
-	// 			if (err) console.log('ERR 1'.red, err);
-
-	// 			// console.log('got meta', metadata);
-
-	// 			// if tile is outside extent of geojson, create empty vector tile
-	// 			if (metadata) {
-	// 				extent = metadata.extent;
-	// 				var coords = vile.getTilecoords(z, x, y);
-	// 				outside = vile.getOutside(coords, extent, z);
-
-	// 			} else {
-	// 				outside = false;
-	// 			}
-
-	// 			callback(null);
-	// 		});
-	// 	});
-
-
-
-	// 	if (outside) {
-
-	// 		// create empty vector tile
-	// 		ops.push(function (callback) {
-
-	// 			console.log('empty!'.red);
-
-	// 			vile._createEmptyVectorTile({
-	// 				fileUuid : fileUuid, 
-	// 				z : z,
-	// 				x : x,
-	// 				y : y
-	// 			}, callback);
-
-	// 			// // create objects
-	// 			// var map = new mapnik.Map(256, 256);
-	// 			// var vtile = new mapnik.VectorTile(z, x, y);
-
-	// 			// // render to pbf
-	// 			// map.render(vtile, {}, function (err, vtile) {
-	// 			// 	if (err) console.log('ERR 3'.red, err);
-
-	// 			// 	var vector_path = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.pbf';
-
-	// 			// 	// write pbf to disk
-	// 			// 	fs.outputFile(vector_path, vtile.getData(), function (err) {
-	// 			// 		if (err) console.log('ERR 2'.red, err);
-	// 			// 		callback('done created empty'); // pass err, cancel async
-	// 			// 	});
-	// 			// });
-	// 		});
-
-
-	// 	} else {
-
-	// 		console.log('inside');
-
-	// 		// create vector tile from geojson
-	// 		ops.push(function (callback) {
-
-	// 			fs.readFile(geopath, function (err, data) {
-	// 				if (err) console.log('ERR 4'.red, err);
-	// 				if (err) console.log('ERR 4'.red, err);
-
-	// 				// console.log('raed source:', geopath);
-
-	// 				if (err) return callback(err);
-
-	// 				if (!data) return callback('No data!');
-					
-	// 				var d = data.toString();
-
-	// 				// create tile
-	// 				var vtile = new mapnik.VectorTile(z, x, y);
-
-
-	// 				// patch, err on double \\"\\" geojson
-	// 				try {
-	// 					vtile.addGeoJSON(d, 'layer');
-	// 				} catch (e) {
-
-	// 					// console.log('empty!2');
-	// 					// create empty tile, todo: try parsing geojson file, regex \\"" qoutes
-	// 					vile._createEmptyVectorTile({
-	// 						fileUuid : fileUuid, 
-	// 						z : z,
-	// 						x : x,
-	// 						y : y
-	// 					}, callback);
-
-
-	// 					return;
-	// 				}
-
-					
-
-	// 				var vector_path = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.pbf';
-
-	// 				// vtile.parse(function (err, parsed_vtile) {
-	// 				// 	console.log('#$$$$$$$$$$$$ parsed'.yellow);
-	// 				// 	console.log('err, parsed_tile', err, parsed_vtile);
-					
-
-	// 				// console.log('writing t222 you !');
-						
-	// 				// });
-
-
-	// 				// write pbf to disk
-	// 				fs.outputFile(vector_path, vtile.getData(), function (err) {
-	// 					if (err) console.log('ERR 5'.red, err);
-	// 					// console.log('wrote pfd to disk!'.magenta, fileUuid, z, x, y);
-	// 					callback('done 4created with data');
-	// 				});
-
-	// 			});
-	// 		});
-	// 	};
-
-	// 	async.series(ops, function (err) {
-	// 		done();
-	// 	});
-
-	// },
-
-
-	// _createVectorTile : function (options, callback) {
-	// 	var fileUuid = options.fileUuid,
-	// 	    geojsonPath = options.geojsonPath,
-	// 	    data = options.data,
-	// 	    z = options.z,
-	// 	    x = options.x, 
-	// 	    y = options.y;
-
-
-	// 	// path
-	// 	var vector_path = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.pbf';
-
-
-	// 	fs.readFile(geojsonPath, function (err, data) {
-	// 		// if (err) console.log('brickinthewall'.yellow, err);
-	// 		if (err) return callback(null)
-	// 		// if (!data) return callback(null);
-
-	// 		// // parse vtile
-	// 		// var vtile = new mapnik.VectorTile(z, x, y);
-	// 		// if (data.length) vtile.setData(data);
-	// 		// vtile.parse();	
-
-			
-	// 		var vtile = new mapnik.VectorTile(z, x, y);
-
-	// 		// add data
-	// 		vtile.addGeoJSON(data.toString(), 'layer');
-
-
-	// 		// write pbf to disk
-	// 		fs.outputFile(vector_path, vtile.getData(), function (err) {
-	// 			if (err) console.log('ERR 5'.red, err);
-				
-	// 			// console.log('wrote !!pfd to disk!'.magenta, fileUuid, z, x, y);
-				
-	// 			// done
-	// 			callback('done created with data1');
-	// 		});
-	// 	});
-
-
-	// 	// // create objects
-	// 	// var map = new mapnik.Map(256, 256);
-	// 	// var vtile = new mapnik.VectorTile(z, x, y);
-
-	// 	// // add data
-	// 	// vtile.addGeoJSON(data, 'layer');
-
-	// 	// // write pbf to disk
-	// 	// fs.outputFile(vector_path, vtile.getData(), function (err) {
-	// 	// 	if (err) console.log('ERR 5'.red, err);
-			
-	// 	// 	console.log('wrote pfd to disk!'.magenta, fileUuid, z, x, y);
-			
-	// 	// 	// done
-	// 	// 	callback('done created with data');
-	// 	// });
-
-	// },
-
-
-
-	// _storedGeoJSON : {
-
-	// },
-
-
-	// _createEmptyVectorTile : function (options, callback) {
-	// 	var fileUuid = options.fileUuid,
-	// 	    z = options.z,
-	// 	    x = options.x, 
-	// 	    y = options.y; 
-
-	// 	// console.log('_createEmptyVectorTile');
-
-	// 	// create objects
-	// 	var map = new mapnik.Map(256, 256);
-	// 	var vtile = new mapnik.VectorTile(z, x, y);
-
-	// 	// render to pbf
-	// 	map.render(vtile, {}, function (err, vtile) {
-	// 		if (err) console.log('ERR 3'.red, err);
-
-	// 		var vector_path = VECTORPATH + fileUuid + '/' + z + '/' + x + '/' + y + '.pbf';
-
-	// 		// write pbf to disk
-	// 		fs.outputFile(vector_path, vtile.getData(), function (err) {
-	// 			if (err) console.log('ERR 2'.red, err);
-	// 			callback('done created empty'); // pass err, cancel async
-	// 		});
-	// 	});
-	// },
-
-
-
-	// // just save to disk
-	// importGeojson : function (req, res) {
-
-	// 	// gunzip
-	// 	var buffer = new Buffer(req.body);
-	// 	zlib.gunzip(buffer, function(err, decoded) {
-	// 		if (err) console.log('ERR 10'.red, err);
-	// 		if (err) return res.end('Zlib error');
-
-	// 		// parse, get vars
-	// 		var pack 	= JSON.parse(decoded.toString());
-	// 		var geojson 	= JSON.stringify(pack.geojson);
-	// 		var layerName 	= pack.layerName;
-	// 		var uuid 	= pack.uuid;
-	// 		var ext 	= '.pbf';
-	// 		var path 	= VECTORPATH + uuid + ext;
-	// 		var folder 	= uuid + '/';
-	// 		var geojsonPath = GEOJSONPATH + uuid + '.geojson';
-
-	// 		// write to file
-	// 		fs.outputFile(geojsonPath, geojson, function (err) {
-	// 			if (err) console.log('ERR 11'.red, err);
-
-	// 			// save meta to file
-	// 			vile.setMeta(uuid, function (err, metadata) {
-	// 				if (err) console.log('ERR 12'.red, err);
-					
-	// 				// return				// todo: start vector tiling
-	// 				res.end(JSON.stringify(metadata));
-
-	// 			});
-	// 		});
-	// 	});
-	// },
-
-
-	// getMeta : function (uuid, callback) {
-
-	// 	var omnipath = METAPATH + uuid + '.meta.json';
-	// 	fs.readJson(omnipath, function (err, metadata) {
-
-	// 		console.log('METADATAAAA', metadata);
-
-	// 		// return metadata
-	// 		if (!err) return callback(null, metadata);
-
-	// 		// not exist, create and return metadata
-	// 		return vile.setMeta(uuid, callback);
-		
-	// 	});
-
-	// },
-
-
-	// setMeta : function (uuid, callback) {
-
-	// 	var geopath = GEOJSONPATH + uuid + '.geojson';
-	// 	var omnipath = METAPATH + uuid + '.meta.json';
-
-	// 	mapnikOmnivore.digest(geopath, function(err, metadata){	
-	// 		if (err) console.log('ERR 14'.red, err);
-
-	// 		console.log('ominvore!', metadata);
-
-	// 		fs.outputFile(omnipath, JSON.stringify(metadata), function (err) {		
-	// 			if (err) console.log('ERR 15'.red, err);
-
-	// 			// return meta
-	// 			if (callback) callback(err, metadata);
-	// 		});
-	// 	});
-	// },
-
-
-
-	// importCartoCSS : function (req, res) {
-
-	// 	var css 	= req.body.css;
-	// 	var cartoid 	= req.body.cartoid;
-	// 	var osm 	= req.body.osm;
-
-	// 	console.log('importCartoCSS', cartoid);
-
-		
-	// 	vile.mss2xml(css, cartoid, function (err) {
-	// 		if (err) {
-	// 			if (err) console.log('ERR 16'.yellow, err); 	// syntax errors trigger here.
-
-	// 			var result = JSON.stringify({
-	// 				ok : false,
-	// 				error : err.message.toString()
-	// 			});
-
-	// 			// return err
-	// 			return res.end(result);
-
-	// 		}
-
-	// 		// return ok
-	// 		res.end(JSON.stringify({
-	// 			ok : true,
-	// 			error : null
-	// 		}));
-	// 	});
-		
-	// },
-
-
-	// mss2xml : function (css, cartoid, callback) {
-
-	// 	var options = {
-	// 		"srs": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
-
-
-
-	// 		"Stylesheet": [{
-	// 			"id" : cartoid,
-	// 			"data" : css
-	// 		}],
-	// 		"Layer": [{
-	// 			"id" : "layer",	
-	// 			"name" : "layer"
-	// 		}]
-	// 	}
-
-	// 	try  {
-
-	// 		// carto renderer
-	// 		var cr = new carto.Renderer({
-	// 			filename: cartoid + '.mss',
-	// 			local_data_dir: CARTOCSSPATH,
-	// 		});
-
-	// 		// get xml from 
-	// 		var xml = cr.render(options);
-	// 		var stylepath = STYLEPATH + cartoid + '.xml';
-	// 		// var stylepath = config.defaultStylesheets.raster;
-
-	// 		fs.outputFile(stylepath, xml, function (err) {
-	// 			if (err) console.log('ERR 16'.red, err);
-
-	// 			callback(err);
-	// 		});
-
-	// 	} catch (e) {
-	// 		console.log('ERR 17'.red, e);
-			
-	// 		var err = {
-	// 			message : e
-	// 		}
-	// 		callback(err);
-	// 	}
-
-
-	// },
-
-
-	// getTilecoords : function (zoom, xtile, ytile) {
-	// 	var n = Math.pow(2, zoom);
-	// 	var lon_deg = xtile / n * 360.0 - 180.0
-	// 	var lat_rad = Math.atan(vile.sinh(Math.PI * (1 - 2 * ytile / n)))
-	// 	var lat_deg = lat_rad * 180.0 / Math.PI;
-	// 	return [lat_deg, lon_deg];
-
-	// 	// n = 2 ^ zoom
-	// 	// lon_deg = xtile / n * 360.0 - 180.0
-	// 	// lat_rad = arctan(sinh(π * (1 - 2 * ytile / n)))
-	// 	// lat_deg = lat_rad * 180.0 / π
-	// 	// http://wiki.openstreetmap.org/wiki/Tilenames
-	// },
-
-
-
-	// sinh : function (aValue) {
-	// 	var myTerm1 = Math.pow(Math.E, aValue);
-	// 	var myTerm2 = Math.pow(Math.E, -aValue);
-	// 	return (myTerm1-myTerm2)/2;
-	// },
-
-	// getCoords : function (z, x, y) {
-	// 	var lat = vile.tile2lat(y,z);
-	// 	var lng = vile.tile2long(x,z);
-	// 	return [lat, lng];
-	// },
-
-	// tile2lat : function (y,z) { 
-	// 	var n=Math.PI-2*Math.PI*y/Math.pow(2,z);
-	// 	return (180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))); 
-	// },
-
-	// tile2long : function (x,z) { 
-	// 	return (x/Math.pow(2,z)*360-180); 
-	// },
-
-	// getOutside : function (coords, extent, zoom) {
-
-	// 	var fx = 1/zoom;  // eg zoom 14, factor - 1/14.. zoom = 2, fx = 1/2 ...
-		
-	// 	// at zoom 7, we want 2.5 degrees extra
-	// 	// at zoom 6, we want 5 degrees extra 		80 / 6
-	// 	// at zoom 5, we want 10 degrees extra
-	// 	// at zoom 4, we want 20 			80 / 4
-	// 	// at zoom 3, we want 30 degrees extra 		
-	// 	// at zoom 2, we want 40 degrees extra 		80 / 2
-	// 	// at zoom 1, we want 80 degrees extra 		80 / 1
-		
-	// 	// todo: calc
-	// 	var trans = {
-
-	// 		1 : 80,  // 
-	// 		2 : 40,  // x = zoom, y = degrees
-	// 		3 : 30,  
-	// 		4 : 20,
-	// 		5 : 10,
-	// 		6 : 5,
-	// 		7 : 2.5,
-	// 		8 : 1.25,
-	// 		9 : 0.625,
-	// 		10 : 0.4,
-	// 		11 : 0.2,
-	// 		12 : 0.1,
-	// 		13 : 0.05,
-	// 		14 : 0.025,
-	// 		15 : 0.0125,
-	// 		16 : 0.0625,
-	// 		17 : 0.004,
-	// 		18 : 0.002,
-	// 		19 : 0.002,
-	// 		20 : 0.001,
-	// 		21 : 0.001,
-	// 		22 : 0.001
-	// 	}
-
-
-
-	// 	var extra = trans[zoom];
-
-
-	// 	// extra degress  
-	// 	var extra = fx * 100; // at zoom 2, gives 50 degrees
-
-	// 	var c = {
-	// 		lat : coords[0],
-	// 		lng : coords[1]  // padding
-	// 	}
-
-	// 	var e = {
-	// 		lat1 : extent[1] - extra, 	// south border
-	// 		lng1 : extent[0] - extra, 	// west border
-	// 		lat2 : extent[3] + extra, 	// north border
-	// 		lng2 : extent[2] + extra 	// east border
-	// 	}
-
-
-	// 	var a,b;
-
-	// 	if (c.lat > e.lat1 && c.lat < e.lat2) {
-	// 		// inside extent
-	// 		a = true;
-	// 		// console.log('a = true');
-	// 	}
-
-	// 	if (c.lng > e.lng1 && c.lng < e.lng2) {
-	// 		// inside extent
-	// 		b = true;
-	// 		// console.log('b = true');
-	// 	}
-
-	// 	if (a && b) return false;
-	// 	return true;
-
-	// },
-
-
-	// // empty grid to avoid 502 misinterpretation
-	// emptyUTFGrid : JSON.stringify({
-	// 	"grid": [
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                ",
-	// 		"                                                                "
-	// 	],
-		
-	// 	"keys": [
-	// 		""
-	// 	],
-		
-	// 	"data": {}
-		
-	// 	}, null, 1)
+	_getAccessToken : function (req) {
+		var access_token = req.query.access_token || req.body.access_token;
+		return access_token;
+	},
+
+	error : {
+
+		missingInformation : function (res, missing) {
+			var error = 'Missing information'
+			var error_description = missing + ' Check out the documentation on https://docs.systemapic.com.';
+			res.json({
+				error : error,
+				error_description : error_description
+			});
+		},
+
+		noAccess : function (res) {
+			res.json({
+				error : 'Unauthenicated.'
+			});
+		},
+	}
 
 }
 
@@ -1210,6 +628,15 @@ var jobs = kue.createQueue({
    	redis : config.kueRedis,
    	prefix : 'vq'
 });
+
+// #########################################
+// ###  Redis for Layer Storage          ###
+// #########################################
+// configure redis for token auth
+var redis = require('redis');
+var layerStore = redis.createClient(config.tokenRedis.port, config.tokenRedis.host)
+layerStore.auth(config.tokenRedis.auth);
+layerStore.on('error', function (err) { console.error(err); });
 
 
 
@@ -1252,7 +679,7 @@ if (cluster.isMaster) {
 	// #########################################
 	// render vector job
 	jobs.process('vector_render', 10, function (job, done) {
-		var fileUuid = job.data.fileUuid;
+		var file_id = job.data.file_id;
 		var z = job.data.z;
 		var x = job.data.x;
 		var y = job.data.y;
