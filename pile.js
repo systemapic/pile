@@ -63,7 +63,8 @@ module.exports = pile = {
 		    affected_tables = options.affected_tables,
 		    interactivity = options.interactivity,
 		    attributes 	= options.attributes,
-		    access_token = req.body.access_token;
+		    access_token = req.body.access_token,
+		    projectUuid = req.body.projectUuid;
 
 		// verify query
 		if (!file_id) 	return pile.error.missingInformation(res, 'Please provide a file_id.')
@@ -117,7 +118,8 @@ module.exports = pile = {
 					cartocss : cartocss,
 					file_id : file_id, 	
 					database_name : options.database_name, 
-					table_name : options.table_name, 	
+					table_name : options.table_name, 
+					metadata : options.metadata,
 
 					// optional				// defaults
 					cartocss_version : cartocss_version 	|| '2.0.1',
@@ -130,20 +132,101 @@ module.exports = pile = {
 				}
 			}
 
+			callback(null, layer);
+
+			
+
+		});
+
+		// // get meta data
+		// ops.push(function (layer, callback) {
+
+		// 	// get layer meta
+		// 	pile._getMetadata(layer, callback);
+
+		// });
+
+
+
+		// save layer to layerStore
+		ops.push(function (layer, callback) {
+
 			// save layer to layerStore
 			layerStore.set(layer.layerUuid, JSON.stringify(layer), function (err) {
 				if (err) return callback(err);
 
 				callback(null, layer);
 			});
+		});
+
+		// create layer model
+		ops.push(function (layer, callback) {
+
+			// get from wu
+			pile.request.get('/api/file/get', {
+				file_id : layer.options.file_id,
+				access_token : access_token
+			}, function (err, fileJSON) {
+				console.log('getFile:  ', err, fileJSON);
+					
+				var file = JSON.parse(fileJSON);
+
+				var options = {
+					uuid : layer.layerUuid,
+					title : file.name,
+					description : file.description,
+					file : file.uuid,
+					data : {
+						postgis : layer.options
+					},
+					metadata : layer.options.metadata,
+					projectUuid : projectUuid
+
+				}
+
+				// pile.request.get('/api/layer/new', {
+				// 	options : options, 
+				// 	access_token : access_token
+				// }, function (err, layerModel) {
+				// 	callback(err, {
+				// 		layerModel : layerModel,
+				// 		layer : layer
+				// 	})
+				// });
+
+				console.log('PSOT LAYER');
+				var url = 'http://wu:3001' + '/api/layers/new';
+				request.post({
+					url : url, 
+					form : {
+						options : options,
+						access_token : access_token
+					}
+				}, function(err, httpResponse, layerModel){
+					console.log('############## err, ', err, layerModel)
+
+					try {
+						var parsedLayerModel = JSON.parse(layerModel);
+					} catch (e) {
+						return callback(e.message);
+					}
+
+					callback(err, {
+						layerModel : parsedLayerModel,
+						layer : layer
+					});
+				})
+
+
+			});
 
 		});
 
 
-		async.waterfall(ops, function (err, layer) {
-
+		async.waterfall(ops, function (err, layerObject) {
+			console.log('all done: ', layerObject);
 			// return layer to client
-			res.json(layer);
+			res.json(layerObject);
 		});
 
 
@@ -161,6 +244,19 @@ module.exports = pile = {
 		});
 	},
 
+	// _getMetadata : function (layer, done) {
+
+	// 	var ops = [];
+
+	// 	// get extent
+	// 	ops.push(function (callback) {
+
+
+
+	// 	});
+
+
+	// },
 
 
 
@@ -210,15 +306,17 @@ module.exports = pile = {
 				user : 'docker',
 				password : 'docker',
 				host : 'postgis',
-				type : 'postgis'
+				type : 'postgis',
+				geometry_field : 'the_geom_3857',
+				srid : '3857'
 			}
 
 			// insert layer settings 
 			var postgis_settings 	= default_postgis_settings;
 			postgis_settings.dbname = storedLayer.options.database_name;
 			postgis_settings.table 	= storedLayer.options.sql;
-			postgis_settings.geometry_field = storedLayer.options.geom_column;
-			postgis_settings.srid 	= storedLayer.options.srid;
+			// postgis_settings.geometry_field = storedLayer.options.geom_column;
+			// postgis_settings.srid 	= storedLayer.options.srid;
 			
 			// everything in spherical mercator (3857)!
 			try {
@@ -274,7 +372,7 @@ module.exports = pile = {
 			if (!im) return callback('Unsupported type.')
 
 			// render
-			map.render(im, callback);
+			map.render(im, {variables : { zoom : params.z }}, callback);
 
 		});
 
@@ -290,12 +388,17 @@ module.exports = pile = {
 
 	               	// return vector
 	               	if (params.type == 'pbf') {
-				res.setHeader('Content-Encoding', 'deflate')
+	               		console.log('PBF!!!!');
+				// res.setHeader('Content-Encoding', 'gzip')
 				res.setHeader('Content-Type', 'application/x-protobuf')
-				return zlib.deflate(tile.getData(), function(err, pbf) {
-					res.send(pbf)
-					callback(err);
-				});
+				var pbf = tile.getData();
+				console.log('PDF', pbf);
+				res.send(pbf)
+				return callback(null);
+				// return zlib.deflate(tile.getData(), function(err, pbf) {
+				// 	res.send(pbf)
+				// 	callback(err);
+				// });
 	               	}
 
 	               	callback('Unsupported tile format.')

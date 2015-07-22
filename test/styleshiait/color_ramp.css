@@ -1,0 +1,212 @@
+// CartoCSS reference guide:
+// https://bit.ly/1z5OvXT
+
+// Cheat Sheet:
+// ------------
+//  Polygons:
+//    polygon-fill: red;
+//    polygon-opacity: 0.5;
+// 
+//  Lines:
+//    line-color: blue;
+//    line-width: 2;
+//    line-opacity: 0.9;
+// 
+//  Text:
+//    text-name: [field_name];
+//    text-size: 12;
+// 
+//  Filters:
+//    [zoom>=12] {
+//        // CSS for zoom 12 and higher
+//    }
+//    [field_name="Field Name"] {
+//        // CSS for this field only
+//    }
+
+
+//// lighten and darken colors
+//lighten(#ace, 10%);
+//darken(#ace, 10%);
+
+//// saturate and desaturate
+//saturate(#550000, 10%);
+//desaturate(#00ff00, 10%);
+
+//// increase or decrease the opacity of a color
+//fadein(#fafafa, 10%);
+//fadeout(#fefefe, 14%);
+
+//// spin rotates a color around the color wheel by degr
+//spin(#ff00ff, 10);
+
+//// mix generates a color in between two other colors.
+//mix(#fff, #000, 50%);
+//
+
+
+
+
+
+
+
+// zoom (works!)
+[zoom=14] {
+  marker-fill: black;
+}
+
+// marker width
+@marker_width: [coherence] * 2;
+
+// scale by height
+@scale_column : [height];
+@scale_max : 1615; // height_max
+@scale_min : 600;  // height_min
+
+//// scale by velocity
+//@scale_column : [vel];
+//@scale_max : 0; // height_max
+//@scale_min : -180;  // height_min
+
+// calc steps
+@delta   : (@scale_max - @scale_min)/10;
+@step_1  : @scale_min;
+@step_2  : @scale_min + @delta;
+@step_3  : @scale_min + (@delta * 2);
+@step_4  : @scale_min + (@delta * 3);
+@step_5  : @scale_min + (@delta * 4);
+@step_6  : @scale_min + (@delta * 5);
+@step_7  : @scale_min + (@delta * 6);
+@step_8  : @scale_min + (@delta * 7);
+@step_9  : @scale_min + (@delta * 8);
+@step_10 : @scale_min + (@delta * 9);
+
+// color scale
+//@color_1 :  #2f00ff;
+//@color_2 :  #003dff;
+//@color_3 :  #009eff;
+//@color_4 :  #00ffdf;
+//@color_5 :  #00ffa9;
+//@color_6 :  #04ff00;
+//@color_7 :  #bbff00;
+//@color_8 :  #e6ff00;
+//@color_9 :  #ffe200;
+//@color_10 :  #ff8c00;
+
+//@spin_color: #2fff00;
+//@color_1 :  spin(@spin_color, 10);
+//@color_2 :  spin(@spin_color, 20);
+//@color_3 :  spin(@spin_color, 30);
+//@color_4 :  spin(@spin_color, 40);
+//@color_5 :  spin(@spin_color, 50);
+//@color_6 :  spin(@spin_color, 60);
+//@color_7 :  spin(@spin_color, 70);
+//@color_8 :  spin(@spin_color, 80);
+//@color_9 :  spin(@spin_color, 90);
+//@color_10 : spin(@spin_color, 100);
+
+@ds_color : #04ff00;
+@color_1  :  desaturate(@ds_color, 0%);
+@color_2  :  desaturate(@ds_color, 10%);
+@color_3  :  desaturate(@ds_color, 20%);
+@color_4  :  desaturate(@ds_color, 30%);
+@color_5  :  desaturate(@ds_color, 40%);
+@color_6  :  desaturate(@ds_color, 50%);
+@color_7  :  desaturate(@ds_color, 60%);
+@color_8  :  desaturate(@ds_color, 70%);
+@color_9  :  desaturate(@ds_color, 80%);
+@color_10 :  desaturate(@ds_color, 90%);
+
+
+//@ds_color : #ff4100;
+//@color_1  :  desaturate(@ds_color, 100%);
+//@color_2  :  desaturate(@ds_color, 90%);
+//@color_3  :  desaturate(@ds_color, 80%);
+//@color_4  :  desaturate(@ds_color, 70%);
+//@color_5  :  desaturate(@ds_color, 60%);
+//@color_6  :  desaturate(@ds_color, 50%);
+//@color_7  :  desaturate(@ds_color, 40%);
+//@color_8  :  desaturate(@ds_color, 30%);
+//@color_9  :  desaturate(@ds_color, 20%);
+//@color_10 : desaturate(@ds_color, 10%);
+
+//@f_color: #ffac00;
+//@color_1 :  fadein(@f_color, 0%);
+//@color_2 :  fadein(@f_color, 10%);
+//@color_3 :  fadein(@f_color, 20%);
+//@color_4 :  fadein(@f_color, 30%);
+//@color_5 :  fadein(@f_color, 40%);
+//@color_6 :  fadein(@f_color, 50%);
+//@color_7 :  fadein(@f_color, 60%);
+//@color_8 :  fadein(@f_color, 70%);
+//@color_9 :  fadein(@f_color, 80%);
+//@color_10 : fadein(@f_color, 90%);
+
+
+#layer {
+  
+    
+  
+
+    // marker style
+  marker-fill: #00ffb4;
+    marker-allow-overlap: true;
+  marker-clip: false;
+    marker-comp-op: screen;
+  marker-opacity: 0.5;
+  
+    // marker width
+  marker-width: @marker_width;
+
+  
+  
+  // lowest
+  [@scale_column < @step_2] {
+      marker-fill: @color_1;
+  }
+  
+  [@scale_column > @step_2][@scale_column < @step_3] {
+      marker-fill: @color_2;
+  }
+  
+   [@scale_column > @step_3][@scale_column < @step_4] {
+      marker-fill: @color_3;
+  }
+  
+   [@scale_column > @step_4][@scale_column < @step_5] {
+      marker-fill: @color_4;
+  }
+  
+   [@scale_column > @step_5][@scale_column < @step_6] {
+      marker-fill: @color_5;
+  }
+  
+   [@scale_column > @step_6][@scale_column < @step_7] {
+      marker-fill: @color_6;
+  }
+  
+   [@scale_column > @step_7][@scale_column < @step_8] {
+      marker-fill: @color_7;
+  }
+  
+   [@scale_column > @step_8][@scale_column < @step_9] {
+      marker-fill: @color_8;
+  }
+  
+   [@scale_column > @step_9][@scale_column < @step_10] {
+      marker-fill: @color_9;
+  }
+  
+   [@scale_column > @step_10] {
+      marker-fill: @color_10;
+  }
+  
+    
+  
+  // velocity
+  //[vel<-50] {
+  //    marker-fill: #d1ff04;
+  //    marker-width: ([vel] * (-1))/20;
+  //    
+  //}
+}
