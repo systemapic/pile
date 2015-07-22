@@ -12,17 +12,32 @@ var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
-// var mapnikOmnivore = require('mapnik-omnivore');
-var mercator = require('./sphericalmercator');
+var mongoose = require('mongoose');
 var request = require('request');
 
 // modules
 var server = require('./server');
-var config = require('./config/pile-config');
+var config = require('../config/pile-config');
+
+// mercator
+var mercator = require('./sphericalmercator');
 
 // register mapnik plugions
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
+
+// database schemas
+var Project 	 = require('../models/project');
+var Clientel 	 = require('../models/client');	
+var User  	 = require('../models/user');
+var File 	 = require('../models/file');
+var Layer 	 = require('../models/layer');
+var Hash 	 = require('../models/hash');
+var Role 	 = require('../models/role');
+var Group 	 = require('../models/group');
+
+// connect to our database
+mongoose.connect(config.mongo.url); 
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
@@ -46,7 +61,6 @@ if (process.argv[2] == 'production') {
 // #########################################
 // vector/raster/utfgrid handling
 module.exports = pile = { 
-
 
 
 	createLayer : function (req, res) {
@@ -151,6 +165,30 @@ module.exports = pile = {
 
 		// create layer model
 		ops.push(function (layer, callback) {
+
+			File
+			.findOne({uuid : file_id})
+			.exec(function (err, file) {
+				console.log('Looked for file: ', err, file);
+
+				var options = {
+					uuid : layer.layerUuid,
+					title : file.name,
+					description : file.description,
+					file : file.uuid,
+					data : {
+						postgis : layer.options
+					},
+					metadata : layer.options.metadata,
+					projectUuid : projectUuid
+
+				}
+
+
+				Layer
+				.findOne({})
+
+			});
 
 			// get from wu
 			pile.request.get('/api/file/get', {
@@ -861,43 +899,43 @@ if (cluster.isMaster) {
 	// ###  Kue jobs: Vector render          ###
 	// #########################################
 	// render vector job
-	jobs.process('vector_render', 10, function (job, done) {
-		var file_id = job.data.file_id;
-		var z = job.data.z;
-		var x = job.data.x;
-		var y = job.data.y;
+	// jobs.process('vector_render', 10, function (job, done) {
+	// 	var file_id = job.data.file_id;
+	// 	var z = job.data.z;
+	// 	var x = job.data.x;
+	// 	var y = job.data.y;
 
-		// create vector tile
-		vile._createVectorTile(job.data, function (err) {
-			// if (err) console.log('ERR 19'.red, err);
-			done();
-		});
+	// 	// create vector tile
+	// 	vile._createVectorTile(job.data, function (err) {
+	// 		// if (err) console.log('ERR 19'.red, err);
+	// 		done();
+	// 	});
 		
-	});
+	// });
 
 
 	// #########################################
 	// ###  Kue jobs: Raster render          ###
 	// #########################################
 	// 'raster_render' job
-	jobs.process('raster_render', 1000, function (job, done) {
-		var fileUuid 	= job.data.fileUuid;
-		var z 		= job.data.z;
-		var x 		= job.data.x;
-		var y 		= job.data.y;
-		var cartoid 	= job.data.cartoid;
+	// jobs.process('raster_render', 1000, function (job, done) {
+	// 	var fileUuid 	= job.data.fileUuid;
+	// 	var z 		= job.data.z;
+	// 	var x 		= job.data.x;
+	// 	var y 		= job.data.y;
+	// 	var cartoid 	= job.data.cartoid;
 
-		// find vector tile and create raster tile
-		vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-			if (!vector_tile) return done();
+	// 	// find vector tile and create raster tile
+	// 	vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
+	// 		if (!vector_tile) return done();
 
-			// create raster from vector_tile 			// callback
-			vile.createRasterTile(vector_tile, fileUuid, cartoid, z, x, y, function (err, raster_tile) {
-				if (err) console.log('ERR 20'.red, err);
-				done && done();
-			});
-		});
-	});
+	// 		// create raster from vector_tile 			// callback
+	// 		vile.createRasterTile(vector_tile, fileUuid, cartoid, z, x, y, function (err, raster_tile) {
+	// 			if (err) console.log('ERR 20'.red, err);
+	// 			done && done();
+	// 		});
+	// 	});
+	// });
 
 
 
