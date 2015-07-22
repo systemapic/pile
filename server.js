@@ -24,16 +24,16 @@ module.exports = function (pile) {
 	app.use(express.static(path.join(__dirname, 'public'))); 	// not secured
 
 
-
-
-
-
-
-
 	// create layer
 	app.post('/api/db/createLayer', checkAccess, function (req, res) {
 		console.log('route: api/db/createLayer');
 		pile.createLayer(req, res);
+	});
+
+	// update layer
+	app.post('/api/db/updateLayer', checkAccess, function (req, res) {
+		console.log('route: api/db/createLayer');
+		pile.updateLayer(req, res);
 	});
 
 	// get layer

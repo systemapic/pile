@@ -23,7 +23,6 @@ var config = require('./config/pile-config');
 // register mapnik plugions
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
-// mapnik.register_datasource(path.join(mapnik.settings.paths.input_plugins,'ogr.input'));
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
@@ -137,15 +136,6 @@ module.exports = pile = {
 			
 
 		});
-
-		// // get meta data
-		// ops.push(function (layer, callback) {
-
-		// 	// get layer meta
-		// 	pile._getMetadata(layer, callback);
-
-		// });
-
 
 
 		// save layer to layerStore
