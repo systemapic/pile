@@ -91,8 +91,6 @@ module.exports = pile = {
 
 		ops.push(function (callback) {
 
-			// console.log('file_id:::::', file_id);
-
 			// get upload status object from wu
 			pile.request.get('/api/import/status', { 	// todo: write more pluggable
 				file_id : file_id, 
@@ -177,7 +175,11 @@ module.exports = pile = {
 
 
 		async.waterfall(ops, function (err, layerObject) {
-			// console.log('all done: ', layerObject);
+			console.log('>>>>>>>>>>>>>>>>>>')
+			console.log('>>>>>>>>>>>>>>>>>> Created layer ');
+			console.log('>>>>>>>>>>>>>>>>>>')
+			console.log(layerObject);
+			
 			// return layer to client
 			res.json(layerObject);
 		});
@@ -229,6 +231,7 @@ module.exports = pile = {
 
 		// try to get tiles from redis first
 		pile._getTileFromRedis(params, function (err, png) {
+			
 			if (!err && png) {
 				console.log('from redis');
 				res.writeHead(200, {'Content-Type': 'image/png'});
@@ -385,6 +388,11 @@ module.exports = pile = {
 			
 			// vector
 			if (params.type == 'pbf') {
+				var im = new mapnik.VectorTile(params.z, params.x, params.y);
+			}
+
+			// grid
+			if (params.type == 'grid') {
 				var im = new mapnik.VectorTile(params.z, params.x, params.y);
 			}
 
