@@ -63,7 +63,10 @@ if (process.argv[2] == 'production') {
 module.exports = pile = { 
 
 
+	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
+		// console.log('PILE createLayer');
+
 		var options 	= req.body,
 		    file_id 	= options.file_id,
 		    sql 	= options.sql,
@@ -76,8 +79,8 @@ module.exports = pile = {
 		    affected_tables = options.affected_tables,
 		    interactivity = options.interactivity,
 		    attributes 	= options.attributes,
-		    access_token = req.body.access_token,
-		    projectUuid = req.body.projectUuid;
+		    access_token = req.body.access_token;
+		    // projectUuid = req.body.projectUuid;
 
 		// verify query
 		if (!file_id) 	return pile.error.missingInformation(res, 'Please provide a file_id.')
@@ -88,11 +91,10 @@ module.exports = pile = {
 
 		ops.push(function (callback) {
 
-			console.log('file_id:::::', file_id);
+			// console.log('file_id:::::', file_id);
 
 			// get upload status object from wu
-			// check if upload is done, processing is done
-			pile.request.get('/api/import/status', {
+			pile.request.get('/api/import/status', { 	// todo: write more pluggable
 				file_id : file_id, 
 				access_token : access_token
 			}, callback);
@@ -108,6 +110,8 @@ module.exports = pile = {
 			// check that done importing to postgis
 			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
 
+			// todo: errors
+
 			// check that done importing to postgis
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
 
@@ -121,9 +125,10 @@ module.exports = pile = {
 			var done_sql = sql.replace('table', options.table_name);
 
 			// create layer object
+			var layerUuid = 'layer-' + uuid.v4();
 			var layer = { 	
 
-				layerUuid : 'layer-' + uuid.v4(),	
+				layerUuid : layerUuid,
 				options : {			
 					
 					// required
@@ -133,6 +138,8 @@ module.exports = pile = {
 					database_name : options.database_name, 
 					table_name : options.table_name, 
 					metadata : options.metadata,
+					layer_id : layerUuid,
+					wicked : 'thing',
 
 					// optional				// defaults
 					cartocss_version : cartocss_version 	|| '2.0.1',
@@ -140,14 +147,12 @@ module.exports = pile = {
 					geom_type : geom_type 			|| 'geometry',
 					raster_band : raster_band 		|| 0,
 					srid : srid 				|| 3857,
-					affected_tables : affected_tables 	|| [],
-					attributes : attributes 		|| {}
+					// affected_tables : affected_tables 	|| [],
+					// attributes : attributes 		|| {}
 				}
 			}
 
 			callback(null, layer);
-
-			
 
 		});
 
@@ -163,102 +168,23 @@ module.exports = pile = {
 			});
 		});
 
-		// create layer model
-		ops.push(function (layer, callback) {
+		// // create layer model
+		// ops.push(function (layer, callback) {
 
-			File
-			.findOne({uuid : file_id})
-			.exec(function (err, file) {
-				console.log('Looked for file: ', err, file);
+		// 	pile._createLayerModel(layer, callback);
 
-				var options = {
-					uuid : layer.layerUuid,
-					title : file.name,
-					description : file.description,
-					file : file.uuid,
-					data : {
-						postgis : layer.options
-					},
-					metadata : layer.options.metadata,
-					projectUuid : projectUuid
-
-				}
-
-
-				Layer
-				.findOne({})
-
-			});
-
-			// get from wu
-			pile.request.get('/api/file/get', {
-				file_id : layer.options.file_id,
-				access_token : access_token
-			}, function (err, fileJSON) {
-				console.log('getFile:  ', err, fileJSON);
-					
-				var file = JSON.parse(fileJSON);
-
-				var options = {
-					uuid : layer.layerUuid,
-					title : file.name,
-					description : file.description,
-					file : file.uuid,
-					data : {
-						postgis : layer.options
-					},
-					metadata : layer.options.metadata,
-					projectUuid : projectUuid
-
-				}
-
-				// pile.request.get('/api/layer/new', {
-				// 	options : options, 
-				// 	access_token : access_token
-				// }, function (err, layerModel) {
-				// 	callback(err, {
-				// 		layerModel : layerModel,
-				// 		layer : layer
-				// 	})
-				// });
-
-				console.log('PSOT LAYER');
-				var url = 'http://wu:3001' + '/api/layers/new';
-				request.post({
-					url : url, 
-					form : {
-						options : options,
-						access_token : access_token
-					}
-				}, function(err, httpResponse, layerModel){
-					console.log('############## err, ', err, layerModel)
-
-					try {
-						var parsedLayerModel = JSON.parse(layerModel);
-					} catch (e) {
-						return callback(e.message);
-					}
-
-					callback(err, {
-						layerModel : parsedLayerModel,
-						layer : layer
-					});
-				})
-
-
-			});
-
-		});
+		// });
 
 
 		async.waterfall(ops, function (err, layerObject) {
-			console.log('all done: ', layerObject);
+			// console.log('all done: ', layerObject);
 			// return layer to client
 			res.json(layerObject);
 		});
 
 
 	},
+
 
 	getLayer : function (req, res) {
 
@@ -272,43 +198,109 @@ module.exports = pile = {
 		});
 	},
 
-	// _getMetadata : function (layer, done) {
-
-	// 	var ops = [];
-
-	// 	// get extent
-	// 	ops.push(function (callback) {
-
-
-
-	// 	});
-
-
-	// },
-
-
-
+	
 
 	getTile : function (req, res) {
 
-		console.time('getTile');
 		// parse url into layerUuid, zxy, type
 		var ops = [],
-		    parsed = req._parsedUrl.pathname.split('/'), // https://dev.systemapic.com/api/tiles/layerUuid/z/x/y.png || .pbf
+		    // https://dev.systemapic.com/api/tiles/layerUuid/z/x/y.png || .pbf
+		    parsed = req._parsedUrl.pathname.split('/'), 
 		    params = {
 			layerUuid : parsed[2],
 			z : parseInt(parsed[3]),
 			x : parseInt(parsed[4]),
 			y : parseInt(parsed[5].split('.')[0]),
 			type : parsed[5].split('.')[1],
-		    },
-		    map,
+		    };
+
+		var map,
 		    layer,
 		    postgis,
 		    bbox;
 
 		// check params
-		console.log('params', params);
+		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
+		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
+
+
+		// try to get tiles from redis first
+		pile._getTileFromRedis(params, function (err, png) {
+			if (!err && png) {
+				console.log('from redis');
+				res.writeHead(200, {'Content-Type': 'image/png'});
+				res.end(png);
+			} else {
+
+				// KUE: create raster tile
+				var start = new Date().getTime();
+				var job = jobs.create('create_tile', { // todo: cluster up with other machines, pluggable clusters
+					params : params,
+				}).priority('high').attempts(5).save();
+
+
+				// KUE DONE: raster created
+				job.on('complete', function (result) {
+					var end = new Date().getTime();
+					var create_tile_time = end - start;
+					console.log('Created tile', create_tile_time);
+
+					layerStore.lpush('timer:create_tile', create_tile_time);
+					
+					pile._getTileFromRedis(params, function (err, png) {
+						res.writeHead(200, {'Content-Type': 'image/png'});
+						res.end(png);
+					});
+
+				});
+
+			}
+		});
+
+		console.log('##############################################')
+		// debug, write redis file
+		var logfile = '/var/www/pile/test/create_tile_time.log';
+		fs.exists(logfile, function(exists) { 
+			if (exists) return; 
+
+			layerStore.lrange('timer:create_tile', [0, 10000000000000000], function (err, list) {
+				console.log('list: ', list);
+				fs.outputFile(logfile, list, function (err) {
+
+				})
+			})
+		}); 
+
+
+
+
+
+		
+	},
+
+	_getTileFromRedis : function (params, done) {
+
+		// get tile from redis
+		var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
+		var key = new Buffer(keyString);
+		layerStore.get(key, done);
+	},
+
+
+	_getTile : function (params, done) {
+
+
+		// parse url into layerUuid, zxy, type
+		var ops = [];
+		var map,
+		    layer,
+		    postgis,
+		    bbox;
+
+		// check params
 		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
 		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
 		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
@@ -327,7 +319,7 @@ module.exports = pile = {
 
 			var storedLayer = JSON.parse(storedLayer);
 
-			console.log('storedLayer: ', storedLayer);
+			// console.log('storedLayer: ', storedLayer);
 
 			// default settings // todo: put in config
 			var default_postgis_settings = {
@@ -340,18 +332,18 @@ module.exports = pile = {
 			}
 
 			// insert layer settings 
-			var postgis_settings 	= default_postgis_settings;
+			var postgis_settings = default_postgis_settings;
 			postgis_settings.dbname = storedLayer.options.database_name;
 			postgis_settings.table 	= storedLayer.options.sql;
 			// postgis_settings.geometry_field = storedLayer.options.geom_column;
-			// postgis_settings.srid 	= storedLayer.options.srid;
+			// postgis_settings.srid = storedLayer.options.srid;
 			
 			// everything in spherical mercator (3857)!
 			try {
-			map = new mapnik.Map(256, 256, mercator.proj4);
-			layer = new mapnik.Layer('layer', mercator.proj4);
-			postgis = new mapnik.Datasource(postgis_settings);
-			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+				map = new mapnik.Map(256, 256, mercator.proj4);
+				layer = new mapnik.Layer('layer', mercator.proj4);
+				postgis = new mapnik.Datasource(postgis_settings);
+				bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 			} catch (e) {
 				return callback(e.message);
 			}
@@ -404,291 +396,32 @@ module.exports = pile = {
 
 		});
 
+		// todo: SAVE TO REDIS HERE!
+
 		// send tile to client
 		ops.push(function (tile, callback) {
 
-			// return raster
-			if (params.type == 'png') {
-				res.writeHead(200, {'Content-Type': 'image/png'});
-	               		res.end(tile.encodeSync('png'));
-	               		return callback(null);
-	               	}
+			// save png to redis
+			var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
+			var key = new Buffer(keyString);
+			layerStore.set(key, tile.encodeSync('png'), callback);
 
-	               	// return vector
-	               	if (params.type == 'pbf') {
-	               		console.log('PBF!!!!');
-				// res.setHeader('Content-Encoding', 'gzip')
-				res.setHeader('Content-Type', 'application/x-protobuf')
-				var pbf = tile.getData();
-				console.log('PDF', pbf);
-				res.send(pbf)
-				return callback(null);
-				// return zlib.deflate(tile.getData(), function(err, pbf) {
-				// 	res.send(pbf)
-				// 	callback(err);
-				// });
-	               	}
-
-	               	callback('Unsupported tile format.')
 		});
 
 
 		// run ops
 		async.waterfall(ops, function (err) {
-			console.log('async done, err, result', err);
-			if (err) return res.json({error : err.message});
-			console.timeEnd('getTile');
-
+			// console.log('async done, err, result', err);
+			done(err);
 		});
 
 	},
-
-
-
-	getRasterTile : function (storedLayer, params, done) {
-
-		// flow: 
-		// 
-		// 1. check for existing png 
-		// 2. create xml from cartocss
-		// 3. create raster from xml + postgis
-		// 4. save to disk
-		// 5. serve
-
-		
-		// layer:  { 
-		// 	layerUuid: 'layer-1d34666c-d8a8-4fce-994e-e042a17bbe7d',
-		// 	options: { 
-		// 		sql: 'SELECT * FROM file_suhrcucstpmtxqgtpyyc',
-		// 		cartocss: '#layer {}',
-		// 		file_id: 'file_suhrcucstpmtxqgtpyyc',
-		// 		database_name: 'zzjihbcpqm',
-		// 		table_name: 'file_suhrcucstpmtxqgtpyyc',
-		// 		cartocss_version: '2.0.1',
-		// 		geom_column: 'geom',
-		// 		geom_type: 'geometry',
-		// 		raster_band: 0,
-		// 		srid: 3857,
-		// 		affected_tables: [],
-		// 		attributes: {} 
-		// 	} 
-		// }
-		// params:  { 
-		// 	layerUuid: 'layer-1d34666c-d8a8-4fce-994e-e042a17bbe7d',
-		// 	z: '0',
-		// 	x: '0',
-		// 	y: '0',
-		// 	type: 'png' 
-		// }
-
-		// return done();
-
-		// // 14/10124/6322
-		// var params = {
-		// 	// z : 13, // cadastral
-		// 	// x : 7533,
-		// 	// y : 4915,
-		// 	z : 14,
-		// 	x : 10124,
-		// 	y : 6322,
-		// 	style : 'points'
-		// 	// z : 0,
-		// 	// x : 0,
-		// 	// y : 0,
-		// }
-
-		// var postgis_settings = {
-		// 	'dbname' 	: 'zzjihbcpqm',
-		// 	// 'table' 	: '(select * from shape_nsziadryou where area > 100000) as mysubquery', // works!!
-		// 	// 'table' 	: '(select * from shape_nsziadryou where area > 300000) as mysubquery',
-		// 	// 'table' 	: 'shape_ozpnkswisx',
-		// 	// 'table' 	: '(select * from shape_ozpnkswisx where area_m2 > 1000) as sub', // works!
-		// 	// 'table' 	: '(select * from shape_ozpnkswisx where area_m2 > 1000) as sub', // works!
-		// 	// 'table' 	: 'shape_ubpdiiswel',
-		// 	// 'table' 	: '(select * from shape_ubpdiiswel where vel < -50) as sub',
-		// 	'table' 	: '(select * from shape_ubpdiiswel where ST_Intersects(geom, !bbox!)) as sub',
-		// 	'user' 		: 'docker',
-		// 	'password' 	: 'docker',
-		// 	'host' 		: 'postgis',
-		// 	'type' 		: 'postgis',
-		// 	'geometry_field': 'geom',
-		// 	'srid' 		: '3857',
-		// 	// 'extent' 	: '16813700.23783365, -4011415.24440605, 16818592.2076439, -4006523.2745957985'  //change this if not merc
-		// 	// 'extent' 	: '-20005048.4188,-9039211.13765,19907487.2779,17096598.5401'
-		// }
-
-		// debug
-		console.log('============ pile.getRasterTile ============');
-		console.log('============ pile.getRasterTile ============');
-		console.log('============ pile.getRasterTile ============');
-		console.log('layer: ', layer);
-		console.log('params: ', params);
-
-		// // default settings // todo: put in config
-		// var default_postgis_settings = {
-		// 	user : 'docker',
-		// 	password : 'docker',
-		// 	host : 'postgis',
-		// 	type : 'postgis'
-		// }
-
-		// // insert layer settings 
-		// var postgis_settings = default_postgis_settings;
-		// postgis_settings.dbname = storedLayer.options.database_name;
-		// postgis_settings.table = storedLayer.options.sql;
-		// postgis_settings.geometry_field = storedLayer.options.geom_column;
-		// postgis_settings.srid = storedLayer.options.srid;
-		
-		// // everything in spherical mercator (3857)!
-		// var map = new mapnik.Map(256, 256, mercator.proj4);
-		// var layer = new mapnik.Layer('layer', mercator.proj4);
-		// var postgis = new mapnik.Datasource(postgis_settings);
-		// var bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-		// // set buffer
-		// map.bufferSize = 64;
-
-		// // set datasource
-		// layer.datasource = postgis;
-
-
-
-		// // |
-		// // |
-		// // v
-		// // everything down to here is same for vector/raster
-		// // ----------------------------------------------------------------------
-
-		// layer.styles = ['layer']; // style names in xml
-		// map.add_layer(layer);
-
-		var ops = [];
-
-		ops.push(function (callback) {
-			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
-		});
-
-		
-		ops.push(function (xml, callback) {
-			map.fromString(xml, {strict : true}, callback);
-		});
-
-		ops.push(function (map, callback) {
-
-			// console.log(map.toXML()); // Debug settings
-
-			map.extent = bbox; // must have extent!
-
-			// raster
-			if (params.type == 'png') {
-				var im = new mapnik.Image(map.width, map.height);
-			}
-			
-			// vector
-			if (params.type == 'pbf') {
-				var im = new mapnik.VectorTile(params.z, params.x, params.y);
-			}
-
-			// render
-			map.render(im, callback);
-
-		});
-
-		// return buffer
-		async.waterfall(ops, done);
-
-
-		// async.waterfall(ops, function (err, im) {
-
-		// 	console.log('map.render err, im', err, im);
-		// 	fs.outputFile('./raster_1.png', im.encodeSync('png'));
-		// 	// fs.writeFileSync("./cetin3.pbf", im.getData());
-
-		// 	// console.log('vector_tile: ', im.names(), im.toJSON());
-		// 	// var json = im.toJSON();
-		// 	// console.log('json.features');
-		// 	// console.log(json[0].features);
-		
-
-		// 	// console.timeEnd('CREATE RASTER');
-
-		// 	// callback(err, im);
-
-		// 	// res.end('ok');
-		// 	done();
-
-		// });
-
-
-		// return done();
-
-		// layer.styles = [params.style]; // todo!
-
-		// todo here: 	cartocss -> xml
-		// 		insert names for layer.styles (polygon, point, whatever.. must match stylesheet layer name?)
-		// 		save rasters to folder structure
-		//		save in redis which rasters have been made? (faster lookup than on disk?)
-
-		// map.load(path.join(__dirname, params.style + '.xml'), { strict: true }, function(err,map) {
-		// 	if (err) throw err;
-		// 	map.add_layer(layer);
-
-		// 	console.log(map.toXML()); // Debug settings
-
-		// 	map.extent = bbox; // must have extent!
-		// 	var im = new mapnik.Image(map.width, map.height);
-
-		// 	// var im = new mapnik.VectorTile(0,0,0);
-
-		// 	map.render(im, function(err, im) {
-		// 		console.log('map.render err, im', err, im);
-		// 		fs.outputFile('./cetin3.png', im.encodeSync('png'))
-		// 		// fs.writeFileSync("./cetin3.pbf", im.getData());
-
-		// 		// console.log('vector_tile: ', im.names(), im.toJSON());
-		// 		// var json = im.toJSON();
-		// 		// console.log('json.features');
-		// 		// console.log(json[0].features);
-			
-
-		// 		console.timeEnd('CREATE RASTER');
-
-		// 	});
-		// });
-	},
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 	// convert CartoCSS to Mapnik XML
 	cartoRenderer : function (css, layer, callback) {
 
-		console.log('>>>>>>>>>>>>>>>>>> layer', layer);
+		// console.log('>>>>>>>>>>>>>>>>>> layer', layer);
 
 		var options = {
 			// srid 3857
@@ -716,7 +449,7 @@ module.exports = pile = {
 			callback(null, xml);
 
 		} catch (e) {
-			console.log('ERR 17'.red, e);
+			// console.log('ERR 17'.red, e);
 			
 			var err = {
 				message : e
@@ -729,28 +462,8 @@ module.exports = pile = {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-	test : function (req, res) {
-		console.log('TEST!!!');
-		res.end(JSON.stringify({
-			get : 'low'
-		}));
-	},
-
-
 	getFile : function (req, res) {
-		console.log('req.query', req.query);
+		// console.log('req.query', req.query);
 		
 		// get access token
 		var access_token = pile._getAccessToken(req),
@@ -770,7 +483,7 @@ module.exports = pile = {
 			file_id : file_id,
 			access_token : access_token
 		}, function (err, results) {
-			console.log('pile.request.get: ', err, results);
+			// console.log('pile.request.get: ', err, results);
 		});
 
 	
@@ -795,8 +508,6 @@ module.exports = pile = {
 					if (n) params += '&'
 				}
 			}
-
-			console.log('params:=====>>>', params);
 
 
 			request({
@@ -855,7 +566,7 @@ var jobs = kue.createQueue({
 // #########################################
 // configure redis for token auth
 var redis = require('redis');
-var layerStore = redis.createClient(config.tokenRedis.port, config.tokenRedis.host)
+var layerStore = redis.createClient(config.tokenRedis.port, config.tokenRedis.host, {detect_buffers : true})
 layerStore.auth(config.tokenRedis.auth);
 layerStore.on('error', function (err) { console.error(err); });
 
@@ -885,61 +596,35 @@ if (cluster.isMaster) {
 	});
 
 
-
-	
-
-
 } else {
 // worker clusters, kues:
 
 	console.log('...clustering!'.yellow);
 
-
 	// #########################################
 	// ###  Kue jobs: Vector render          ###
 	// #########################################
 	// render vector job
-	// jobs.process('vector_render', 10, function (job, done) {
-	// 	var file_id = job.data.file_id;
-	// 	var z = job.data.z;
-	// 	var x = job.data.x;
-	// 	var y = job.data.y;
+	jobs.process('create_tile', 10, function (job, done) {
 
-	// 	// create vector tile
-	// 	vile._createVectorTile(job.data, function (err) {
-	// 		// if (err) console.log('ERR 19'.red, err);
-	// 		done();
-	// 	});
-		
-	// });
+		var params = job.data.params;
 
+		pile._getTile(params, function (err) {
+			if (err) console.log('create_tile cluster fuck', err);
+			done();
+		});
+	});
 
-	// #########################################
-	// ###  Kue jobs: Raster render          ###
-	// #########################################
-	// 'raster_render' job
-	// jobs.process('raster_render', 1000, function (job, done) {
-	// 	var fileUuid 	= job.data.fileUuid;
-	// 	var z 		= job.data.z;
-	// 	var x 		= job.data.x;
-	// 	var y 		= job.data.y;
-	// 	var cartoid 	= job.data.cartoid;
-
-	// 	// find vector tile and create raster tile
-	// 	vile.findVectorTile(fileUuid, z, x, y, function (vector_tile) {
-	// 		if (!vector_tile) return done();
-
-	// 		// create raster from vector_tile 			// callback
-	// 		vile.createRasterTile(vector_tile, fileUuid, cartoid, z, x, y, function (err, raster_tile) {
-	// 			if (err) console.log('ERR 20'.red, err);
-	// 			done && done();
-	// 		});
-	// 	});
-	// });
-
-
-
-
+	// remove stale jobs
+	jobs.on( 'job complete', function ( id ) {
+		kue.Job.get( id, function ( err, job ) {
+			if ( err ) return;
+			job.remove( function ( err ) {
+				if ( err ) console.log(err);
+				console.log( 'removed completed job #%d', job.id );
+			} );
+		} );
+	} );
 
 }
 
