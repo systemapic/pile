@@ -207,68 +207,115 @@ module.exports = pile = {
 			x : parseInt(parsed[4]),
 			y : parseInt(parsed[5].split('.')[0]),
 			type : parsed[5].split('.')[1],
+
+
 		    };
+
+
+
 
 		var map,
 		    layer,
 		    postgis,
 		    bbox;
-
-		// check params
-		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
-		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
+		var type = params.type;
+		var ops = [];
 
 
-		// try to get tiles from redis first
-		pile._getTileFromRedis(params, function (err, png) {
+		// get stored layer
+		layerStore.get(params.layerUuid, function (err, storedLayerJSON) {	
+			if (err || !storedLayerJSON) return callback(err || 'No such layer_id stored.');
+			var storedLayer = JSON.parse(storedLayerJSON);
+
+
+
 			
-			if (!err && png) {
-				console.log('from redis');
-				res.writeHead(200, {'Content-Type': 'image/png'});
-				res.end(png);
-			} else {
+			// get tiles
+			if (type == 'pbf') ops.push(function (callback) {
+				pile.getVectorTile(params, storedLayer, callback);
+			});
 
-				// KUE: create raster tile
-				var start = new Date().getTime();
-				var job = jobs.create('create_tile', { // todo: cluster up with other machines, pluggable clusters
-					params : params,
-				}).priority('high').attempts(5).save();
+			if (type == 'png') ops.push(function (callback) {
+				pile.getRasterTile(params, storedLayer, callback);
+			});
+
+			if (type == 'grid') ops.push(function (callback) {
+				pile.getGridTile(params, storedLayer, callback);
+			});
 
 
-				// KUE DONE: raster created
-				job.on('complete', function (result) {
-					var end = new Date().getTime();
-					var create_tile_time = end - start;
-					console.log('Created tile', create_tile_time);
+			// run ops
+			async.series(ops, function (err, data) {
+				// console.log('GET TIEL err, DATA: ', err, data);
+				var data = data[0];
 
-					layerStore.lpush('timer:create_tile', create_tile_time);
-					
-					pile._getTileFromRedis(params, function (err, png) {
-						res.writeHead(200, {'Content-Type': 'image/png'});
-						res.end(png);
-					});
+				// send to client
+				res.writeHead(200, {'Content-Type': pile.headers[type]});
+				res.end(data);
+			});
 
-				});
-
-			}
 		});
 
-		console.log('##############################################')
-		// debug, write redis file
-		var logfile = '/var/www/pile/test/create_tile_time.log';
-		fs.exists(logfile, function(exists) { 
-			if (exists) return; 
+		// var map,
+		//     layer,
+		//     postgis,
+		//     bbox;
 
-			layerStore.lrange('timer:create_tile', [0, 10000000000000000], function (err, list) {
-				console.log('list: ', list);
-				fs.outputFile(logfile, list, function (err) {
+		// // check params
+		// if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
+		// if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		// if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		// if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
+		// if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
 
-				})
-			})
-		}); 
+
+		// // try to get tiles from redis first
+		// pile._getTileFromRedis(params, function (err, png) {
+			
+		// 	if (!err && png) {
+		// 		console.log('from redis');
+		// 		res.writeHead(200, {'Content-Type': 'image/png'});
+		// 		res.end(png);
+		// 	} else {
+
+		// 		// KUE: create raster tile
+		// 		var start = new Date().getTime();
+		// 		var job = jobs.create('create_tile', { // todo: cluster up with other machines, pluggable clusters
+		// 			params : params,
+		// 		}).priority('high').attempts(5).save();
+
+
+		// 		// KUE DONE: raster created
+		// 		job.on('complete', function (result) {
+		// 			var end = new Date().getTime();
+		// 			var create_tile_time = end - start;
+		// 			console.log('Created tile', create_tile_time);
+
+		// 			layerStore.lpush('timer:create_tile', create_tile_time);
+					
+		// 			pile._getTileFromRedis(params, function (err, png) {
+		// 				res.writeHead(200, {'Content-Type': 'image/png'});
+		// 				res.end(png);
+		// 			});
+
+		// 		});
+
+		// 	}
+		// });
+
+		// console.log('##############################################')
+		// // debug, write redis file
+		// var logfile = '/var/www/pile/test/create_tile_time.log';
+		// fs.exists(logfile, function(exists) { 
+		// 	if (exists) return; 
+
+		// 	layerStore.lrange('timer:create_tile', [0, 10000000000000000], function (err, list) {
+		// 		console.log('list: ', list);
+		// 		fs.outputFile(logfile, list, function (err) {
+
+		// 		})
+		// 	})
+		// }); 
 
 
 
@@ -277,13 +324,116 @@ module.exports = pile = {
 		
 	},
 
-	_getTileFromRedis : function (params, done) {
+	_createVectorTile : function (params, storedLayer, done) {
+
+		// KUE: create raster tile
+		var start = new Date().getTime();
+		var job = jobs.create('render_vector_tile', { // todo: cluster up with other machines, pluggable clusters
+			params : params,
+			storedLayer : storedLayer
+		}).priority('high').attempts(5).save();
+
+
+		// KUE DONE: raster created
+		job.on('complete', function (result) {
+
+			// stats
+			var end = new Date().getTime();
+			var create_tile_time = end - start;
+			console.log('Created vector tile', create_tile_time);
+			layerStore.lpush('timer:create_tile', create_tile_time);
+			
+			// get tile
+			pile._getVectorTileFromRedis(params, storedLayer, done);
+		});
+
+
+	},
+
+	_createRasterTile : function (params, storedLayer, done) {
+
+		// KUE: create raster tile
+		var start = new Date().getTime();
+		var job = jobs.create('render_raster_tile', { // todo: cluster up with other machines, pluggable clusters
+			params : params,
+			storedLayer : storedLayer
+		}).priority('high').attempts(5).save();
+
+
+		// KUE DONE: raster created
+		job.on('complete', function (result) {
+			
+			// stats
+			var end = new Date().getTime();
+			var create_tile_time = end - start;
+			console.log('Created raster tile', create_tile_time);
+			layerStore.lpush('timer:create_tile', create_tile_time);
+			
+			// get tile
+			pile._getRasterTileFromRedis(params, done);
+		});
+
+
+	},
+
+
+
+	getVectorTile : function (params, storedLayer, done) {
+
+		// look for in redis
+		// vector tiles stored on sql id, not style id. 
+
+		pile._getVectorTileFromRedis(params, storedLayer, function (err, data) {
+			if (data) return done(null, data);
+
+			// create
+			pile._createVectorTile(params, storedLayer, function (err, data) {
+				return done(err, data);
+			});
+		});
+			
+
+	},
+
+	getRasterTile : function (params, storedLayer, done) {
+
+		// check cache
+		pile._getRasterTileFromRedis(params, function (err, data) {
+			if (data) return done(null, data);
+
+
+			// create
+			pile._createRasterTile(params, storedLayer, done);
+		});
+	},
+
+
+	_getRasterTileFromRedis : function (params, done) {
 
 		// get tile from redis
-		var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
+		var keyString = 'tile_png:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
 		layerStore.get(key, done);
 	},
+
+	_getVectorTileFromRedis : function (params, storedLayer, done) {
+		// get tile, based on file + sql
+		var keyString = 'tile_pbf:' + storedLayer.file_id + ':' + storedLayer.sql_id + ':' + params.z + ':' + params.x + ':' + params.y;
+		var key = new Buffer(keyString);
+		layerStore.get(key, done);
+	},
+
+	checkParams : function (params, done) {
+
+		if (!params.layerUuid) 	return done('Invalid url: Missing layerUuid.');
+		if (!params.z) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.x) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.y) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.type) 	return done('Invalid url: Missing type extension.');
+
+		return done(null);
+	},
+
 
 
 	_getTile : function (params, done) {
