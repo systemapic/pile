@@ -166,13 +166,6 @@ module.exports = pile = {
 			});
 		});
 
-		// // create layer model
-		// ops.push(function (layer, callback) {
-
-		// 	pile._createLayerModel(layer, callback);
-
-		// });
-
 
 		async.waterfall(ops, function (err, layerObject) {
 			console.log('>>>>>>>>>>>>>>>>>>')
@@ -378,6 +371,12 @@ module.exports = pile = {
 
 			// console.log(map.toXML()); // Debug settings
 
+			var map_options = {
+				variables : { 
+					zoom : params.z // insert min_max etc 
+				}
+			}
+
 			// set extent
 			map.extent = bbox; // must have extent!
 
@@ -393,25 +392,34 @@ module.exports = pile = {
 
 			// grid
 			if (params.type == 'grid') {
-				var im = new mapnik.VectorTile(params.z, params.x, params.y);
+				var im = new mapnik.Grid(map.width, map.height);
+
+				var fields = ['gid', 'vel', 'coherence', 'height'];
+
+				var map_options = {
+					layer : 0,
+					fields : fields,
+					buffer_size : 64
+				}
 			}
 
 			// check
 			if (!im) return callback('Unsupported type.')
 
 			// render
-			map.render(im, {variables : { zoom : params.z }}, callback);
+			map.render(im, map_options, callback);
 
 		});
 
 		// todo: SAVE TO REDIS HERE!
 
-		// send tile to client
 		ops.push(function (tile, callback) {
 
 			// save png to redis
 			var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
 			var key = new Buffer(keyString);
+			
+			
 			layerStore.set(key, tile.encodeSync('png'), callback);
 
 		});
