@@ -62,6 +62,12 @@ if (process.argv[2] == 'production') {
 // vector/raster/utfgrid handling
 module.exports = pile = { 
 
+	headers : {
+		png : 'image/png',
+		pbf : 'application/x-protobuf',
+		grid : 'application/json'
+	},
+
 
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
@@ -155,11 +161,11 @@ module.exports = pile = {
 		});
 
 
-		// save layer to layerStore
+		// save layer to redisStore
 		ops.push(function (layer, callback) {
 
-			// save layer to layerStore
-			layerStore.set(layer.layerUuid, JSON.stringify(layer), function (err) {
+			// save layer to redisStore
+			redisStore.set(layer.layerUuid, JSON.stringify(layer), function (err) {
 				if (err) return callback(err);
 
 				callback(null, layer);
@@ -188,7 +194,7 @@ module.exports = pile = {
 		if (!layerUuid) return pile.error.missingInformation(res, 'Please provide layerUuid.');
 
 		// retrieve layer and return it to client
-		layerStore.get(layerUuid, function (err, layer) {
+		redisStore.get(layerUuid, function (err, layer) {
 			res.end(layer);
 		});
 	},
@@ -213,81 +219,355 @@ module.exports = pile = {
 		    layer,
 		    postgis,
 		    bbox;
+		var type = params.type;
+		var ops = [];
 
-		// check params
-		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
-		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
+		console.log('getTILE', params);
+
+		// get stored layer
+		redisStore.get(params.layerUuid, function (err, storedLayerJSON) {	
+			if (err) console.log(err);
+			// if (err || !storedLayer) return res.json({
+			// 	error : 'No such layer id.'
+			// });
+			// if (err || !storedLayerJSON) return callback(err || 'No such layer_id stored.');
+			var storedLayer = JSON.parse(storedLayerJSON);
+
+			console.log('do type', type);
+
+			// get tiles
+			if (type == 'pbf') ops.push(function (callback) {
+				pile.getVectorTile(params, storedLayer, callback);
+			});
+
+			if (type == 'png') ops.push(function (callback) {
+				pile.getRasterTile(params, storedLayer, callback);
+			});
+
+			if (type == 'grid') ops.push(function (callback) {
+				pile.getGridTile(params, storedLayer, callback);
+			});
 
 
-		// try to get tiles from redis first
-		pile._getTileFromRedis(params, function (err, png) {
-			
-			if (!err && png) {
-				console.log('from redis');
-				res.writeHead(200, {'Content-Type': 'image/png'});
-				res.end(png);
-			} else {
+			// run ops
+			async.series(ops, function (err, data) {
+				var data = data[0];
 
-				// KUE: create raster tile
-				var start = new Date().getTime();
-				var job = jobs.create('create_tile', { // todo: cluster up with other machines, pluggable clusters
-					params : params,
-				}).priority('high').attempts(5).save();
+				console.log('RES END');
 
+				// send to client
+				res.writeHead(200, {'Content-Type': pile.headers[type]});
+				res.end(data);
+			});
 
-				// KUE DONE: raster created
-				job.on('complete', function (result) {
-					var end = new Date().getTime();
-					var create_tile_time = end - start;
-					console.log('Created tile', create_tile_time);
-
-					layerStore.lpush('timer:create_tile', create_tile_time);
-					
-					pile._getTileFromRedis(params, function (err, png) {
-						res.writeHead(200, {'Content-Type': 'image/png'});
-						res.end(png);
-					});
-
-				});
-
-			}
 		});
-
-		console.log('##############################################')
-		// debug, write redis file
-		var logfile = '/var/www/pile/test/create_tile_time.log';
-		fs.exists(logfile, function(exists) { 
-			if (exists) return; 
-
-			layerStore.lrange('timer:create_tile', [0, 10000000000000000], function (err, list) {
-				console.log('list: ', list);
-				fs.outputFile(logfile, list, function (err) {
-
-				})
-			})
-		}); 
-
-
-
 
 
 		
 	},
 
-	_getTileFromRedis : function (params, done) {
+	createVectorTile : function (params, storedLayer, done) {
 
-		// get tile from redis
-		var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
-		var key = new Buffer(keyString);
-		layerStore.get(key, done);
+		// KUE: create raster tile
+		var start = new Date().getTime();
+		var job = jobs.create('render_vector_tile', { // todo: cluster up with other machines, pluggable clusters
+			params : params,
+			storedLayer : storedLayer
+		}).priority('high').attempts(5).save();
+
+
+		// KUE DONE: raster created
+		job.on('complete', function (result) {
+
+			// stats
+			var end = new Date().getTime();
+			var create_tile_time = end - start;
+			console.log('Created vector tile', create_tile_time);
+			redisStore.lpush('timer:create_tile', create_tile_time);
+			
+			// get tile
+			pile._getVectorTileFromRedis(params, storedLayer, done);
+		});
+
+
+	},
+
+	createRasterTile : function (params, storedLayer, done) {
+
+		console.log('start kue job')
+
+		// KUE: create raster tile
+		var start = new Date().getTime();
+		var job = jobs.create('render_raster_tile', { // todo: cluster up with other machines, pluggable clusters
+			params : params,
+			storedLayer : storedLayer
+		}).priority('high').attempts(5).save();
+
+
+		// KUE DONE: raster created
+		job.on('complete', function (result) {
+
+			console.log('kyee copmlete');
+			
+			// stats
+			var end = new Date().getTime();
+			var create_tile_time = end - start;
+			console.log('Created raster tile', create_tile_time);
+			redisStore.lpush('timer:create_tile', create_tile_time);
+			
+			// get tile
+			pile._getRasterTileFromRedis(params, done);
+		});
+
+
 	},
 
 
-	_getTile : function (params, done) {
+	createGridTile : function (params, storedLayer, done) {
 
+		console.log('start kue job')
+
+		// KUE: create raster tile
+		var start = new Date().getTime();
+		var job = jobs.create('render_grid_tile', { // todo: cluster up with other machines, pluggable clusters
+			params : params,
+			storedLayer : storedLayer
+		}).priority('high').attempts(5).save();
+
+
+		// KUE DONE: raster created
+		job.on('complete', function (result) {
+
+			console.log('kyee copmlete');
+			
+			// stats
+			var end = new Date().getTime();
+			var create_tile_time = end - start;
+			console.log('Created raster tile', create_tile_time);
+			redisStore.lpush('timer:create_tile', create_tile_time);
+			
+			// get tile
+			pile._getGridTileFromRedis(params, done);
+		});
+
+
+	},
+
+	_renderVectorTile : function (params, done) {
+
+		pile._prepareTile(params, function (err, map) {
+			if (err) console.log('create_tile cluster fuck', err);
+
+			var map_options = {
+				variables : { 
+					zoom : params.z // insert min_max etc 
+				}
+			}
+
+			
+
+			// vector
+			var im = new mapnik.VectorTile(params.z, params.x, params.y);
+			
+			// check
+			if (!im) return callback('Unsupported type.')
+
+			// render
+			map.render(im, map_options, function (err, tile) {
+
+				// save png to redis
+				var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+				var key = new Buffer(keyString);
+				redisStore.set(key, tile.getData(), done);
+			});
+		});
+		
+	},
+
+
+	_renderRasterTile : function (params, done) {
+
+		console.log('_res ras');
+
+		pile._prepareTile(params, function (err, map) {
+
+			console.log('preped tile', err, map);
+
+			if (err) console.log('create_tile cluster fuck', err);
+			if (!map) console.log('NOT MAPPP');
+
+			var map_options = {
+				variables : { 
+					zoom : params.z // insert min_max etc 
+				}
+			}
+
+			
+			// raster
+			var im = new mapnik.Image(256, 256);
+			
+			// check
+			if (!im) return callback('Unsupported type.')
+
+			// render
+			map.render(im, map_options, function (err, tile) {
+				if (err) console.log('err: ', err);
+
+				console.log('rendered raster tile!');
+
+				// save png to redis
+				var keyString = 'raster_tile:'  + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+				var key = new Buffer(keyString);
+				redisStore.set(key, tile.encodeSync('png'), done);
+			});
+		});
+		
+	},
+
+
+	_renderGridTile : function (params, done) {
+
+		pile._prepareTile(params, function (err, map) {
+			if (err) console.log('create_tile cluster fuck', err);
+
+			var map_options = {
+				variables : { 
+					zoom : params.z // insert min_max etc 
+				}
+			}
+
+		
+
+			// raster
+			var im = new mapnik.Grid(map.width, map.height);
+
+			var fields = ['gid', 'vel'];
+
+			var map_options = {
+				layer : 0,
+				fields : fields,
+				buffer_size : 64
+			}
+			
+			// check
+			if (!im) return callback('Unsupported type.')
+
+			// render
+			map.render(im, map_options, function (err, grid) {
+
+				console.log('grid : ', grid, grid.fields(), grid.painted());
+
+				for (g in grid) {
+					console.log('g: ', g);
+				}
+
+				grid.encode({features : true}, function (err, utf) {
+					// save grid to redis
+					var keyString = 'grid_tile:'  + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+					// var key = new Buffer(keyString);
+
+					redisStore.set(keyString, JSON.stringify(utf), done);
+				})
+
+				
+			});
+		});
+		
+	},
+
+		
+
+	// return tiles from redis or created
+	/////////////////////////////////////
+	getVectorTile : function (params, storedLayer, done) {
+
+		// check redis
+		pile._getVectorTileFromRedis(params, storedLayer, function (err, data) {
+
+			// return data
+			if (data) return done(null, data);
+
+			// create
+			pile.createVectorTile(params, storedLayer, done);
+		});
+	},
+	getRasterTile : function (params, storedLayer, done) {
+
+		console.log('getrast')
+
+		// check cache
+		pile._getRasterTileFromRedis(params, function (err, data) {
+
+			// return data
+			if (data) return done(null, data);
+
+			
+			// create
+			pile.createRasterTile(params, storedLayer, done);
+		});
+	},
+	getGridTile : function (params, storedLayer, done) {
+
+		console.log('g1');
+
+		// check cache
+		pile._getGridTileFromRedis(params, function (err, data) {
+			console.log('g10');
+
+			if (data) return done(null, data);
+
+			// create
+			pile.createGridTile(params, storedLayer, done);
+		});
+	},
+
+
+
+	
+
+	// get tiles from redis
+	///////////////////////
+	_getRasterTileFromRedis : function (params, done) {
+		console.log('get rasred')
+		// get tile from redis
+		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		var key = new Buffer(keyString);
+		redisStore.get(key, done);
+	},
+	_getVectorTileFromRedis : function (params, done) {
+		// get tile, based on file + sql
+		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		var key = new Buffer(keyString);
+		redisStore.get(key, done);
+	},
+	_getGridTileFromRedis : function (params, done) {
+		// get tile, based on file + sql
+		var keyString = 'grid_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		var key = new Buffer(keyString);
+		redisStore.get(key, done);
+	},
+
+	
+
+
+
+
+	checkParams : function (params, done) {
+
+		if (!params.layerUuid) 	return done('Invalid url: Missing layerUuid.');
+		if (!params.z) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.x) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.y) 		return done('Invalid url: Missing tile coordinates.');
+		if (!params.type) 	return done('Invalid url: Missing type extension.');
+
+		return done(null);
+	},
+
+
+
+	_prepareTile : function (params, done) {
+
+		console.log('prep tile');
 
 		// parse url into layerUuid, zxy, type
 		var ops = [];
@@ -306,7 +586,7 @@ module.exports = pile = {
 
 		// look for stored layerUuid
 		ops.push(function (callback) {
-			layerStore.get(params.layerUuid, callback);
+			redisStore.get(params.layerUuid, callback);
 		});
 
 		// define settings, xml
@@ -347,6 +627,9 @@ module.exports = pile = {
 			// set buffer
 			map.bufferSize = 64;
 
+			// set extent
+			map.extent = bbox; // must have extent!
+
 			// set datasource
 			layer.datasource = postgis;
 
@@ -366,69 +649,75 @@ module.exports = pile = {
 			map.fromString(xml, {strict : true}, callback);
 		});
 
-		// render vector/raster tile
-		ops.push(function (map, callback) {
 
-			// console.log(map.toXML()); // Debug settings
+		// // render vector/raster tile
+		// ops.push(function (map, callback) {
 
-			var map_options = {
-				variables : { 
-					zoom : params.z // insert min_max etc 
-				}
-			}
+		// 	// console.log(map.toXML()); // Debug settings
 
-			// set extent
-			map.extent = bbox; // must have extent!
+		// 	var map_options = {
+		// 		variables : { 
+		// 			zoom : params.z // insert min_max etc 
+		// 		}
+		// 	}
 
-			// raster
-			if (params.type == 'png') {
-				var im = new mapnik.Image(map.width, map.height);
-			}
+		// 	// set extent
+		// 	map.extent = bbox; // must have extent!
+
+		// 	// raster
+		// 	if (params.type == 'png') {
+		// 		var im = new mapnik.Image(map.width, map.height);
+		// 	}
 			
-			// vector
-			if (params.type == 'pbf') {
-				var im = new mapnik.VectorTile(params.z, params.x, params.y);
-			}
+		// 	// vector
+		// 	if (params.type == 'pbf') {
+		// 		var im = new mapnik.VectorTile(params.z, params.x, params.y);
+		// 	}
 
-			// grid
-			if (params.type == 'grid') {
-				var im = new mapnik.Grid(map.width, map.height);
+		// 	// grid
+		// 	if (params.type == 'grid') {
+		// 		var im = new mapnik.Grid(map.width, map.height);
 
-				var fields = ['gid', 'vel', 'coherence', 'height'];
+		// 		var fields = ['gid', 'vel', 'coherence', 'height'];
 
-				var map_options = {
-					layer : 0,
-					fields : fields,
-					buffer_size : 64
-				}
-			}
+		// 		var map_options = {
+		// 			layer : 0,
+		// 			fields : fields,
+		// 			buffer_size : 64
+		// 		}
+		// 	}
 
-			// check
-			if (!im) return callback('Unsupported type.')
+		// 	// check
+		// 	if (!im) return callback('Unsupported type.')
 
-			// render
-			map.render(im, map_options, callback);
+		// 	// render
+		// 	map.render(im, map_options, callback);
 
-		});
+		// });
 
-		// todo: SAVE TO REDIS HERE!
+		// // todo: SAVE TO REDIS HERE!
 
-		ops.push(function (tile, callback) {
+		// ops.push(function (tile, callback) {
 
-			// save png to redis
-			var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
-			var key = new Buffer(keyString);
+		// 	// save png to redis
+		// 	var keyString = 'tile:' + params.z + ':' + params.x + ':' + params.y + ':' + params.layerUuid;
+		// 	var key = new Buffer(keyString);
 			
 			
-			layerStore.set(key, tile.encodeSync('png'), callback);
+		// 	redisStore.set(key, tile.encodeSync('png'), callback);
 
-		});
+		// });
 
 
 		// run ops
-		async.waterfall(ops, function (err) {
+		async.waterfall(ops, function (err, map) {
+
+			console.log('PREP DONE!', err, map);
+
 			// console.log('async done, err, result', err);
-			done(err);
+			// if (err) done(err);
+
+			done(err, map);
 		});
 
 	},
@@ -566,29 +855,26 @@ module.exports = pile = {
 
 
 
-
+// #########################################
+// ###  Redis for Layer Storage          ###
+// #########################################
+// configure redis for token auth
+var redis = require('redis');
+var redisStore = redis.createClient(config.redis.port, config.redis.host, {detect_buffers : true});
+redisStore.auth(config.redis.auth);
+redisStore.on('error', function (err) { console.error(err); });
+redisStore.select(1, function (err) {
+	console.log('selected db 1');
+});
 
 // #########################################
 // ###  Initialize Kue                   ###
 // #########################################
 // init kue
 var jobs = kue.createQueue({
-   	redis : config.kueRedis,
-   	prefix : 'vq'
+   	redis : config.kue,
+   	prefix : '_kue4'
 });
-
-// #########################################
-// ###  Redis for Layer Storage          ###
-// #########################################
-// configure redis for token auth
-var redis = require('redis');
-var layerStore = redis.createClient(config.tokenRedis.port, config.tokenRedis.host, {detect_buffers : true})
-layerStore.auth(config.tokenRedis.auth);
-layerStore.on('error', function (err) { console.error(err); });
-
-
-
-
 
 // #########################################
 // ###  Clusters                         ###
@@ -608,8 +894,26 @@ if (cluster.isMaster) {
 	// listen to exit, keep alive
 	cluster.on('exit', function(worker, code, signal) { 
 		console.log('__________________Cluster died, respawning__________________________________'.red);
+
+		clearRedis();
 		cluster.fork(); 
 	});
+
+
+	// clear kue
+	function clearRedis() {
+		redisStore.select(4, function (err) {
+			if (err) console.log(err);
+			redisStore.flushdb(function (err) {
+				console.log('flushed');
+				if (err) console.log(err);
+				redisStore.select(1, function (err) {
+					if (err) console.log(err);
+					console.log('cleared kue');
+				});
+			});
+		});
+	}
 
 
 } else {
@@ -621,11 +925,34 @@ if (cluster.isMaster) {
 	// ###  Kue jobs: Vector render          ###
 	// #########################################
 	// render vector job
-	jobs.process('create_tile', 10, function (job, done) {
+	jobs.process('render_vector_tile', 10, function (job, done) {
 
 		var params = job.data.params;
 
-		pile._getTile(params, function (err) {
+	
+		pile._renderVectorTile(params, function (err) {
+			if (err) console.log('create_tile cluster fuck', err);
+			done();
+		});
+	});
+	// render vector job
+	jobs.process('render_raster_tile', 10, function (job, done) {
+		console.log('ren ras');
+		var params = job.data.params;
+
+		pile._renderRasterTile(params, function (err) {
+			console.log('kue: calling done()')
+			if (err) console.log('create_tile cluster fuck', err);
+			done();
+		});
+
+	});
+	// render vector job
+	jobs.process('render_grid_tile', 1, function (job, done) {
+
+		var params = job.data.params;
+
+		pile._renderGridTile(params, function (err) {
 			if (err) console.log('create_tile cluster fuck', err);
 			done();
 		});
