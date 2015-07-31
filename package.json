@@ -20,6 +20,8 @@
     "mapnik-omnivore": "^6.1.4",
     "mongoose": "^4.0.8",
     "mongoose-times": "^0.1.0",
+    "pg": "^4.4.0",
+    "pg-native": "^1.8.1",
     "redis": "^0.12.1",
     "request": "^2.58.0",
     "spark": "^0.5.9",
