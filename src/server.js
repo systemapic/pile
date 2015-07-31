@@ -42,15 +42,21 @@ module.exports = function (pile) {
 		pile.getLayer(req, res);
 	});
 
-	// get raster tile
-	app.get('/api/db/raster', checkAccess, function (req, res) {
-		console.log('server.js GET /api/db/raster');
-		pile.getRasterTile(req, res);
+	// invalidate tile jobs
+	app.post('/api/db/invalidate', checkAccess, function (req, res) {
+		console.log('route: api/db/invalidate');
+		pile.invalidateTiles(req, res);
 	});
+
+	// // get raster tile
+	// app.get('/api/db/raster', checkAccess, function (req, res) {
+	// 	console.log('server.js GET /api/db/raster');
+	// 	pile.getRasterTile(req, res);
+	// });
 
 	// get tiles
 	app.get('/tiles/*', checkAccess, function (req, res) {
-		console.log('route /api/tiles/*');
+		console.log('route /tiles/*');
 		pile.getTile(req, res);
 	});
 
@@ -71,18 +77,49 @@ module.exports = function (pile) {
 
 // helper fn's for auth
 function checkAccess (req, res, next) {
-	console.time('checkAccess');
 	var access_token = req.query.access_token || req.body.access_token;
 
 	// request wu for checking access tokens
 	var verifyUrl = 'http://wu:3001/api/token/check?access_token=' + access_token;
 	request(verifyUrl, function (error, response, body) {
-	console.timeEnd('checkAccess');
 		
 		// allowed
 		if (response.statusCode == 200 && !error && body == 'OK') return next();
+
+		// check if raster request
+		if (req._parsedUrl && req._parsedUrl.pathname) {
+			var parsed = req._parsedUrl.pathname.split('/');
+			if (parsed[5]) {
+				var ext = parsed[5].split('.');
+				if (ext.length > 0) {
+					var type = ext[1];
+					if (type == 'png') {
+						// serve noAccessTile
+						return fs.readFile('public/noAccessTile.png', function (err, tile) {
+							res.writeHead(200, {'Content-Type': 'image/png'});
+							res.end(tile);
+						});
+					}
+				}
+			}
+		}
 
 		// not allowed
 		res.json({access : 'Unauthorized'});
 	});
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
