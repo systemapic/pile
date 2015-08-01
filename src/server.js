@@ -60,7 +60,11 @@ module.exports = function (pile) {
 		pile.getTile(req, res);
 	});
 
-
+	// update layer
+	app.post('/api/db/fetch', checkAccess, function (req, res) {
+		console.log('route: api/db/fecth');
+		pile.fetchData(req, res);
+	});
 
 
 
@@ -82,6 +86,7 @@ function checkAccess (req, res, next) {
 	// request wu for checking access tokens
 	var verifyUrl = 'http://wu:3001/api/token/check?access_token=' + access_token;
 	request(verifyUrl, function (error, response, body) {
+		if (!response) return res.json({access : 'Unauthorized'});
 		
 		// allowed
 		if (response.statusCode == 200 && !error && body == 'OK') return next();

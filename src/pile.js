@@ -68,6 +68,85 @@ module.exports = pile = {
 	},
 
 
+	fetchData : function (req, res) {
+
+		var options = req.body,
+		    column = options.column, // gid
+		    row = options.row, // eg. 282844
+		    layer_id = options.layer_id;
+
+
+		console.log('options', options);
+
+		var ops = [];
+
+		ops.push(function (callback) {
+			// get layer info
+
+			// retrieve layer and return it to client
+			store.redis.get(layer_id, function (err, layer) {
+				console.log('sffsdf', err, layer);
+				if (err || !layer) return callback(err || 'no layer');
+				callback(null, JSON.parse(layer));
+			});
+
+		});
+
+
+
+		ops.push(function (layer, callback) {
+
+			var table = layer.options.table_name;
+			var database = layer.options.database_name;
+
+			// do sql query on postgis
+			var GET_DATA_SCRIPT_PATH = 'src/get_data_by_column.sh';
+
+			// st_extent script 
+			var command = [
+				GET_DATA_SCRIPT_PATH, 	// script
+				layer.options.database_name, 	// database name
+				layer.options.table_name,	// table name
+				column,
+				row
+
+			].join(' ');
+
+
+			// create database in postgis
+			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+
+				var json = stdout.split('\n')[2];
+
+				console.log('json', json);
+
+				var data = JSON.parse(json);
+				data.geom = null;
+				data.the_geom_3857 = null;
+				data.the_geom_4326 = null;
+
+
+				// callback
+				callback(null, data);
+			});
+
+
+		});
+
+
+		async.waterfall(ops, function (err, data) {
+			console.log('asun conde', err, data);
+
+			res.json(data);
+		});
+		
+
+	},
+
+
+
+
+
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
 
