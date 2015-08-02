@@ -672,6 +672,16 @@ module.exports = pile = {
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
+			// check if tile bbox is outside extent of shape
+			console.log('bbox: ', bbox);
+			console.log('data extent: ', storedLayer.options.extent);
+
+
+
+			// var intersects = pile._checkTileIntersect(bbox, storedLayer.options.extent);
+
+			// console.log('isnter??', intersects);
+
 			// insert layer settings 
 			var postgis_settings = default_postgis_settings;
 			postgis_settings.dbname = storedLayer.options.database_name;
@@ -679,7 +689,10 @@ module.exports = pile = {
 			postgis_settings.extent = storedLayer.options.extent;
 			postgis_settings.geometry_field = storedLayer.options.geom_column;
 			postgis_settings.srid = storedLayer.options.srid;
+			postgis_settings.asynchronous_request = true;
+			postgis_settings.max_async_connection = 10;
 			
+
 			// everything in spherical mercator (3857)!
 			try {
 				map = new mapnik.Map(256, 256, mercator.proj4);
@@ -718,6 +731,51 @@ module.exports = pile = {
 		// run ops
 		async.waterfall(ops, done);
 
+	},
+
+	_checkTileIntersect : function (bbox, extentString) {
+
+		var extent = [
+			parseFloat(extentString.split(' ')[0]),
+			parseFloat(extentString.split(' ')[1].split(',')[0]),
+			parseFloat(extentString.split(',')[1].split(' ')[0]),
+			parseFloat(extentString.split(',')[1].split(' ')[1]),
+		]
+
+		return pile._intersects(bbox, extent);
+	},
+
+
+	_intersects : function (box1, box2) {
+		// return true if boxes intersect, quick n dirty
+		console.log('box1: ', box1);
+		console.log('box2: ', box2);
+
+		// tile
+		var box1_xmin = box1[0]
+		var box1_ymin = box1[1]
+		var box1_xmax = box1[2]
+		var box1_ymax = box1[3]
+
+		// data
+		var box2_xmin = box2[0]
+		var box2_ymin = box2[1]
+		var box2_xmax = box2[2]
+		var box2_ymax = box2[3]
+
+		// if both sides of tile is further north than extent, no overlap possible
+		if (box1_ymax > box2_ymax && box1_ymin > box2_ymax) return false;
+
+		// if both sides of tile is further west than extent, no overlap possible
+		if (box1_xmin < box2_xmin && box1_xmax < box2_xmin) return false;
+
+		// if both sides of tile is further south than extent, no overlap possible
+		if (box1_ymin < box2_ymin && box1_ymax < box2_ymin) return false;
+
+		// if both sides of tile is further east than extent, no overlap possible
+		if (box1_xmax > box2_xmax && box1_xmin > box2_xmax) return false;
+
+		return true;
 	},
 
 
@@ -849,7 +907,7 @@ if (cluster.isMaster) {
 	// start server
 	server(pile);
 
-	console.log('Cluster...'.bgYellow.black);
+	console.log('Cluster...'.bgYellow.black, numCPUs);
 	for (var i = 0; i < numCPUs - 2; i++) {  // 6 cpus
 		// fork workers
 		cluster.fork(); 
@@ -880,7 +938,7 @@ if (cluster.isMaster) {
 		});
 	});
 	// render vector job
-	jobs.process('render_raster_tile', 1, function (job, done) {
+	jobs.process('render_raster_tile', 3, function (job, done) {
 
 		var params = job.data.params;
 
