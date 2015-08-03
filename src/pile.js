@@ -144,7 +144,111 @@ module.exports = pile = {
 	},
 
 
+	fetchDataArea : function (req, res) {
+		var options = req.body,
+		    geojson = options.geojson,
+		    access_token = options.access_token,
+		    layer_id = options.layer_id;
 
+		var ops = [];
+
+		ops.push(function (callback) {
+			// retrieve layer and return it to client
+			store.redis.get(layer_id, function (err, layer) {
+				// console.log('err, layer', err, layer);
+				if (err || !layer) return callback(err || 'no layer');
+				callback(null, JSON.parse(layer));
+			});
+		});
+
+		ops.push(function (layer, callback) {
+
+			var table = layer.options.table_name;
+			var database = layer.options.database_name;
+			var polygon = "'" + JSON.stringify(geojson.geometry) + "'";
+
+			// do sql query on postgis
+			var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
+
+			// st_extent script 
+			var command = [
+				GET_DATA_AREA_SCRIPT_PATH, 	// script
+				layer.options.database_name, 	// database name
+				layer.options.table_name,	// table name
+				polygon
+			].join(' ');
+
+
+			// create database in postgis
+			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+
+				var arr = stdout.split('\n');
+				var result = arr.slice(4, -3);
+
+				var points = [];
+				result.forEach(function (r) {
+					var point = JSON.parse(r);
+
+					// delete geoms
+					delete point.geom;
+					delete point.the_geom_3857;
+					delete point.the_geom_4326;
+					
+					// push
+					points.push(point);
+				});
+
+				// calculate averages
+				var average = pile._calculateAverages(points);
+
+				// only return 100 points
+				if (points.length > 100) {
+					points = points.slice(0, 100);
+				}
+
+				// return results
+				var resultObject = {
+					all : points,
+					average : average
+				}
+
+				// callback
+				callback(null, resultObject);
+			});
+		});
+
+
+		async.waterfall(ops, function (err, data) {
+			res.json(data);
+		});
+	},
+
+
+	_calculateAverages : function (points) {
+
+		var keys = {};
+
+		// get keys
+		for (var key in points[0]) {
+			keys[key] = [];
+		}
+
+		// sum values
+		points.forEach(function (p) {
+			for (var key in p) {
+				keys[key].push(p[key]);
+			}
+		});
+
+		// calc avg
+		var averages = {};
+		for (var k in keys) {
+			averages[k] = (_.sum(keys[k]) / keys[k].length)
+		}
+
+
+		return averages;
+	},
 
 
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer

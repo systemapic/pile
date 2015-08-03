@@ -60,10 +60,16 @@ module.exports = function (pile) {
 		pile.getTile(req, res);
 	});
 
-	// update layer
+	// get data from point
 	app.post('/api/db/fetch', checkAccess, function (req, res) {
 		console.log('route: api/db/fecth');
 		pile.fetchData(req, res);
+	});
+
+	// get data from area
+	app.post('/api/db/fetchArea', checkAccess, function (req, res) {
+		console.log('route: api/db/fecthArea');
+		pile.fetchDataArea(req, res);
 	});
 
 
