@@ -155,7 +155,6 @@ module.exports = pile = {
 		ops.push(function (callback) {
 			// retrieve layer and return it to client
 			store.redis.get(layer_id, function (err, layer) {
-				// console.log('err, layer', err, layer);
 				if (err || !layer) return callback(err || 'no layer');
 				callback(null, JSON.parse(layer));
 			});
@@ -166,21 +165,24 @@ module.exports = pile = {
 			var table = layer.options.table_name;
 			var database = layer.options.database_name;
 			var polygon = "'" + JSON.stringify(geojson.geometry) + "'";
+			var sql = '"' + layer.options.sql + '"';
 
 			// do sql query on postgis
 			var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
 
-			// st_extent script 
+			// st_intersect script 
 			var command = [
 				GET_DATA_AREA_SCRIPT_PATH, 	// script
 				layer.options.database_name, 	// database name
-				layer.options.table_name,	// table name
-				polygon
-			].join(' ');
+				sql,				// sql
+				polygon 			// geojson
+			].join(' '); 
 
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				if (err) return callback(err);
+
 
 				var arr = stdout.split('\n');
 				var result = arr.slice(4, -3);
