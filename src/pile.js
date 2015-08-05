@@ -292,6 +292,8 @@ module.exports = pile = {
 
 			var upload_status = JSON.parse(upload_status);
 
+			console.log('uploadStatus: ', upload_status);
+
 			// check that done importing to postgis
 			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
 
@@ -303,6 +305,24 @@ module.exports = pile = {
 			// all good
 			callback(null, upload_status);
 		});
+
+
+		// // get file
+		// ops.push(function (options, callback) {
+
+		// 	var file_id = options.file_id;
+
+		// 	File
+		// 	.findOne({uuid : file_id})
+		// 	.exec(function (err, f) {
+		// 		console.log('foiund file??????!?!?!?!?', err, f);
+
+		// 		options.fileObject = f;
+
+		// 		callback(err, options);
+		// 	})
+
+		// });
 
 		ops.push(function (options, callback) {
 
