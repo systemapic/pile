@@ -171,19 +171,19 @@ module.exports = pile = {
 			// do sql query on postgis
 			var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
 
-			// st_intersect script 
+			// st_extent script 
 			var command = [
 				GET_DATA_AREA_SCRIPT_PATH, 	// script
 				layer.options.database_name, 	// database name
-				sql,				// sql
-				polygon 			// geojson
-			].join(' '); 
+				// layer.options.table_name,	// table name
+				sql,
+				polygon
+			].join(' ');
 
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 				if (err) return callback(err);
-
 
 				var arr = stdout.split('\n');
 				var result = arr.slice(4, -3);
@@ -216,7 +216,8 @@ module.exports = pile = {
 					all : points,
 					average : average,
 					total_points : total_points,
-					area : geojsonArea.geometry(geojson.geometry)
+					area : geojsonArea.geometry(geojson.geometry),
+					layer_id : layer_id
 				}
 
 				// callback
