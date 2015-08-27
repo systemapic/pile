@@ -42,18 +42,6 @@ module.exports = function (pile) {
 		pile.getLayer(req, res);
 	});
 
-	// // invalidate tile jobs
-	// app.post('/api/db/invalidate', checkAccess, function (req, res) {
-	// 	console.log('route: api/db/invalidate');
-	// 	// pile.invalidateTiles(req, res);
-	// });
-
-	// // get raster tile
-	// app.get('/api/db/raster', checkAccess, function (req, res) {
-	// 	console.log('server.js GET /api/db/raster');
-	// 	pile.getRasterTile(req, res);
-	// });
-
 	// get tiles
 	app.get('/tiles/*', checkAccess, function (req, res) {
 		console.log('route /tiles/*');
