@@ -181,16 +181,36 @@ module.exports = pile = {
 			].join(' ');
 
 
-			// create database in postgis
+			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				console.log('err, stdout, stdin', err, stdout, stdin);
+				console.log('err: ', err);
+
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n');
-				var result = arr.slice(4, -3);
+
+				console.log('arr: ', arr);
+				var result = [];
+				arr.forEach(function (arrr) {
+
+					try {
+						var item = JSON.parse(arrr);
+						result.push(item);
+					} catch (e) {
+						console.log('NOT JSON', e);
+					}
+				});
+
+				// var result = arr.slice(4, -3);
+
+				console.log('RESUSUSUS', result);
 
 				var points = [];
-				result.forEach(function (r) {
-					var point = JSON.parse(r);
+				result.forEach(function (point) {
+					// var point = JSON.parse(r);
+
+					console.log('r---->', point);
 
 					// delete geoms
 					delete point.geom;
