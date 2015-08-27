@@ -23,6 +23,7 @@ var store  = require('./store');
 
 // mercator
 var mercator = require('./sphericalmercator');
+var geojsonArea = require('geojson-area');
 
 // register mapnik plugions
 mapnik.register_default_fonts();
@@ -203,6 +204,8 @@ module.exports = pile = {
 				// calculate averages
 				var average = pile._calculateAverages(points);
 
+				var total_points = points.length;
+
 				// only return 100 points
 				if (points.length > 100) {
 					points = points.slice(0, 100);
@@ -211,14 +214,15 @@ module.exports = pile = {
 				// return results
 				var resultObject = {
 					all : points,
-					average : average
+					average : average,
+					total_points : total_points,
+					area : geojsonArea.geometry(geojson.geometry)
 				}
 
 				// callback
 				callback(null, resultObject);
 			});
 		});
-
 
 		async.waterfall(ops, function (err, data) {
 			res.json(data);
