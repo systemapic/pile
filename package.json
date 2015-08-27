@@ -14,6 +14,7 @@
     "dirty-json": "0.0.5",
     "express": "^4.13.0",
     "fs-extra": "^0.22.1",
+    "geojson-area": "^0.2.0",
     "grainstore": "^1.0.0",
     "kue": "^0.9.3",
     "lodash": "^3.10.0",
