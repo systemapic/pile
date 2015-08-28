@@ -23,6 +23,7 @@ var store  = require('./store');
 
 // mercator
 var mercator = require('./sphericalmercator');
+var geojsonArea = require('geojson-area');
 
 // register mapnik plugions
 mapnik.register_default_fonts();
@@ -170,26 +171,46 @@ module.exports = pile = {
 			// do sql query on postgis
 			var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
 
-			// st_intersect script 
+			// st_extent script 
 			var command = [
 				GET_DATA_AREA_SCRIPT_PATH, 	// script
 				layer.options.database_name, 	// database name
-				sql,				// sql
-				polygon 			// geojson
-			].join(' '); 
+				// layer.options.table_name,	// table name
+				sql,
+				polygon
+			].join(' ');
 
 
-			// create database in postgis
+			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				console.log('err, stdout, stdin', err, stdout, stdin);
+				console.log('err: ', err);
+
 				if (err) return callback(err);
 
-
 				var arr = stdout.split('\n');
-				var result = arr.slice(4, -3);
+
+				console.log('arr: ', arr);
+				var result = [];
+				arr.forEach(function (arrr) {
+
+					try {
+						var item = JSON.parse(arrr);
+						result.push(item);
+					} catch (e) {
+						console.log('NOT JSON', e);
+					}
+				});
+
+				// var result = arr.slice(4, -3);
+
+				console.log('RESUSUSUS', result);
 
 				var points = [];
-				result.forEach(function (r) {
-					var point = JSON.parse(r);
+				result.forEach(function (point) {
+					// var point = JSON.parse(r);
+
+					console.log('r---->', point);
 
 					// delete geoms
 					delete point.geom;
@@ -203,6 +224,8 @@ module.exports = pile = {
 				// calculate averages
 				var average = pile._calculateAverages(points);
 
+				var total_points = points.length;
+
 				// only return 100 points
 				if (points.length > 100) {
 					points = points.slice(0, 100);
@@ -211,14 +234,16 @@ module.exports = pile = {
 				// return results
 				var resultObject = {
 					all : points,
-					average : average
+					average : average,
+					total_points : total_points,
+					area : geojsonArea.geometry(geojson.geometry),
+					layer_id : layer_id
 				}
 
 				// callback
 				callback(null, resultObject);
 			});
 		});
-
 
 		async.waterfall(ops, function (err, data) {
 			res.json(data);
