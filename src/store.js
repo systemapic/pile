@@ -27,6 +27,7 @@ var pile_settings = {
 	store : 'disk' // or redis
 }
 
+console.log('store!');
 var redis = require('redis');
 var redisStore = redis.createClient(config.redis.port, config.redis.host, {detect_buffers : true});
 redisStore.auth(config.redis.auth);
@@ -46,6 +47,9 @@ module.exports = store = {
 
 	kue : kueStore,
 
+
+
+	
 
 
 
