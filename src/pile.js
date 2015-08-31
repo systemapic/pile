@@ -197,7 +197,6 @@ module.exports = pile = {
 			var command = [
 				GET_DATA_AREA_SCRIPT_PATH, 	// script
 				layer.options.database_name, 	// database name
-				// layer.options.table_name,	// table name
 				sql,
 				polygon
 			].join(' ');
@@ -205,34 +204,21 @@ module.exports = pile = {
 
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				// console.log('err, stdout, stdin', err, stdout, stdin);
-				// console.log('err: ', err);
-
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n');
 
-				// console.log('arr: ', arr);
 				var result = [];
 				arr.forEach(function (arrr) {
-
 					try {
 						var item = JSON.parse(arrr);
 						result.push(item);
-					} catch (e) {
-						console.log('NOT JSON', e);
-					}
+					} catch (e) {};
 				});
 
-				// var result = arr.slice(4, -3);
-
-				// console.log('RESUSUSUS', result);
 
 				var points = [];
 				result.forEach(function (point) {
-					// var point = JSON.parse(r);
-
-					// console.log('r---->', point);
 
 					// delete geoms
 					delete point.geom;
