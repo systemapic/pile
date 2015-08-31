@@ -16,6 +16,7 @@
     "fs-extra": "^0.22.1",
     "geojson-area": "^0.2.0",
     "grainstore": "^1.0.0",
+    "http-request": "^0.7.0",
     "kue": "^0.9.3",
     "lodash": "^3.10.0",
     "mapnik": "^3.4.0",

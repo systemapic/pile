@@ -20,6 +20,7 @@ var exec = require('child_process').exec;
 var server = require('./server');
 var config = require('../config/pile-config');
 var store  = require('./store');
+var proxy = require('./proxy');
 
 // mercator
 var mercator = require('./sphericalmercator');
@@ -46,6 +47,7 @@ mongoose.connect(config.mongo.url);
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
+var PROXYPATH 	 = '/data/proxy_tiles/';
 
 // mute console in production mode
 if (process.argv[2] == 'production') {
@@ -63,11 +65,39 @@ if (process.argv[2] == 'production') {
 module.exports = pile = { 
 
 	headers : {
+		jpeg : 'image/jpeg',
 		png : 'image/png',
 		pbf : 'application/x-protobuf',
 		grid : 'application/json'
 	},
 
+	proxyTile : function (req, res) {
+
+		// parse url
+		var params = req.params[0].split('/');
+
+		// set options
+		var options = {
+			provider : params[0],
+			type 	 : params[1],
+			z 	 : params[2],
+			x 	 : params[3],
+			y 	 : params[4].split('.')[0],
+			format 	 : params[4].split('.')[1]
+		}
+
+		// create proxy tile job
+		var job = jobs.create('proxy_tile', { 
+			options : options,
+		}).priority('high').attempts(5).save();
+
+		// proxy tile job done
+		job.on('complete', function (result) {
+
+			// serve proxy tile
+			proxy.serveTile(res, options);
+		});
+	},
 
 	fetchData : function (req, res) {
 
@@ -75,7 +105,6 @@ module.exports = pile = {
 		    column = options.column, // gid
 		    row = options.row, // eg. 282844
 		    layer_id = options.layer_id;
-
 
 		console.log('options', options);
 
@@ -92,8 +121,6 @@ module.exports = pile = {
 			});
 
 		});
-
-
 
 		ops.push(function (layer, callback) {
 
@@ -130,20 +157,15 @@ module.exports = pile = {
 				// callback
 				callback(null, data);
 			});
-
-
 		});
-
 
 		async.waterfall(ops, function (err, data) {
 			console.log('asun conde', err, data);
 
 			res.json(data);
 		});
-		
 
 	},
-
 
 	fetchDataArea : function (req, res) {
 		var options = req.body,
@@ -183,14 +205,14 @@ module.exports = pile = {
 
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log('err, stdout, stdin', err, stdout, stdin);
-				console.log('err: ', err);
+				// console.log('err, stdout, stdin', err, stdout, stdin);
+				// console.log('err: ', err);
 
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n');
 
-				console.log('arr: ', arr);
+				// console.log('arr: ', arr);
 				var result = [];
 				arr.forEach(function (arrr) {
 
@@ -204,13 +226,13 @@ module.exports = pile = {
 
 				// var result = arr.slice(4, -3);
 
-				console.log('RESUSUSUS', result);
+				// console.log('RESUSUSUS', result);
 
 				var points = [];
 				result.forEach(function (point) {
 					// var point = JSON.parse(r);
 
-					console.log('r---->', point);
+					// console.log('r---->', point);
 
 					// delete geoms
 					delete point.geom;
@@ -272,7 +294,6 @@ module.exports = pile = {
 		for (var k in keys) {
 			averages[k] = (_.sum(keys[k]) / keys[k].length)
 		}
-
 
 		return averages;
 	},
@@ -407,7 +428,10 @@ module.exports = pile = {
 		async.waterfall(ops, function (err, layerObject) {
 			if (err) return res.json({error : err});
 
-			console.log('>>>>>>>>>>>>>>>>>> Created layer ', layerObject);
+			console.log('###################');
+			console.log('## Created Layer ##')
+			console.log(layerObject);
+			console.log('###################');
 			
 			// return layer to client
 			res.json(layerObject);
@@ -455,8 +479,6 @@ module.exports = pile = {
 		// add access token to params
 		params.access_token = req.query.access_token || req.body.access_token;
 
-		console.log('getTile ', params.z, params.x, params.y);
-
 		// get stored layer
 		store.redis.get(params.layerUuid, function (err, storedLayerJSON) {	
 			if (err) return pile._getTileErrorHandler(res, err);
@@ -497,7 +519,6 @@ module.exports = pile = {
 
 
 	_getTileErrorHandler : function (res, err) {
-		console.log('_getTileErrorHandler err:', err);
 		res.end();
 	},
 
@@ -518,7 +539,6 @@ module.exports = pile = {
 			// stats
 			var end = new Date().getTime();
 			var create_tile_time = end - start;
-			console.log('Created vector tile', create_tile_time);
 			
 			// get tile
 			pile._readVectorTile(params, storedLayer, done);
@@ -581,6 +601,7 @@ module.exports = pile = {
 
 		pile._prepareTile(params, function (err, map) {
 			if (err) console.log('create_tile cluster fuck', err);
+			if (err) return done(err);
 
 			var map_options = {
 				variables : { 
@@ -673,12 +694,6 @@ module.exports = pile = {
 				if (err) return done(err);
 				if (!grid) return done('no grid 233');
 
-				// console.log('grid : ', grid, grid.fields(), grid.painted());
-
-				// for (g in grid) {
-					// console.log('g: ', g);
-				// }
-
 				grid.encode({features : true}, function (err, utf) {
 					if (err) return done(err);
 					// save grid to redis
@@ -754,11 +769,11 @@ module.exports = pile = {
 
 
 	checkParams : function (params, done) {
-		if (!params.layerUuid) 	return done('Invalid url: Missing layerUuid.');
-		if (!params.z) 		return done('Invalid url: Missing tile coordinates.');
-		if (!params.x) 		return done('Invalid url: Missing tile coordinates.');
-		if (!params.y) 		return done('Invalid url: Missing tile coordinates.');
-		if (!params.type) 	return done('Invalid url: Missing type extension.');
+		if (!params.layerUuid) 		return done('Invalid url: Missing layerUuid.');
+		if (params.z == undefined) 	return done('Invalid url: Missing tile coordinates. z', params.z);
+		if (params.x == undefined) 	return done('Invalid url: Missing tile coordinates. x', params.x);
+		if (params.y == undefined) 	return done('Invalid url: Missing tile coordinates. y', params.y);
+		if (!params.type) 		return done('Invalid url: Missing type extension.');
 		return done(null);
 	},
 
@@ -772,11 +787,11 @@ module.exports = pile = {
 		    bbox;
 
 		// check params
-		if (!params.layerUuid) 	return pile.error.missingInformation(res, 'Invalid url: Missing layerUuid.');
-		if (!params.z) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.x) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.y) 		return pile.error.missingInformation(res, 'Invalid url: Missing tile coordinates.');
-		if (!params.type) 	return pile.error.missingInformation(res, 'Invalid url: Missing type (extension).');
+		if (!params.layerUuid) 	   return done('Invalid url: Missing layerUuid.');
+		if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
+		if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
+		if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
+		if (!params.type) 	   return done('Invalid url: Missing type extension.');
 
 
 		// look for stored layerUuid
@@ -804,8 +819,8 @@ module.exports = pile = {
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
 			// check if tile bbox is outside extent of shape
-			console.log('bbox: ', bbox);
-			console.log('data extent: ', storedLayer.options.extent);
+			// console.log('bbox: ', bbox);
+			// console.log('data extent: ', storedLayer.options.extent);
 
 
 
@@ -879,8 +894,8 @@ module.exports = pile = {
 
 	_intersects : function (box1, box2) {
 		// return true if boxes intersect, quick n dirty
-		console.log('box1: ', box1);
-		console.log('box2: ', box2);
+		// console.log('box1: ', box1);
+		// console.log('box2: ', box2);
 
 		// tile
 		var box1_xmin = box1[0]
@@ -1068,7 +1083,8 @@ if (cluster.isMaster) {
 			done(err);
 		});
 	});
-	// render vector job
+
+	// render raster job
 	jobs.process('render_raster_tile', 3, function (job, done) {
 
 		var params = job.data.params;
@@ -1077,22 +1093,31 @@ if (cluster.isMaster) {
 		var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
 
 		// render
-		console.time('render raster tile', params.z);
 		pile._renderRasterTile(params, function (err) {
-			console.timeEnd('render raster tile', params.z);
-
 			if (err) console.log('create_tile cluster fuck', err);
 			
 			done(null);
 		});
 
 	});
-	// render vector job
+
+	// render grid job
 	jobs.process('render_grid_tile', 1, function (job, done) {
 
 		var params = job.data.params;
 		pile._renderGridTile(params, function (err) {
 			if (err) console.log('create_tile cluster fuck', err);
+			done(err);
+		});
+	});
+
+
+	// render grid job
+	jobs.process('proxy_tile', 100, function (job, done) {
+
+		var options = job.data.options;
+		proxy._getTile(options, function (err) {
+			if (err) console.log('proxy_tile cluster fuck', err);
 			done(err);
 		});
 	});
