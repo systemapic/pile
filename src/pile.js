@@ -428,7 +428,10 @@ module.exports = pile = {
 		async.waterfall(ops, function (err, layerObject) {
 			if (err) return res.json({error : err});
 
-			console.log('>>>>>>>>>>>>>>>>>> Created layer ', layerObject);
+			console.log('###################');
+			console.log('## Created Layer ##')
+			console.log(layerObject);
+			console.log('###################');
 			
 			// return layer to client
 			res.json(layerObject);
@@ -476,8 +479,6 @@ module.exports = pile = {
 		// add access token to params
 		params.access_token = req.query.access_token || req.body.access_token;
 
-		console.log('getTile ', params.z, params.x, params.y);
-
 		// get stored layer
 		store.redis.get(params.layerUuid, function (err, storedLayerJSON) {	
 			if (err) return pile._getTileErrorHandler(res, err);
@@ -518,7 +519,6 @@ module.exports = pile = {
 
 
 	_getTileErrorHandler : function (res, err) {
-		console.log('_getTileErrorHandler err:', err);
 		res.end();
 	},
 
@@ -539,7 +539,6 @@ module.exports = pile = {
 			// stats
 			var end = new Date().getTime();
 			var create_tile_time = end - start;
-			console.log('Created vector tile', create_tile_time);
 			
 			// get tile
 			pile._readVectorTile(params, storedLayer, done);
@@ -695,12 +694,6 @@ module.exports = pile = {
 				if (err) return done(err);
 				if (!grid) return done('no grid 233');
 
-				// console.log('grid : ', grid, grid.fields(), grid.painted());
-
-				// for (g in grid) {
-					// console.log('g: ', g);
-				// }
-
 				grid.encode({features : true}, function (err, utf) {
 					if (err) return done(err);
 					// save grid to redis
@@ -826,8 +819,8 @@ module.exports = pile = {
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
 			// check if tile bbox is outside extent of shape
-			console.log('bbox: ', bbox);
-			console.log('data extent: ', storedLayer.options.extent);
+			// console.log('bbox: ', bbox);
+			// console.log('data extent: ', storedLayer.options.extent);
 
 
 
@@ -901,8 +894,8 @@ module.exports = pile = {
 
 	_intersects : function (box1, box2) {
 		// return true if boxes intersect, quick n dirty
-		console.log('box1: ', box1);
-		console.log('box2: ', box2);
+		// console.log('box1: ', box1);
+		// console.log('box2: ', box2);
 
 		// tile
 		var box1_xmin = box1[0]
@@ -1100,10 +1093,7 @@ if (cluster.isMaster) {
 		var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
 
 		// render
-		console.time('render raster tile', params.z);
 		pile._renderRasterTile(params, function (err) {
-			console.timeEnd('render raster tile', params.z);
-
 			if (err) console.log('create_tile cluster fuck', err);
 			
 			done(null);

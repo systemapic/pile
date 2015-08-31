@@ -96,7 +96,6 @@ module.exports = proxy = {
 		ops.push(function (callback) {
 
 			fs.readFile(tile_on_disk_path, function (err, data) {
-				if (err) console.log('err: ', err);
 				
 				// found tile on disk
 				if (!err && data) return callback({
