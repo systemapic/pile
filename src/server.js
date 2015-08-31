@@ -41,6 +41,7 @@ module.exports = function (pile) {
 
 	// get tiles
 	app.get('/tiles/*', checkAccess, function (req, res) {
+		console.log('/tiles/*');
 		pile.getTile(req, res);
 	});
 
@@ -58,6 +59,7 @@ module.exports = function (pile) {
 
 	// proxy tiles
 	app.get('/proxy/*', checkAccess, function (req, res) {
+		console.log('/proxy/*');
 		pile.proxyTile(req, res);
 	});
 

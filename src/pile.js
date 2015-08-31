@@ -58,6 +58,7 @@ if (process.argv[2] == 'production') {
 }
 
 
+
 // #########################################
 // ### Vector, raster, utfgrid handling  ###
 // #########################################
@@ -106,8 +107,6 @@ module.exports = pile = {
 		    row = options.row, // eg. 282844
 		    layer_id = options.layer_id;
 
-		console.log('options', options);
-
 		var ops = [];
 
 		ops.push(function (callback) {
@@ -146,8 +145,6 @@ module.exports = pile = {
 
 				var json = stdout.split('\n')[2];
 
-				console.log('json', json);
-
 				var data = JSON.parse(json);
 				data.geom = null;
 				data.the_geom_3857 = null;
@@ -160,8 +157,6 @@ module.exports = pile = {
 		});
 
 		async.waterfall(ops, function (err, data) {
-			console.log('asun conde', err, data);
-
 			res.json(data);
 		});
 
@@ -465,7 +460,6 @@ module.exports = pile = {
 
 		// parse url into layerUuid, zxy, type
 		var ops = [],
-		    // https://dev.systemapic.com/tiles/layerUuid/z/x/y.png || .pbf
 		    parsed = req._parsedUrl.pathname.split('/'), 
 		    params = {
 			layerUuid : parsed[2],
@@ -729,6 +723,8 @@ module.exports = pile = {
 	},
 
 	getRasterTile : function (params, storedLayer, done) {
+
+		console.log('getting raster tiles');
 
 		// check cache
 		store._readRasterTile(params, function (err, data) {
@@ -1098,6 +1094,7 @@ if (cluster.isMaster) {
 		// save job by id
 		var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
 
+		
 		// render
 		pile._renderRasterTile(params, function (err) {
 			if (err) console.log('create_tile cluster fuck', err);
