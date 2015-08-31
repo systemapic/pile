@@ -26,43 +26,40 @@ module.exports = function (pile) {
 
 	// create layer
 	app.post('/api/db/createLayer', checkAccess, function (req, res) {
-		console.log('route: api/db/createLayer');
 		pile.createLayer(req, res);
 	});
 
 	// update layer
 	app.post('/api/db/updateLayer', checkAccess, function (req, res) {
-		console.log('route: api/db/createLayer');
 		pile.updateLayer(req, res);
 	});
 
 	// get layer
 	app.get('/api/db/getLayer', checkAccess, function (req, res) {
-		console.log('route: api/db/getLayer');
 		pile.getLayer(req, res);
 	});
 
 	// get tiles
 	app.get('/tiles/*', checkAccess, function (req, res) {
-		console.log('route /tiles/*');
 		pile.getTile(req, res);
 	});
 
 	// get data from point
 	app.post('/api/db/fetch', checkAccess, function (req, res) {
-		console.log('route: api/db/fecth');
 		pile.fetchData(req, res);
 	});
 
 	// get data from area
 	app.post('/api/db/fetchArea', checkAccess, function (req, res) {
-		console.log('route: api/db/fecthArea');
 		pile.fetchDataArea(req, res);
 	});
 
 
 
-
+	// proxy tiles
+	app.get('/proxy/*', checkAccess, function (req, res) {
+		pile.proxyTile(req, res);
+	});
 
 
 	// start server
