@@ -62,7 +62,11 @@ module.exports = function (pile) {
 
 
 
-
+	// proxy tiles
+	app.get('/proxy/*', checkAccess, function (req, res) {
+		console.log('/api/proxy');
+		pile.proxyTile(req, res);
+	});
 
 
 	// start server
