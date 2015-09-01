@@ -114,7 +114,6 @@ module.exports = pile = {
 
 			// retrieve layer and return it to client
 			store.redis.get(layer_id, function (err, layer) {
-				console.log('sffsdf', err, layer);
 				if (err || !layer) return callback(err || 'no layer');
 				callback(null, JSON.parse(layer));
 			});
