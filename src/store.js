@@ -44,8 +44,7 @@ kueStore.flushall(function (err) {
 module.exports = store = { 
 
 	redis : redisStore,
-
-	kue : kueStore,
+	kue   : kueStore,
 
 
 
@@ -53,7 +52,7 @@ module.exports = store = {
 
 
 
-
+	// save tiles generically
 	_saveVectorTile : function (tile, params, done) {
 		if (pile_settings.store == 'redis') return store._saveVectorTileRedis(tile, params, done);
 		if (pile_settings.store == 'disk')  return store._saveVectorTileDisk(tile, params, done);
@@ -75,7 +74,7 @@ module.exports = store = {
 
 
 
-
+	// read/write to redis
 	_saveVectorTileRedis : function (tile, params, done) {
 		// save png to redis
 		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
@@ -98,7 +97,7 @@ module.exports = store = {
 
 
 
-
+	// read/write to disk
 	_saveVectorTileDisk : function (tile, params, done) {
 		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var path = VECTORPATH + keyString;

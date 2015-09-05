@@ -23,7 +23,6 @@ module.exports = function (pile) {
 	app.use(bodyParser.json({ limit: '1000mb'}));
 	app.use(express.static(path.join(__dirname, 'public'))); 	// not secured
 
-
 	// create layer
 	app.post('/api/db/createLayer', checkAccess, function (req, res) {
 		pile.createLayer(req, res);
@@ -41,7 +40,6 @@ module.exports = function (pile) {
 
 	// get tiles
 	app.get('/tiles/*', checkAccess, function (req, res) {
-		console.log('/tiles/*');
 		pile.getTile(req, res);
 	});
 
@@ -59,7 +57,6 @@ module.exports = function (pile) {
 
 	// proxy tiles
 	app.get('/proxy/*', checkAccess, function (req, res) {
-		console.log('/proxy/*');
 		pile.proxyTile(req, res);
 	});
 
@@ -106,18 +103,3 @@ function checkAccess (req, res, next) {
 		res.json({access : 'Unauthorized'});
 	});
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

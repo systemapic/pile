@@ -110,7 +110,6 @@ module.exports = pile = {
 		var ops = [];
 
 		ops.push(function (callback) {
-			// get layer info
 
 			// retrieve layer and return it to client
 			store.redis.get(layer_id, function (err, layer) {
@@ -142,13 +141,14 @@ module.exports = pile = {
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 
+				// parse results
 				var json = stdout.split('\n')[2];
-
 				var data = JSON.parse(json);
+				
+				// remove geom columns
 				data.geom = null;
 				data.the_geom_3857 = null;
 				data.the_geom_4326 = null;
-
 
 				// callback
 				callback(null, data);
@@ -200,9 +200,9 @@ module.exports = pile = {
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 				if (err) return callback(err);
 
-				var arr = stdout.split('\n');
+				var arr = stdout.split('\n'),
+				    result = [];
 
-				var result = [];
 				arr.forEach(function (arrr) {
 					try {
 						var item = JSON.parse(arrr);
@@ -223,9 +223,8 @@ module.exports = pile = {
 					points.push(point);
 				});
 
-				// calculate averages
+				// calculate averages, totals
 				var average = pile._calculateAverages(points);
-
 				var total_points = points.length;
 
 				// only return 100 points
@@ -318,8 +317,6 @@ module.exports = pile = {
 
 			var upload_status = JSON.parse(upload_status);
 
-			console.log('uploadStatus: ', upload_status);
-
 			// check that done importing to postgis
 			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
 
@@ -333,22 +330,6 @@ module.exports = pile = {
 		});
 
 
-		// // get file
-		// ops.push(function (options, callback) {
-
-		// 	var file_id = options.file_id;
-
-		// 	File
-		// 	.findOne({uuid : file_id})
-		// 	.exec(function (err, f) {
-		// 		console.log('foiund file??????!?!?!?!?', err, f);
-
-		// 		options.fileObject = f;
-
-		// 		callback(err, options);
-		// 	})
-
-		// });
 
 		ops.push(function (options, callback) {
 
@@ -428,10 +409,7 @@ module.exports = pile = {
 		async.waterfall(ops, function (err, layerObject) {
 			if (err) return res.json({error : err});
 
-			console.log('###################');
-			console.log('## Created Layer ##')
-			console.log(layerObject);
-			console.log('###################');
+			console.log('Created layer.', layerObject);
 			
 			// return layer to client
 			res.json(layerObject);
@@ -592,8 +570,6 @@ module.exports = pile = {
 			// get tile
 			pile._getGridTileFromRedis(params, done);
 		});
-
-
 	},
 
 	_renderVectorTile : function (params, done) {
@@ -695,12 +671,11 @@ module.exports = pile = {
 
 				grid.encode({features : true}, function (err, utf) {
 					if (err) return done(err);
+					
 					// save grid to redis
 					var keyString = 'grid_tile:'  + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
-					// var key = new Buffer(keyString);
-
 					store.redis.set(keyString, JSON.stringify(utf), done);
-				})
+				});
 			});
 		});
 	},
@@ -723,8 +698,6 @@ module.exports = pile = {
 
 	getRasterTile : function (params, storedLayer, done) {
 
-		console.log('getting raster tiles');
-
 		// check cache
 		store._readRasterTile(params, function (err, data) {
 
@@ -741,9 +714,10 @@ module.exports = pile = {
 		// check cache
 		pile._getGridTileFromRedis(params, function (err, data) {
 
+			// found, return data
 			if (data) return done(null, data);
 
-			// create
+			// not found, create
 			pile.createGridTile(params, storedLayer, done);
 		});
 	},
@@ -819,36 +793,25 @@ module.exports = pile = {
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
-			// check if tile bbox is outside extent of shape
-			// console.log('bbox: ', bbox);
-			// console.log('data extent: ', storedLayer.options.extent);
-
-
-
-			// var intersects = pile._checkTileIntersect(bbox, storedLayer.options.extent);
-
-			// console.log('isnter??', intersects);
-
 			// insert layer settings 
-			var postgis_settings = default_postgis_settings;
-			postgis_settings.dbname = storedLayer.options.database_name;
-			postgis_settings.table 	= storedLayer.options.sql;
-			postgis_settings.extent = storedLayer.options.extent;
-			postgis_settings.geometry_field = storedLayer.options.geom_column;
-			postgis_settings.srid = storedLayer.options.srid;
-			postgis_settings.asynchronous_request = true;
-			postgis_settings.max_async_connection = 10;
+			var postgis_settings 			= default_postgis_settings;
+			postgis_settings.dbname 		= storedLayer.options.database_name;
+			postgis_settings.table 			= storedLayer.options.sql;
+			postgis_settings.extent 		= storedLayer.options.extent;
+			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
+			postgis_settings.srid 			= storedLayer.options.srid;
+			postgis_settings.asynchronous_request 	= true;
+			postgis_settings.max_async_connection 	= 10;
 			
 
 			// everything in spherical mercator (3857)!
-			try {
+			try {  	
 				map = new mapnik.Map(256, 256, mercator.proj4);
 				layer = new mapnik.Layer('layer', mercator.proj4);
 				postgis = new mapnik.Datasource(postgis_settings);
 				
-			} catch (e) {
-				return callback(e.message);
-			}
+			// catch errors
+			} catch (e) { return callback(e.message); }
 
 			// set buffer
 			map.bufferSize = 128;
@@ -895,8 +858,6 @@ module.exports = pile = {
 
 	_intersects : function (box1, box2) {
 		// return true if boxes intersect, quick n dirty
-		// console.log('box1: ', box1);
-		// console.log('box2: ', box2);
 
 		// tile
 		var box1_xmin = box1[0]
@@ -977,7 +938,6 @@ module.exports = pile = {
 			file_id : file_id,
 			access_token : access_token
 		}, function (err, results) {
-			// console.log('pile.request.get: ', err, results);
 		});
 	},
 
@@ -1092,7 +1052,6 @@ if (cluster.isMaster) {
 
 		// save job by id
 		var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
-
 		
 		// render
 		pile._renderRasterTile(params, function (err) {
