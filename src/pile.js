@@ -112,7 +112,7 @@ module.exports = pile = {
 		ops.push(function (callback) {
 
 			// retrieve layer and return it to client
-			store.redis.get(layer_id, function (err, layer) {
+			store.layers.get(layer_id, function (err, layer) {
 				if (err || !layer) return callback(err || 'no layer');
 				callback(null, JSON.parse(layer));
 			});
@@ -399,7 +399,7 @@ module.exports = pile = {
 		ops.push(function (layer, callback) {
 
 			// save layer to store.redis
-			store.redis.set(layer.layerUuid, JSON.stringify(layer), function (err) {
+			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
 				if (err) console.log('resdiStore.set layer err: ', err);
 				callback(err, layer);
 			});
@@ -426,7 +426,7 @@ module.exports = pile = {
 		if (!layerUuid) return pile.error.missingInformation(res, 'Please provide layerUuid.');
 
 		// retrieve layer and return it to client
-		store.redis.get(layerUuid, function (err, layer) {
+		store.layers.get(layerUuid, function (err, layer) {
 			res.end(layer);
 		});
 	},
@@ -457,7 +457,7 @@ module.exports = pile = {
 		params.access_token = req.query.access_token || req.body.access_token;
 
 		// get stored layer
-		store.redis.get(params.layerUuid, function (err, storedLayerJSON) {	
+		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
 			if (err) return pile._getTileErrorHandler(res, err);
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
@@ -674,7 +674,7 @@ module.exports = pile = {
 					
 					// save grid to redis
 					var keyString = 'grid_tile:'  + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
-					store.redis.set(keyString, JSON.stringify(utf), done);
+					store.layers.set(keyString, JSON.stringify(utf), done);
 				});
 			});
 		});
@@ -730,16 +730,16 @@ module.exports = pile = {
 	_getRasterTileFromRedis : function (params, done) {
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
-		store.redis.get(key, done);
+		store.layers.get(key, done);
 	},
 	_getVectorTileFromRedis : function (params, done) {
 		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
-		store.redis.get(key, done);
+		store.layers.get(key, done);
 	},
 	_getGridTileFromRedis : function (params, done) {
 		var keyString = 'grid_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
-		store.redis.get(keyString, done);
+		store.layers.get(keyString, done);
 	},
 
 
@@ -771,7 +771,7 @@ module.exports = pile = {
 
 		// look for stored layerUuid
 		ops.push(function (callback) {
-			store.redis.get(params.layerUuid, callback);
+			store.layers.get(params.layerUuid, callback);
 		});
 
 		// define settings, xml
@@ -998,7 +998,7 @@ module.exports = pile = {
 // #########################################
 // init kue
 var jobs = kue.createQueue({
-   	redis : config.kueredis,
+   	redis : config.redis.temp,
    	prefix : '_kue4'
 });
 

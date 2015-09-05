@@ -27,25 +27,40 @@ var pile_settings = {
 	store : 'disk' // or redis
 }
 
-console.log('store!');
-var redis = require('redis');
-var redisStore = redis.createClient(config.redis.port, config.redis.host, {detect_buffers : true});
-redisStore.auth(config.redis.auth);
-redisStore.on('error', function (err) { console.error('redisStore err: ', err); });
+var redisLayers = redis.createClient(config.redis.layers.port, config.redis.layers.host, {detect_buffers : true});
+redisLayers.auth(config.redis.layers.auth);
+redisLayers.on('error', function (err) { console.error('redisLayers err: ', err); });
+redisLayers.select(config.redis.layers.db, function (err) {
+	console.log('selected db', config.redis.layers.db, err);
+})
 
-
-var kueStore = redis.createClient(config.kueredis.port, config.kueredis.host);
-kueStore.auth(config.kueredis.auth);
-kueStore.on('error', function (err) { console.error('kueStore err: ', err); });
-kueStore.flushall(function (err) {
-	console.log('kueStore flushedall!', err);
+var redisTemp = redis.createClient(config.redis.temp.port, config.redis.temp.host);
+redisTemp.auth(config.redis.temp.auth);
+redisTemp.on('error', function (err) { console.error('redisTemp err: ', err); });
+redisTemp.select(config.redis.temp.db, function (err) {
+	console.log('redisTemp db', config.redis.temp.db, err);
 });
+redisTemp.flushdb(function (err) {
+	console.log('redisTemp flushed db !', err);
+});
+
+var redisStats = redis.createClient(config.redis.stats.port, config.redis.stats.host);
+redisStats.auth(config.redis.stats.auth);
+redisStats.on('error', function (err) { console.error('redisStats err: ', err); });
+redisStats.select(config.redis.stats.db, function (err) {
+	console.log('redisStats db', config.redis.stats.db, err);
+})
+redisTemp.flushdb(function (err) {
+	console.log('redisTemp flushed db !', err);
+});
+
 
 module.exports = store = { 
 
-	redis : redisStore,
-	kue   : kueStore,
 
+	layers : redisLayers,
+	temp : redisTemp,
+	stats : redisStats,
 
 
 	
@@ -79,18 +94,18 @@ module.exports = store = {
 		// save png to redis
 		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
-		redisStore.set(key, tile.getData(), done);
+		store.layers.set(key, tile.getData(), done);
 	},
 	_saveRasterTileRedis : function (tile, params, done) {
 		// save png to redis
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
-		redisStore.set(key, tile.encodeSync('png'), done);
+		store.layers.set(key, tile.encodeSync('png'), done);
 	},
 	_readRasterTileRedis : function (params, done) {
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		var key = new Buffer(keyString);
-		redisStore.get(key, done);
+		store.layers.get(key, done);
 	},
 
 	
