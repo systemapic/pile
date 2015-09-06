@@ -171,7 +171,7 @@ module.exports = pile = {
 
 		ops.push(function (callback) {
 			// retrieve layer and return it to client
-			store.redis.get(layer_id, function (err, layer) {
+			store.layers.get(layer_id, function (err, layer) {
 				if (err || !layer) return callback(err || 'no layer');
 				callback(null, JSON.parse(layer));
 			});
