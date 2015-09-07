@@ -252,6 +252,76 @@ module.exports = pile = {
 	},
 
 
+	fetchHistogram : function (req, res) {
+
+		console.log('fetchHistogram', req.body);
+
+		var options = req.body,
+		    column = options.column,
+		    access_token = options.access_token,
+		    layer_id = options.layer_id,
+		    num_buckets = options.num_buckets || 20;
+
+		var ops = [];
+
+		ops.push(function (callback) {
+			// retrieve layer and return it to client
+			store.layers.get(layer_id, function (err, layer) {
+				if (err || !layer) return callback(err || 'no layer');
+				callback(null, JSON.parse(layer));
+			});
+		});
+
+		ops.push(function (layer, callback) {
+
+			var table = layer.options.table_name;
+			var database = layer.options.database_name;
+
+			// do sql query on postgis
+			var GET_HISTOGRAM_SCRIPT = 'src/get_histogram.sh';
+
+			// st_extent script 
+			var command = [
+				GET_HISTOGRAM_SCRIPT, 	// script
+				database, 	// database name
+				table,
+				column,
+				num_buckets
+			].join(' ');
+
+
+			// do postgis script
+			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				console.log("HISTOGRAM--> ", err, stdout, stdin);
+
+				if (err) return callback(err);
+
+				var arr = stdout.split('\n'),
+				    result = [];
+
+				arr.forEach(function (arrr) {
+					try {
+						var item = JSON.parse(arrr);
+						result.push(item);
+					} catch (e) {};
+				});
+
+
+				console.log('reuslt: ', result);
+
+				callback(null, result);
+
+			});
+		});
+
+
+		async.waterfall(ops, function (err, data) {
+			res.json(data);
+		});
+
+	},
+
+
 	_calculateAverages : function (points) {
 
 		var keys = {};

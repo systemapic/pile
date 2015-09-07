@@ -53,6 +53,11 @@ module.exports = function (pile) {
 		pile.fetchDataArea(req, res);
 	});
 
+	// get histogram from column
+	app.post('/api/db/fetchHistogram', checkAccess, function (req, res) {
+		pile.fetchHistogram(req, res);
+	});
+
 
 
 	// proxy tiles
