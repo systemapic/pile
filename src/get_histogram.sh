@@ -37,7 +37,7 @@ if [ "$5" == "bar" ]; then
 	),
 	     histogram as (
 	   select width_bucket("'$3'", min, max, '$BUCKETS') as bucket,
-	          int4range(min("'$3'")::int, max("'$3'")::int, '"'"'[]'"'"') as range,
+	          int8range(min("'$3'")::int, max("'$3'")::int, '"'"'[]'"'"') as range,
 	          min("'$3'") as range_min,
 	          max("'$3'") as range_max,
 	          count(*) as freq

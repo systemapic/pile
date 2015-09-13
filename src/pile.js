@@ -254,8 +254,6 @@ module.exports = pile = {
 
 	fetchHistogram : function (req, res) {
 
-		console.log('fetchHistogram', req.body);
-
 		var options = req.body,
 		    column = options.column,
 		    access_token = options.access_token,
@@ -292,8 +290,6 @@ module.exports = pile = {
 
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log("HISTOGRAM--> ", err, stdout, stdin);
-
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n'),
@@ -306,11 +302,7 @@ module.exports = pile = {
 					} catch (e) {};
 				});
 
-
-				console.log('reuslt: ', result);
-
 				callback(null, result);
-
 			});
 		});
 
@@ -350,7 +342,6 @@ module.exports = pile = {
 
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
-
 		var options 	= req.body,
 		    file_id 	= options.file_id,
 		    sql 	= options.sql,
@@ -398,8 +389,6 @@ module.exports = pile = {
 			// all good
 			callback(null, upload_status);
 		});
-
-
 
 		ops.push(function (options, callback) {
 
@@ -703,7 +692,6 @@ module.exports = pile = {
 		});
 		
 	},
-
 
 
 	_renderGridTile : function (params, done) {
