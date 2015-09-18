@@ -195,9 +195,13 @@ module.exports = pile = {
 				polygon
 			].join(' ');
 
+			console.log('polygon: ', polygon);
+			console.log('COMMAND', command);
+			console.log('sql', sql);
 
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				console.log('err, stdout', err, stdout);
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n'),

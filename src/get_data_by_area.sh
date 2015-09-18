@@ -21,4 +21,3 @@ fi
 
 
 PGPASSWORD=docker psql -U docker -d $1 -h postgis -c "select row_to_json(t) from (select * from $2 where st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('$3'), 4326), 3857), sub.the_geom_3857)) as t;"
-
