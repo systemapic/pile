@@ -59,7 +59,12 @@ module.exports = proxy = {
 
 	_serveErrorTile : function (res) {
 		var errorTile = 'public/errorTile.png';
-		fs.readFile(errorTile, function (err, tile) {
+		// fs.readFile(errorTile, function (err, tile) {
+		// 	console.log('err, tile', err);
+		// 	res.writeHead(200, {'Content-Type': 'image/png'});
+		// 	res.end(tile);
+		// });
+		fs.readFile('public/noAccessTile.png', function (err, tile) {
 			res.writeHead(200, {'Content-Type': 'image/png'});
 			res.end(tile);
 		});

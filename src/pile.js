@@ -1137,7 +1137,7 @@ if (cluster.isMaster) {
 		var options = job.data.options;
 		proxy._getTile(options, function (err) {
 			if (err) console.log('proxy_tile cluster fuck', err);
-			done(err);
+			done();
 		});
 	});
 
