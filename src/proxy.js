@@ -16,7 +16,7 @@ var mongoose = require('mongoose');
 var request = require('request');
 var http = require('http-request');
 
-var converter = require('../test/node-coordinator/coordinator');
+// var converter = require('../test/node-coordinator/coordinator');
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
@@ -208,27 +208,27 @@ module.exports = proxy = {
 
 	},
 
-	_getNorkartBBOX : function (options) {
+	// _getNorkartBBOX : function (options) {
 		
-		var z = options.z,
-		    x = options.x,
-		    y = options.y;
+	// 	var z = options.z,
+	// 	    x = options.x,
+	// 	    y = options.y;
 
-		var lng = this._tile2lng(x, z);
-		console.log('lng: ', lng);
+	// 	var lng = this._tile2lng(x, z);
+	// 	console.log('lng: ', lng);
 
-		var lat = this._tile2lat(y, z);
-		console.log('lat: ', lat); 
+	// 	var lat = this._tile2lat(y, z);
+	// 	console.log('lat: ', lat); 
 
-		// var bbox = this._getbbox([lat, lng]);
-		console.log('converter: ', converter);
+	// 	// var bbox = this._getbbox([lat, lng]);
+	// 	console.log('converter: ', converter);
 
-		console.log('fN: ', fn);
-		var fn = converter('latlong', 'utm');
-		var bbox = fn(lat, lng, z);
+	// 	console.log('fN: ', fn);
+	// 	var fn = converter('latlong', 'utm');
+	// 	var bbox = fn(lat, lng, z);
 
-		console.log('bbox: :: : ', bbox);
-	},
+	// 	console.log('bbox: :: : ', bbox);
+	// },
 
 	// _getbbox : function (latlng) {
 	// 	var map = this._map,
