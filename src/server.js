@@ -43,6 +43,11 @@ module.exports = function (pile) {
 		pile.getTile(req, res);
 	});
 
+	// get tiles
+	app.get('/overlay_tiles/*', checkAccess, function (req, res) {
+		pile.getOverlayTile(req, res);
+	});
+
 	// get data from point
 	app.post('/api/db/fetch', checkAccess, function (req, res) {
 		pile.fetchData(req, res);

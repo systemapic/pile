@@ -1,0 +1,71 @@
+0 info it worked if it ends with ok
+1 verbose cli [ 'node',
+1 verbose cli   '/usr/local/bin/npm',
+1 verbose cli   'install',
+1 verbose cli   'node-coordinator',
+1 verbose cli   '--save' ]
+2 info using npm@2.1.4
+3 info using node@v0.10.25
+4 verbose node symlink /usr/bin/node
+5 silly cache add args [ 'node-coordinator', null ]
+6 verbose cache add spec node-coordinator
+7 silly cache add parsed spec { raw: 'node-coordinator',
+7 silly cache add   scope: null,
+7 silly cache add   name: 'node-coordinator',
+7 silly cache add   rawSpec: '',
+7 silly cache add   spec: '*',
+7 silly cache add   type: 'range' }
+8 verbose addNamed node-coordinator@*
+9 silly addNamed semver.valid null
+10 silly addNamed semver.validRange *
+11 silly addNameRange { name: 'node-coordinator', range: '*', hasData: false }
+12 verbose mapToRegistry name node-coordinator
+13 verbose mapToRegistry uri https://registry.npmjs.org/node-coordinator
+14 verbose addNameRange registry:https://registry.npmjs.org/node-coordinator not in flight; fetching
+15 verbose request on initialization, where is /node-coordinator
+16 verbose request after pass 1, where is /node-coordinator
+17 verbose request url raw /node-coordinator
+18 verbose request resolving registry [ 'https://registry.npmjs.org/', './node-coordinator' ]
+19 verbose request after pass 2, where is https://registry.npmjs.org/node-coordinator
+20 verbose request no auth needed
+21 info attempt registry request try #1 at 14:07:35
+22 verbose request id 6a90bb3b0169ffb8
+23 http request GET https://registry.npmjs.org/node-coordinator
+24 http 404 https://registry.npmjs.org/node-coordinator
+25 silly registry.get cb [ 404,
+25 silly registry.get   { 'content-type': 'application/json',
+25 silly registry.get     'cache-control': 'max-age=0',
+25 silly registry.get     'content-length': '2',
+25 silly registry.get     'accept-ranges': 'bytes',
+25 silly registry.get     date: 'Fri, 18 Sep 2015 12:07:35 GMT',
+25 silly registry.get     via: '1.1 varnish',
+25 silly registry.get     age: '0',
+25 silly registry.get     connection: 'keep-alive',
+25 silly registry.get     'x-served-by': 'cache-ams4132-AMS',
+25 silly registry.get     'x-cache': 'MISS',
+25 silly registry.get     'x-cache-hits': '0',
+25 silly registry.get     'x-timer': 'S1442578055.562673,VS0,VE99' } ]
+26 verbose stack Error: Not Found
+26 verbose stack     at errorResponse (/usr/local/lib/node_modules/npm/lib/cache/add-named.js:269:10)
+26 verbose stack     at setData (/usr/local/lib/node_modules/npm/lib/cache/add-named.js:212:12)
+26 verbose stack     at RES (/usr/local/lib/node_modules/npm/node_modules/inflight/inflight.js:23:14)
+26 verbose stack     at f (/usr/local/lib/node_modules/npm/node_modules/once/once.js:16:25)
+26 verbose stack     at saved (/usr/local/lib/node_modules/npm/node_modules/npm-registry-client/lib/get.js:167:7)
+26 verbose stack     at Object.oncomplete (fs.js:107:15)
+27 verbose statusCode 404
+28 verbose pkgid node-coordinator
+29 verbose cwd /var/www/pile
+30 error Linux 3.13.0-36-generic
+31 error argv "node" "/usr/local/bin/npm" "install" "node-coordinator" "--save"
+32 error node v0.10.25
+33 error npm  v2.1.4
+34 error code E404
+35 error 404 Not Found
+35 error 404
+35 error 404 'node-coordinator' is not in the npm registry.
+35 error 404 You should bug the author to publish it (or use the name yourself!)
+35 error 404 It was specified as a dependency of 'pile'
+35 error 404
+35 error 404 Note that you can also install from a
+35 error 404 tarball, folder, http url, or git url.
+36 verbose exit [ 1, true ]

@@ -360,10 +360,12 @@ module.exports = pile = {
 		    attributes 	= options.attributes,
 		    access_token = req.body.access_token;
 
+
+		console.log('options', options);
+
 		// verify query
 		if (!file_id) 	return pile.error.missingInformation(res, 'Please provide a file_id.')
-		if (!sql) 	return pile.error.missingInformation(res, 'Please provide a SQL statement.')
-		if (!cartocss) 	return pile.error.missingInformation(res, 'Please provide CartoCSS.')
+		
 
 		var ops = [];
 
@@ -377,8 +379,16 @@ module.exports = pile = {
 
 		});
 
+
 		ops.push(function (upload_status, callback) {
 			if (!upload_status) return callback('No such upload_status.');
+
+
+
+
+
+
+
 
 			var upload_status = JSON.parse(upload_status);
 
@@ -390,11 +400,69 @@ module.exports = pile = {
 			// check that done importing to postgis
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
 
-			// all good
-			callback(null, upload_status);
+
+			console.log('create layer, up', upload_status);
+
+			if (upload_status.data_type == 'vector') {
+				console.log('creating vecotr layer')
+
+				return pile._createPostGISLayer({
+					upload_status : upload_status,
+					options : options
+				}, callback);
+			} 
+
+			if (upload_status.data_type == 'raster') {
+
+
+				console.log('create raster layer!');
+
+				return pile._createRasterLayer({
+					upload_status : upload_status,
+					options : options
+				}, callback)
+
+			}
+
+			// error
+			callback('Invalid data_type: ' +  upload_status.data_type);
+		})
+		
+
+		async.waterfall(ops, function (err, layerObject) {
+			if (err) return res.json({error : err});
+
+			console.log('Created layer.', layerObject);
+			
+			// return layer to client
+			res.json(layerObject);
 		});
 
-		ops.push(function (options, callback) {
+
+	},
+
+
+	_createPostGISLayer : function (opts, done) {
+		var ops = [],
+		    options = opts.upload_status,
+		    file_id = opts.options.file_id,
+		    sql = opts.options.sql,
+		    cartocss 	= opts.options.cartocss,
+		    cartocss_version = opts.options.cartocss_version,
+		    geom_column = opts.options.geom_column,
+		    geom_type 	= opts.options.geom_type,
+		    raster_band = opts.options.raster_band,
+		    srid 	= opts.options.srid,
+		    affected_tables = opts.options.affected_tables,
+		    interactivity = opts.options.interactivity,
+		    attributes 	= opts.options.attributes,
+		    access_token = opts.options.access_token;
+
+
+		if (!sql) 	return done('Please provide a SQL statement.')
+		if (!cartocss) 	return done('Please provide CartoCSS.')
+
+		ops.push(function (callback) {
 
 			// inject table name into sql
 			var done_sql = sql.replace('table', options.table_name);
@@ -468,17 +536,102 @@ module.exports = pile = {
 			});
 		});
 
+		// layer created, return
+		async.waterfall(ops, done);
+	},
 
-		async.waterfall(ops, function (err, layerObject) {
-			if (err) return res.json({error : err});
+	_createRasterLayer : function (opts, done) {
+		var ops = [],
+		    options = opts.upload_status,
+		    file_id = opts.options.file_id,
+		    // sql = opts.options.sql,
+		    // cartocss 	= opts.options.cartocss,
+		    // cartocss_version = opts.options.cartocss_version,
+		    // geom_column = opts.options.geom_column,
+		    // geom_type 	= opts.options.geom_type,
+		    // raster_band = opts.options.raster_band,
+		    srid 	= opts.options.srid,
+		    // affected_tables = opts.options.affected_tables,
+		    // interactivity = opts.options.interactivity,
+		    // attributes 	= opts.options.attributes,
+		    access_token = opts.options.access_token;
 
-			console.log('Created layer.', layerObject);
-			
-			// return layer to client
-			res.json(layerObject);
+		ops.push(function (callback) {
+
+			// inject table name into sql
+			// var done_sql = sql.replace('table', options.table_name);
+
+			// create layer object
+			var layerUuid = 'layer_id-' + uuid.v4();
+			var layer = { 	
+
+				layerUuid : layerUuid,
+				options : {			
+					
+					// required
+					sql : false,
+					cartocss : false,
+					file_id : file_id, 	
+					// database_name : options.database_name, 
+					// table_name : options.table_name, 
+					metadata : options.metadata,
+					layer_id : layerUuid,
+					wicked : 'thing',
+
+					// optional				// defaults
+					// cartocss_version : cartocss_version 	|| '2.0.1',
+					// geom_column : geom_column 		|| 'geom',
+					// geom_type : geom_type 			|| 'geometry',
+					// raster_band : raster_band 		|| 0,
+					srid : srid 				|| 3857,
+				}
+			}
+
+			callback(null, layer);
+
 		});
 
 
+		// // get extent of file (todo: put in file object)
+		// ops.push(function (layer, callback) {
+
+		// 	var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
+
+		// 	// st_extent script 
+		// 	var command = [
+		// 		GET_EXTENT_SCRIPT_PATH, 	// script
+		// 		layer.options.database_name, 	// database name
+		// 		layer.options.table_name,	// table name
+		// 	].join(' ');
+
+
+		// 	// create database in postgis
+		// 	exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+
+		// 		// parse stdout
+		// 		var extent = stdout.split('(')[1].split(')')[0];
+
+		// 		// set extent
+		// 		layer.options.extent = extent;
+
+		// 		// callback
+		// 		callback(null, layer);
+		// 	});
+		// });
+
+
+		// save layer to store.redis
+		ops.push(function (layer, callback) {
+
+			// save layer to store.redis
+			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
+				if (err) console.log('resdiStore.set layer err: ', err);
+				callback(err, layer);
+			});
+		});
+
+		// layer created, return
+		async.waterfall(ops, done);
 	},
 
 
@@ -494,9 +647,64 @@ module.exports = pile = {
 		});
 	},
 
+	getOverlayTile : function (req, res) {
+
+
+		console.log('getOverlayTile');
+
+		// parse url into layerUuid, zxy, type
+		var ops = [],
+		    parsed = req._parsedUrl.pathname.split('/'), 
+		    params = {
+			layerUuid : parsed[2],
+			z : parseInt(parsed[3]),
+			x : parseInt(parsed[4]),
+			y : parseInt(parsed[5].split('.')[0]),
+			type : parsed[5].split('.')[1],
+		    };
+
+		var map,
+		    layer,
+		    postgis,
+		    bbox;
+		var type = params.type;
+		var ops = [];
+
+
+		// add access token to params
+		// params.access_token = req.query.access_token || req.body.access_token;
+
+		// get stored layer
+		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
+			if (err) return pile._getTileErrorHandler(res, err);
+			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
+
+			var storedLayer = JSON.parse(storedLayerJSON);
+
+			console.log('storedLayer', storedLayer);
+
+
+			var file_id = storedLayer.options.file_id;
+			var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+			fs.readFile(path, function (err, buffer) {
+				console.log('looking for tile: ', path);
+				console.log('err? ', err);
+				
+				// send to client
+				res.writeHead(200, {'Content-Type': pile.headers[type]});
+				res.end(buffer);
+			});
+			// /data/raster_tiles/file_wxtgjzgdvgvrnxrrssqq/
+
+			
+
+		});
+	},
 	
 
 	getTile : function (req, res) {
+
+		console.log('getTile');
 
 		// parse url into layerUuid, zxy, type
 		var ops = [],
@@ -525,6 +733,8 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
+
+			console.log('storedLayer', storedLayer);
 
 			// get tiles
 			if (type == 'pbf') ops.push(function (callback) {
@@ -759,6 +969,8 @@ module.exports = pile = {
 	},
 
 	getRasterTile : function (params, storedLayer, done) {
+
+		console.log('getRasterTile', params, storedLayer);
 
 		// check cache
 		store._readRasterTile(params, function (err, data) {
