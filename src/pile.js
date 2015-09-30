@@ -93,12 +93,11 @@ module.exports = pile = {
 
 	fetchData : function (req, res) {
 
-		var options = req.body,
-		    column = options.column, // gid
-		    row = options.row, // eg. 282844
-		    layer_id = options.layer_id;
-
-		var ops = [];
+		var options 	= req.body,
+		    column 	= options.column, // gid
+		    row 	= options.row, // eg. 282844
+		    layer_id 	= options.layer_id,
+		    ops 	= [];
 
 		ops.push(function (callback) {
 
@@ -362,6 +361,7 @@ module.exports = pile = {
 		    access_token = req.body.access_token;
 
 
+		// log to file
 		console.log({
 			type : 'createLayer',
 			options : options
@@ -438,10 +438,10 @@ module.exports = pile = {
 
 
 	_createPostGISLayer : function (opts, done) {
-		var ops = [],
-		    options = opts.upload_status,
-		    file_id = opts.options.file_id,
-		    sql = opts.options.sql,
+		var ops 	= [],
+		    options 	= opts.upload_status,
+		    file_id 	= opts.options.file_id,
+		    sql 	= opts.options.sql,
 		    cartocss 	= opts.options.cartocss,
 		    cartocss_version = opts.options.cartocss_version,
 		    geom_column = opts.options.geom_column,
@@ -543,22 +543,10 @@ module.exports = pile = {
 		var ops = [],
 		    options = opts.upload_status,
 		    file_id = opts.options.file_id,
-		    // sql = opts.options.sql,
-		    // cartocss 	= opts.options.cartocss,
-		    // cartocss_version = opts.options.cartocss_version,
-		    // geom_column = opts.options.geom_column,
-		    // geom_type 	= opts.options.geom_type,
-		    // raster_band = opts.options.raster_band,
 		    srid 	= opts.options.srid,
-		    // affected_tables = opts.options.affected_tables,
-		    // interactivity = opts.options.interactivity,
-		    // attributes 	= opts.options.attributes,
 		    access_token = opts.options.access_token;
 
 		ops.push(function (callback) {
-
-			// inject table name into sql
-			// var done_sql = sql.replace('table', options.table_name);
 
 			// create layer object
 			var layerUuid = 'layer_id-' + uuid.v4();
@@ -571,53 +559,16 @@ module.exports = pile = {
 					sql : false,
 					cartocss : false,
 					file_id : file_id, 	
-					// database_name : options.database_name, 
-					// table_name : options.table_name, 
 					metadata : options.metadata,
 					layer_id : layerUuid,
 					wicked : 'thing',
-
-					// optional				// defaults
-					// cartocss_version : cartocss_version 	|| '2.0.1',
-					// geom_column : geom_column 		|| 'geom',
-					// geom_type : geom_type 			|| 'geometry',
-					// raster_band : raster_band 		|| 0,
-					srid : srid 				|| 3857,
+					srid : srid || 3857,
 				}
 			}
 
 			callback(null, layer);
 
 		});
-
-
-		// // get extent of file (todo: put in file object)
-		// ops.push(function (layer, callback) {
-
-		// 	var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
-
-		// 	// st_extent script 
-		// 	var command = [
-		// 		GET_EXTENT_SCRIPT_PATH, 	// script
-		// 		layer.options.database_name, 	// database name
-		// 		layer.options.table_name,	// table name
-		// 	].join(' ');
-
-
-		// 	// create database in postgis
-		// 	exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-
-		// 		// parse stdout
-		// 		var extent = stdout.split('(')[1].split(')')[0];
-
-		// 		// set extent
-		// 		layer.options.extent = extent;
-
-		// 		// callback
-		// 		callback(null, layer);
-		// 	});
-		// });
-
 
 		// save layer to store.redis
 		ops.push(function (layer, callback) {
