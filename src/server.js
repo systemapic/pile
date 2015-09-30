@@ -9,8 +9,9 @@ var path 	= require('path');
 var compression = require('compression')
 var http 	= require('http');
 var config 	= require('../config/pile-config'); // config
-var port 	= config.port; // port for tileserver (nginx proxied)
 var request 	= require('request');
+var winston 	= require('winston');
+var port 	= config.port; // port for tileserver (nginx proxied)
 
 // #########################################
 // ###  Server, routes                   ###	// runs on 1 cpu
@@ -63,19 +64,16 @@ module.exports = function (pile) {
 		pile.fetchHistogram(req, res);
 	});
 
-
-
 	// proxy tiles
 	app.get('/proxy/*', checkAccess, function (req, res) {
 		pile.proxyTile(req, res);
 	});
 
-
 	// start server
 	app.listen(port);
 
 	// debug
-	console.log('PostGIS tileserver is up @ ', port);
+	console.log('PostGIS tileserver is up @ ' + port);
 }
 
 
@@ -113,3 +111,67 @@ function checkAccess (req, res, next) {
 		res.json({access : 'Unauthorized'});
 	});
 }
+
+
+// logger
+var logger = new (winston.Logger)({
+
+	transports: [
+
+		// all console.log's
+		new winston.transports.File({ 
+			filename: config.path.log + 'pile.log',
+			name : 'info',
+			level : 'info',
+			prettyPrint : true,
+			json : true,
+			maxsize : 10000000, // 10MB
+			tailable : true
+		}),
+		
+		// console.errors
+		new winston.transports.File({
+			filename: config.path.log + 'pile.error.log',
+			name : 'error',
+			level : 'error',
+			prettyPrint : true,
+			json : true,
+			maxsize : 10000000, // 10MB
+			tailable : true
+
+		}),
+
+		// console
+		new winston.transports.Console({
+			// colorize : true
+		}),
+	],
+});
+
+// tile logger
+var tile_logger = new (winston.Logger)({
+
+	transports: [
+
+		// all console.log's
+		new winston.transports.File({ 
+			filename: config.path.log + 'pile.tiles.log',
+			name : 'info',
+			level : 'info',
+			prettyPrint : true,
+			json : true,
+			maxsize : 10000000, // 10MB
+			tailable : true
+		}),
+		
+		// console
+		new winston.transports.Console({
+			// colorize : true
+		}),
+	],
+});
+
+// globally pipe console to winston
+console.log 	= logger.info;
+console.error 	= logger.error;
+console.tile 	= tile_logger.info;

@@ -29,42 +29,37 @@ var pile_settings = {
 
 var redisLayers = redis.createClient(config.redis.layers.port, config.redis.layers.host, {detect_buffers : true});
 redisLayers.auth(config.redis.layers.auth);
-redisLayers.on('error', function (err) { console.error('redisLayers err: ', err); });
+redisLayers.on('error', function (err) { console.error({err_msg : 'redisLayers err: ', error : err}); });
 redisLayers.select(config.redis.layers.db, function (err) {
-	console.log('selected db', config.redis.layers.db, err);
+	// console.log('selected db', config.redis.layers.db, err);
 })
 
 var redisTemp = redis.createClient(config.redis.temp.port, config.redis.temp.host);
 redisTemp.auth(config.redis.temp.auth);
-redisTemp.on('error', function (err) { console.error('redisTemp err: ', err); });
+redisTemp.on('error', function (err) { console.error({err_msg : 'redisTemp err: ', error : err}); });
 redisTemp.select(config.redis.temp.db, function (err) {
-	console.log('redisTemp db', config.redis.temp.db, err);
+	// console.log('redisTemp db', config.redis.temp.db, err);
 });
 redisTemp.flushdb(function (err) {
-	console.log('redisTemp flushed db !', err);
+	// console.log('redisTemp flushed db !', err);
 });
 
 var redisStats = redis.createClient(config.redis.stats.port, config.redis.stats.host);
 redisStats.auth(config.redis.stats.auth);
-redisStats.on('error', function (err) { console.error('redisStats err: ', err); });
+redisStats.on('error', function (err) { console.error({err_msg : 'redisStats err: ', error : err}); });
 redisStats.select(config.redis.stats.db, function (err) {
-	console.log('redisStats db', config.redis.stats.db, err);
+	// console.log('redisStats db', config.redis.stats.db, err);
 })
 redisTemp.flushdb(function (err) {
-	console.log('redisTemp flushed db !', err);
+	// console.log('redisTemp flushed db !', err);
 });
 
 
 module.exports = store = { 
 
-
 	layers : redisLayers,
 	temp : redisTemp,
 	stats : redisStats,
-
-
-	
-
 
 
 	// save tiles generically

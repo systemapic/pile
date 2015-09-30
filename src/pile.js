@@ -49,15 +49,6 @@ var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH 	 = '/data/proxy_tiles/';
 
-// mute console in production mode
-if (process.argv[2] == 'production') {
-	var nullFn = function () {};
-	console.log = nullFn;
-	console.time = nullFn;
-	console.timeEnd = nullFn;
-}
-
-
 
 // #########################################
 // ### Vector, raster, utfgrid handling  ###
@@ -134,12 +125,12 @@ module.exports = pile = {
 				layer.options.table_name,	// table name
 				column,
 				row
-
 			].join(' ');
 
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				if (err) return callback(err);
 
 				// parse results
 				var json = stdout.split('\n')[2];
@@ -156,6 +147,11 @@ module.exports = pile = {
 		});
 
 		async.waterfall(ops, function (err, data) {
+			if (err) console.error({
+				err_id : 51,
+				err_msg : 'fetch data script',
+				error : err
+			});
 			res.json(data);
 		});
 
@@ -195,13 +191,8 @@ module.exports = pile = {
 				polygon
 			].join(' ');
 
-			console.log('polygon: ', polygon);
-			console.log('COMMAND', command);
-			console.log('sql', sql);
-
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log('err, stdout', err, stdout);
 				if (err) return callback(err);
 
 				var arr = stdout.split('\n'),
@@ -251,6 +242,11 @@ module.exports = pile = {
 		});
 
 		async.waterfall(ops, function (err, data) {
+			if (err) console.error({
+				err_id : 52,
+				err_msg : 'fetch data area script',
+				error : err
+			});
 			res.json(data);
 		});
 	},
@@ -312,6 +308,11 @@ module.exports = pile = {
 
 
 		async.waterfall(ops, function (err, data) {
+			if (err) console.error({
+				err_id : 53,
+				err_msg : 'fetch histogram script',
+				error : err
+			});
 			res.json(data);
 		});
 
@@ -361,10 +362,13 @@ module.exports = pile = {
 		    access_token = req.body.access_token;
 
 
-		console.log('options', options);
+		console.log({
+			type : 'createLayer',
+			options : options
+		});
 
 		// verify query
-		if (!file_id) 	return pile.error.missingInformation(res, 'Please provide a file_id.')
+		if (!file_id) return pile.error.missingInformation(res, 'Please provide a file_id.')
 		
 
 		var ops = [];
@@ -383,13 +387,6 @@ module.exports = pile = {
 		ops.push(function (upload_status, callback) {
 			if (!upload_status) return callback('No such upload_status.');
 
-
-
-
-
-
-
-
 			var upload_status = JSON.parse(upload_status);
 
 			// check that done importing to postgis
@@ -401,10 +398,7 @@ module.exports = pile = {
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
 
 
-			console.log('create layer, up', upload_status);
-
 			if (upload_status.data_type == 'vector') {
-				console.log('creating vecotr layer')
 
 				return pile._createPostGISLayer({
 					upload_status : upload_status,
@@ -413,9 +407,6 @@ module.exports = pile = {
 			} 
 
 			if (upload_status.data_type == 'raster') {
-
-
-				console.log('create raster layer!');
 
 				return pile._createRasterLayer({
 					upload_status : upload_status,
@@ -430,10 +421,14 @@ module.exports = pile = {
 		
 
 		async.waterfall(ops, function (err, layerObject) {
-			if (err) return res.json({error : err});
-
-			console.log('Created layer.', layerObject);
-			
+			if (err) {
+				console.error({
+					err_id : 30,
+					err_msg : 'create layer',
+					error : err
+				});
+				return res.json({error : err});
+			}
 			// return layer to client
 			res.json(layerObject);
 		});
@@ -531,7 +526,11 @@ module.exports = pile = {
 
 			// save layer to store.redis
 			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
-				if (err) console.log('resdiStore.set layer err: ', err);
+				if (err) console.error({
+					err_id : 1,
+					err_msg : 'create postgis layer',
+					error : err
+				});
 				callback(err, layer);
 			});
 		});
@@ -625,7 +624,11 @@ module.exports = pile = {
 
 			// save layer to store.redis
 			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
-				if (err) console.log('resdiStore.set layer err: ', err);
+				if (err) console.error({
+					err_id : 2,
+					err_msg : 'create raster',
+					error : err
+				});
 				callback(err, layer);
 			});
 		});
@@ -643,14 +646,16 @@ module.exports = pile = {
 
 		// retrieve layer and return it to client
 		store.layers.get(layerUuid, function (err, layer) {
+			if (err) console.error({
+				err_id : 21,
+				err_msg : 'render vector',
+				error : err
+			});
 			res.end(layer);
 		});
 	},
 
 	getOverlayTile : function (req, res) {
-
-
-		console.log('getOverlayTile');
 
 		// parse url into layerUuid, zxy, type
 		var ops = [],
@@ -681,30 +686,20 @@ module.exports = pile = {
 
 			var storedLayer = JSON.parse(storedLayerJSON);
 
-			console.log('storedLayer', storedLayer);
-
 
 			var file_id = storedLayer.options.file_id;
 			var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
 			fs.readFile(path, function (err, buffer) {
-				console.log('looking for tile: ', path);
-				console.log('err? ', err);
-				
 				// send to client
 				res.writeHead(200, {'Content-Type': pile.headers[type]});
 				res.end(buffer);
 			});
-			// /data/raster_tiles/file_wxtgjzgdvgvrnxrrssqq/
-
-			
 
 		});
 	},
 	
 
 	getTile : function (req, res) {
-
-		console.log('getTile');
 
 		// parse url into layerUuid, zxy, type
 		var ops = [],
@@ -715,14 +710,14 @@ module.exports = pile = {
 			x : parseInt(parsed[4]),
 			y : parseInt(parsed[5].split('.')[0]),
 			type : parsed[5].split('.')[1],
-		    };
-
-		var map,
+		    },
+		    map,
 		    layer,
 		    postgis,
-		    bbox;
-		var type = params.type;
-		var ops = [];
+		    bbox,
+		    type = params.type,
+		    ops = [],
+		    start_time = new Date().getTime();
 
 		// add access token to params
 		params.access_token = req.query.access_token || req.body.access_token;
@@ -733,8 +728,6 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
-
-			console.log('storedLayer', storedLayer);
 
 			// get tiles
 			if (type == 'pbf') ops.push(function (callback) {
@@ -752,16 +745,33 @@ module.exports = pile = {
 
 			// run ops
 			async.series(ops, function (err, data) {
-				var data = data[0];
 
 				if (err) {
-					console.log('ASYCN ERR', err);
+					console.error({
+						err_id : 2,
+						err_msg : 'render vector',
+						error : err
+					});
 					return res.end();
 				}
 
+				// timer
+				var end_time = new Date().getTime();
+				var create_tile_time = end_time - start_time;
+
+				// log tile request
+				console.tile({
+					z : params.z,
+					x : params.x,
+					y : params.y,
+					format : type,
+					layer_id : params.layerUuid,
+					render_time : create_tile_time
+				});
+
 				// send to client
 				res.writeHead(200, {'Content-Type': pile.headers[type]});
-				res.end(data);
+				res.end(data[0]);
 			});
 		});
 		
@@ -769,6 +779,11 @@ module.exports = pile = {
 
 
 	_getTileErrorHandler : function (res, err) {
+		if (err) console.error({
+			err_id : 60,
+			err_msg : 'get tile error handler',
+			error : err
+		});
 		res.end();
 	},
 
@@ -776,7 +791,6 @@ module.exports = pile = {
 	createVectorTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
-		var start = new Date().getTime();
 		var job = jobs.create('render_vector_tile', { // todo: cluster up with other machines, pluggable clusters
 			params : params,
 			storedLayer : storedLayer
@@ -786,10 +800,6 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
-			// stats
-			var end = new Date().getTime();
-			var create_tile_time = end - start;
-			
 			// get tile
 			pile._readVectorTile(params, storedLayer, done);
 		});
@@ -800,7 +810,6 @@ module.exports = pile = {
 	createRasterTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
-		var start = new Date().getTime();
 		var job = jobs.create('render_raster_tile', { // todo: cluster up with other machines, pluggable clusters
 			params : params,
 			storedLayer : storedLayer
@@ -810,11 +819,6 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
-			// stats
-			var end = new Date().getTime();
-			var create_tile_time = end - start;
-			console.log('Created raster tile', create_tile_time, 'ms');
-			
 			// get tile
 			store._readRasterTile(params, done);
 		});
@@ -825,7 +829,6 @@ module.exports = pile = {
 	createGridTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
-		var start = new Date().getTime();
 		var job = jobs.create('render_grid_tile', { // todo: cluster up with other machines, pluggable clusters
 			params : params,
 			storedLayer : storedLayer
@@ -835,11 +838,6 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
-			// stats
-			var end = new Date().getTime();
-			var create_tile_time = end - start;
-			console.log('Created grid tile', create_tile_time, 'ms');
-			
 			// get tile
 			pile._getGridTileFromRedis(params, done);
 		});
@@ -848,7 +846,11 @@ module.exports = pile = {
 	_renderVectorTile : function (params, done) {
 
 		pile._prepareTile(params, function (err, map) {
-			if (err) console.log('create_tile cluster fuck', err);
+			if (err) console.error({
+				err_id : 3,
+				err_msg : 'render vector',
+				error : err
+			});
 			if (err) return done(err);
 
 			var map_options = {
@@ -865,6 +867,11 @@ module.exports = pile = {
 
 			// render
 			map.render(im, map_options, function (err, tile) {
+				if (err) console.error({
+					err_id : 4,
+					err_msg : 'render vector',
+					error : err
+				});
 
 				pile._saveVectorTile(tile, params, done);
 			});
@@ -897,7 +904,11 @@ module.exports = pile = {
 
 			// render
 			map.render(im, map_options, function (err, tile) {
-				if (err) console.log('err: ', err);
+				if (err) console.error({
+					err_id : 5,
+					err_msg : 'render raster',
+					error : err
+				});
 				if (err) return done(err);
 
 				// save png to redis
@@ -911,7 +922,12 @@ module.exports = pile = {
 	_renderGridTile : function (params, done) {
 
 		pile._prepareTile(params, function (err, map) {
-			if (err) console.log('create_tile cluster fuck', err);
+			if (err) console.error({
+				err_id : 61,
+				err_msg : 'render grid tile',
+				error : err
+			});
+
 			if (err) return done(err);
 			if (!map) return done('no map 4493');
 
@@ -970,8 +986,6 @@ module.exports = pile = {
 
 	getRasterTile : function (params, storedLayer, done) {
 
-		console.log('getRasterTile', params, storedLayer);
-
 		// check cache
 		store._readRasterTile(params, function (err, data) {
 
@@ -1015,7 +1029,6 @@ module.exports = pile = {
 		var keyString = 'grid_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		store.layers.get(keyString, done);
 	},
-
 
 	checkParams : function (params, done) {
 		if (!params.layerUuid) 		return done('Invalid url: Missing layerUuid.');
@@ -1212,6 +1225,7 @@ module.exports = pile = {
 			file_id : file_id,
 			access_token : access_token
 		}, function (err, results) {
+		
 		});
 	},
 
@@ -1288,7 +1302,7 @@ if (cluster.isMaster) {
 	// start server
 	server(pile);
 
-	console.log('Cluster...'.bgYellow.black, numCPUs);
+	console.log('Cluster...' + numCPUs);
 	for (var i = 0; i < numCPUs - 2; i++) {  // 6 cpus
 		// fork workers
 		cluster.fork(); 
@@ -1296,7 +1310,11 @@ if (cluster.isMaster) {
 
 	// listen to exit, keep alive
 	cluster.on('exit', function(worker, code, signal) { 
-		console.log('__________________Cluster died, respawning__________________________________'.red);
+		console.error({
+			err_id : 7,
+			err_msg : 'cluster died',
+			error : err
+		});
 		cluster.fork(); 
 	});
 
@@ -1304,7 +1322,7 @@ if (cluster.isMaster) {
 } else {
 // worker clusters, kues:
 
-	console.log('...clustering!'.yellow);
+	console.log('...clustering!');
 
 	// #########################################
 	// ###  Kue jobs: Vector render          ###
@@ -1314,7 +1332,11 @@ if (cluster.isMaster) {
 
 		var params = job.data.params;
 		pile._renderVectorTile(params, function (err) {
-			if (err) console.log('create_tile cluster fuck', err);
+			if (err) console.error({
+				err_id : 8,
+				err_msg : 'render vector tile',
+				error : err
+			});
 			done(err);
 		});
 	});
@@ -1325,12 +1347,15 @@ if (cluster.isMaster) {
 		var params = job.data.params;
 
 		// save job by id
-		var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
+		// var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
 		
 		// render
 		pile._renderRasterTile(params, function (err) {
-			if (err) console.log('create_tile cluster fuck', err);
-			
+			if (err) console.error({
+				err_id : 9,
+				err_msg : 'create_tile cluster fuck',
+				error : err
+			});
 			done(null);
 		});
 
@@ -1341,7 +1366,11 @@ if (cluster.isMaster) {
 
 		var params = job.data.params;
 		pile._renderGridTile(params, function (err) {
-			if (err) console.log('create_tile cluster fuck', err);
+			if (err) console.error({
+				err_id : 10,
+				err_msg : 'create_tile cluster fuck',
+				error : err
+			});
 			done(err);
 		});
 	});
@@ -1352,7 +1381,11 @@ if (cluster.isMaster) {
 
 		var options = job.data.options;
 		proxy._getTile(options, function (err) {
-			if (err) console.log('proxy_tile cluster fuck', err);
+			if (err) console.error({
+				err_id : 11,
+				err_msg : 'proxy tile job',
+				error : err
+			});
 			done();
 		});
 	});
@@ -1366,7 +1399,11 @@ if (cluster.isMaster) {
 			var job_id = job.id;
 
 			job.remove( function (err) {
-				if (err) console.log('job.remove err: ', err);
+				if (err) console.error({
+					err_id : 13,
+					err_msg : 'job remove',
+					error : err
+				});
 			});
 		});
 	});

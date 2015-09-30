@@ -47,7 +47,11 @@ module.exports = proxy = {
 
 		// read tile, serve
 		fs.readFile(tile_on_disk_path, function (err, buffer) {
-			if (err) console.log('err: ', err);
+			if (err) console.error({
+				err_id : 14,
+				err_msg : 'serve tile',
+				error : err
+			});
 
 			// error tile
 			if (err) return proxy._serveErrorTile(res);
@@ -72,13 +76,19 @@ module.exports = proxy = {
 		// provider
 		var provider = options.provider;
 
+		console.tile(options);
+
 		// pass to provider
 		if (provider == 'norkart') return proxy._getNorkartTile(options, done);
 		if (provider == 'google') return proxy._getGoogleTile(options, done);
 
 		// provider not supported err
 		var err = 'Provider not supported!', provider
-		console.log(err);
+		if (err) console.error({
+			err_id : 17,
+			err_msg : 'get tile from provider',
+			error : err
+		});
 		done(err);
 	},
 
@@ -93,10 +103,6 @@ module.exports = proxy = {
 		var headers = options.headers;
 
 		var ops = [];
-
-		console.log('_fetchTile:');
-		console.log(tile_on_disk_path);
-		console.log(url);
 
 		// check disk
 		ops.push(function (callback) {
@@ -118,7 +124,11 @@ module.exports = proxy = {
 
 			// create folder
 			fs.ensureDir(tile_on_disk_folder, function (err) {
-				if (err) console.log('err', err);
+				if (err) console.error({
+					err_id : 15,
+					err_msg : 'fetch tile',
+					error : err
+				});
 			
 				var httpOptions = {
 					url: url,
@@ -126,11 +136,13 @@ module.exports = proxy = {
 					headers : headers
 				};
 
-				console.log('getting tile from internet');
-				
 				// get tile
 				http.get(httpOptions, tile_on_disk_path, function (err, result) {
-					if (err) console.log('http.get err:', err);
+					if (err) console.error({
+						err_id : 16,
+						err_msg : 'fetch tile',
+						error : err
+					});
 					
 					// got tile
 					if (!err && result) return callback({
@@ -203,6 +215,7 @@ module.exports = proxy = {
 			'X-Message-For-Norkart' : 'We are proxying because we need four subdomains for speedy tile requests. Logging is done as normal in browser! – knutole@systemapic.com'
 		}
 
+
 		// fetch
 		proxy._fetchTile(options, done);
 
@@ -257,24 +270,5 @@ module.exports = proxy = {
 	_getHistoricalNorkartTile : function (options, done) {
 
 
-
-
-
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
