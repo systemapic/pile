@@ -172,6 +172,37 @@ var tile_logger = new (winston.Logger)({
 });
 
 // globally pipe console to winston
-console.log 	= logger.info;
-console.error 	= logger.error;
-console.tile 	= tile_logger.info;
+// console.log 	= logger.info;
+// console.error 	= logger.error;
+// console.tile 	= tile_logger.info;
+
+// globally pipe console to winston
+console.log = function () {
+	try {
+		var arr = _.toArray(arguments);
+		console.info(arr);
+		logger.info(arguments);
+
+	} catch (e) {
+		console.info('CONSOLE ERROR 1', e);
+	}
+}
+console.error = function () {
+	try {
+		var arr = _.toArray(arguments);
+		console.info(arr.join(' '));
+		logger.error(arguments);
+	} catch (e) {
+		console.info('CONSOLE.ERROR', e);
+	}
+}
+console.tile = function () {
+	try {
+		var arr = _.toArray(arguments);
+		console.info(arr.join(' '));
+		tile_logger.info(arguments);
+	} catch (e) {
+		console.info('CONSOLE.ERROR', e);
+	}
+}
+
