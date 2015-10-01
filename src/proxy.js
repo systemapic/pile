@@ -141,7 +141,8 @@ module.exports = proxy = {
 					if (err) console.error({
 						err_id : 16,
 						err_msg : 'fetch tile',
-						error : err
+						// error : err
+						error : 'tile_on_disk_path: ' + tile_on_disk_path
 					});
 					
 					// got tile

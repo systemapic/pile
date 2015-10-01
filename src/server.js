@@ -113,63 +113,63 @@ function checkAccess (req, res, next) {
 }
 
 
-// logger
-var logger = new (winston.Logger)({
+// // logger
+// var logger = new (winston.Logger)({
 
-	transports: [
+// 	transports: [
 
-		// all console.log's
-		new winston.transports.File({ 
-			filename: config.path.log + 'pile.log',
-			name : 'info',
-			level : 'info',
-			prettyPrint : true,
-			json : true,
-			maxsize : 10000000, // 10MB
-			tailable : true
-		}),
+// 		// all console.log's
+// 		new winston.transports.File({ 
+// 			filename: config.path.log + 'pile.log',
+// 			name : 'info',
+// 			level : 'info',
+// 			prettyPrint : true,
+// 			json : true,
+// 			maxsize : 10000000, // 10MB
+// 			tailable : true
+// 		}),
 		
-		// console.errors
-		new winston.transports.File({
-			filename: config.path.log + 'pile.error.log',
-			name : 'error',
-			level : 'error',
-			prettyPrint : true,
-			json : true,
-			maxsize : 10000000, // 10MB
-			tailable : true
+// 		// console.errors
+// 		new winston.transports.File({
+// 			filename: config.path.log + 'pile.error.log',
+// 			name : 'error',
+// 			level : 'error',
+// 			prettyPrint : true,
+// 			json : true,
+// 			maxsize : 10000000, // 10MB
+// 			tailable : true
 
-		}),
+// 		}),
 
-		// // console
-		// new winston.transports.Console({
-		// 	// colorize : true
-		// }),
-	],
-});
+// 		// // console
+// 		// new winston.transports.Console({
+// 		// 	// colorize : true
+// 		// }),
+// 	],
+// });
 
-// tile logger
-var tile_logger = new (winston.Logger)({
+// // tile logger
+// var tile_logger = new (winston.Logger)({
 
-	transports: [
+// 	transports: [
 
-		// all console.log's
-		new winston.transports.File({ 
-			filename: config.path.log + 'pile.tiles.log',
-			name : 'info',
-			level : 'info',
-			prettyPrint : true,
-			json : true,
-			maxsize : 10000000, // 10MB
-			tailable : true
-		}),
+// 		// all console.log's
+// 		new winston.transports.File({ 
+// 			filename: config.path.log + 'pile.tiles.log',
+// 			name : 'info',
+// 			level : 'info',
+// 			prettyPrint : true,
+// 			json : true,
+// 			maxsize : 10000000, // 10MB
+// 			tailable : true
+// 		}),
 		
-		// // console
-		// new winston.transports.Console({
-		// 	// colorize : true
-		// }),
-	],
-});
+// 		// // console
+// 		// new winston.transports.Console({
+// 		// 	// colorize : true
+// 		// }),
+// 	],
+// });
 
 // globally pipe console to winston
 // console.log 	= logger.info;
@@ -177,32 +177,32 @@ var tile_logger = new (winston.Logger)({
 // console.tile 	= tile_logger.info;
 
 // globally pipe console to winston
-console.log = function () {
-	try {
-		var arr = _.toArray(arguments);
-		console.info(arr);
-		logger.info(arr);
+// console.log = function () {
+// 	try {
+// 		var arr = _.toArray(arguments);
+// 		console.info(arr);
+// 		logger.info(arr);
 
-	} catch (e) {
-		console.info('CONSOLE ERROR 1', e);
-	}
-}
-console.error = function () {
-	try {
-		var arr = _.toArray(arguments);
-		console.info(arr);
-		logger.error(arr);
-	} catch (e) {
-		console.info('CONSOLE.ERROR', e);
-	}
-}
-console.tile = function () {
-	try {
-		var arr = _.toArray(arguments);
-		console.info(arr);
-		tile_logger.info(arr);
-	} catch (e) {
-		console.info('CONSOLE.ERROR', e);
-	}
-}
+// 	} catch (e) {
+// 		console.info('CONSOLE ERROR 1', e);
+// 	}
+// }
+// console.error = function () {
+// 	try {
+// 		var arr = _.toArray(arguments);
+// 		console.info(arr);
+// 		logger.error(arr);
+// 	} catch (e) {
+// 		console.info('CONSOLE.ERROR', e);
+// 	}
+// }
+// console.tile = function () {
+// 	try {
+// 		var arr = _.toArray(arguments);
+// 		console.info(arr);
+// 		tile_logger.info(arr);
+// 	} catch (e) {
+// 		console.info('CONSOLE.ERROR', e);
+// 	}
+// }
 
