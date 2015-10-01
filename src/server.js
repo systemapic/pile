@@ -112,6 +112,7 @@ function checkAccess (req, res, next) {
 	});
 }
 
+console.tile = console.info;
 
 // // logger
 // var logger = new (winston.Logger)({

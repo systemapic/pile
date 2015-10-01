@@ -1264,7 +1264,6 @@ if (cluster.isMaster) {
 		console.error({
 			err_id : 7,
 			err_msg : 'cluster died',
-			error : err
 		});
 		cluster.fork(); 
 	});
@@ -1297,9 +1296,6 @@ if (cluster.isMaster) {
 
 		var params = job.data.params;
 
-		// save job by id
-		// var jobID = 'job_id:' + params.z + ':' + params.access_token + ':' + params.layerUuid;
-		
 		// render
 		pile._renderRasterTile(params, function (err) {
 			if (err) console.error({
