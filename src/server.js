@@ -141,10 +141,10 @@ var logger = new (winston.Logger)({
 
 		}),
 
-		// console
-		new winston.transports.Console({
-			// colorize : true
-		}),
+		// // console
+		// new winston.transports.Console({
+		// 	// colorize : true
+		// }),
 	],
 });
 
@@ -164,10 +164,10 @@ var tile_logger = new (winston.Logger)({
 			tailable : true
 		}),
 		
-		// console
-		new winston.transports.Console({
-			// colorize : true
-		}),
+		// // console
+		// new winston.transports.Console({
+		// 	// colorize : true
+		// }),
 	],
 });
 
@@ -181,7 +181,7 @@ console.log = function () {
 	try {
 		var arr = _.toArray(arguments);
 		console.info(arr);
-		logger.info(arguments);
+		logger.info(arr);
 
 	} catch (e) {
 		console.info('CONSOLE ERROR 1', e);
@@ -190,8 +190,8 @@ console.log = function () {
 console.error = function () {
 	try {
 		var arr = _.toArray(arguments);
-		console.info(arr.join(' '));
-		logger.error(arguments);
+		console.info(arr);
+		logger.error(arr);
 	} catch (e) {
 		console.info('CONSOLE.ERROR', e);
 	}
@@ -199,8 +199,8 @@ console.error = function () {
 console.tile = function () {
 	try {
 		var arr = _.toArray(arguments);
-		console.info(arr.join(' '));
-		tile_logger.info(arguments);
+		console.info(arr);
+		tile_logger.info(arr);
 	} catch (e) {
 		console.info('CONSOLE.ERROR', e);
 	}
