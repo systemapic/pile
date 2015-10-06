@@ -362,10 +362,10 @@ module.exports = pile = {
 
 
 		// log to file
-		console.log({
-			type : 'createLayer',
-			options : options
-		});
+		// console.log({
+		// 	type : 'createLayer',
+		// 	options : options
+		// });
 
 		// verify query
 		if (!file_id) return pile.error.missingInformation(res, 'Please provide a file_id.')
@@ -487,6 +487,8 @@ module.exports = pile = {
 					srid : srid 				|| 3857,
 				}
 			}
+
+			// console.log('lyaeer: ', layer);
 
 			callback(null, layer);
 
@@ -871,8 +873,9 @@ module.exports = pile = {
 
 
 	_renderGridTile : function (params, done) {
-
+		console.time('grid preparetile');
 		pile._prepareTile(params, function (err, map) {
+		console.timeEnd('grid preparetile');
 			if (err) console.error({
 				err_id : 61,
 				err_msg : 'render grid tile',
@@ -904,11 +907,15 @@ module.exports = pile = {
 			if (!im) return callback('Unsupported type.')
 
 			// render
+			console.time('grid map.render');
 			map.render(im, map_options, function (err, grid) {
+			console.timeEnd('grid map.render');
 				if (err) return done(err);
 				if (!grid) return done('no grid 233');
 
+				console.time('grid.encode');
 				grid.encode({features : true}, function (err, utf) {
+				console.timeEnd('grid.encode');
 					if (err) return done(err);
 					
 					// save grid to redis
@@ -1031,15 +1038,21 @@ module.exports = pile = {
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
+			var sql = storedLayer.options.table_name;
+			var sql = storedLayer.options.sql;
+
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
 			postgis_settings.dbname 		= storedLayer.options.database_name;
-			postgis_settings.table 			= storedLayer.options.sql;
+			// postgis_settings.table 			= storedLayer.options.sql;
+			postgis_settings.table 			= sql;
 			postgis_settings.extent 		= storedLayer.options.extent;
+			// postgis_settings.geometry_field 	= 'ST_Simplify(the_geom_3857, 0.1)';
 			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
 			postgis_settings.srid 			= storedLayer.options.srid;
-			postgis_settings.asynchronous_request 	= true;
-			postgis_settings.max_async_connection 	= 10;
+			// postgis_settings.asynchronous_request 	= true;
+			// postgis_settings.max_async_connection 	= 10;
+			// postgis_settings.simplify_geometries	= true;
 			
 
 			// everything in spherical mercator (3857)!
@@ -1143,6 +1156,8 @@ module.exports = pile = {
 
 			// carto renderer
 			var xml = new carto.Renderer().render(options);
+
+			// console.log('zml', xml);
 
 			callback(null, xml);
 
