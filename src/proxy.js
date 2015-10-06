@@ -76,7 +76,7 @@ module.exports = proxy = {
 		// provider
 		var provider = options.provider;
 
-		console.tile(options);
+		// console.tile(options);
 
 		// pass to provider
 		if (provider == 'norkart') return proxy._getNorkartTile(options, done);

@@ -56,6 +56,137 @@ var PROXYPATH 	 = '/data/proxy_tiles/';
 // vector/raster/utfgrid handling
 module.exports = pile = { 
 
+
+	cancelTileRequests : function (req, res) {
+
+		// console.log('cancelTileRequests', req.body);
+		console.log('pile.cancelTileRequests');
+
+		var tiles = req.body.tiles;
+
+		// cancel
+		pile._cancelTileRequests(tiles, function (err, status) {
+			res.json(status);
+		});
+
+		
+	},
+
+	_cancelTileRequests : function (tiles, done) {
+		if (!tiles.length) return done({
+			error : 'No tiles to cancel.'
+		});
+
+		// tiles.forEach(function (t) {
+
+		// 	api.redis.
+
+		// })
+
+		async.each(tiles, function (t, callback) {
+
+			// console.log('===>> TIle: ', t);
+
+			var tile_key = 'render_job:' + t;
+
+			// console.log('tile_key2', tile_key);
+
+			store.temp.get(tile_key, function (err, job_id) {
+				// console.log('found job_id: ', err, job_id);
+				
+				console.log('cancelling job:', job_id);
+
+
+				kue.Job.remove(job_id, function (err, j) {
+					console.log('kue Job remove', err, j);
+				
+
+				kue.Job.get(job_id, function (err, job) {
+					if (err || !job) return callback(); 
+
+					// console.log('jobjob', job);
+
+    					// job.getJob(function (err, worker) {	 		// no fn getJob() ! 
+    					// 	console.log('worker: ', err, worker);
+    					// })
+
+					// job.get(job.id, function (err, j) { 			// no job returned
+					// 	console.log('job.get', err, j);
+					// 	j.failed();
+					// })
+
+					job.failed(function (err, f) {
+						console.log('job failed: ', err, f);
+					})
+
+
+
+					// job.failed(function (err) {
+						// if (err) console.log('JOB REMOVE ERROR', err);
+
+						// console.log('FAILED JOB!', job.id);
+
+						// var tile_key = 'render_job:' + url;
+						store.temp.del(tile_key, function (err) {
+							console.log('deleted job key');
+							// res.end();
+							callback();
+						});
+
+						
+					// });
+				});
+
+				})
+
+
+
+
+			})
+
+		}, function (err) {
+			// console.log('ASYNC EACH TILES DONE', err);
+			done && done();
+		});
+	},
+
+	checkTileRequestStatus : function (url, callback) {
+
+		// console.log('checkTileRequestStatus', url);
+
+		var tile_key = 'render_job:' + url;
+
+		store.temp.get(tile_key, function (err, job_id) {
+			// console.log('found cancel job_id: ', err, job_id);
+			
+			// all good, not listed for cancelling
+			if (err || !job_id) return callback();
+
+			return callback(true);
+		});
+	},
+
+
+	cancelledRequest : function (res, url) {
+		// console.log('cancelledRequest', url);
+		var tile_key = 'render_job:' + url;
+		store.temp.del(tile_key, function (err) {
+			res.end();
+		});
+
+	},
+
+	_saveRenderJob : function (options, callback) {
+		var job_id = options.job_id,
+		    url = options.url;
+
+		// console.log('-________________ _saveRenderJob', options);
+
+		var tile_key = 'render_job:' + url;
+		// console.log('tile_key: ', tile_key);
+		store.temp.set(tile_key, job_id, callback);
+	},
+
 	headers : {
 		jpeg : 'image/jpeg',
 		png : 'image/png',
@@ -672,61 +803,78 @@ module.exports = pile = {
 		    ops = [],
 		    start_time = new Date().getTime();
 
+
 		// add access token to params
 		params.access_token = req.query.access_token || req.body.access_token;
 
-		// get stored layer
-		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
-			if (err) return pile._getTileErrorHandler(res, err);
-			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
+		// add tile url to params
+		params.url = req.url;
 
-			var storedLayer = JSON.parse(storedLayerJSON);
+		// check if tile requets has been cancelled in the meantime
+		pile.checkTileRequestStatus(params.url, function (cancel) {
+			if (cancel) return pile.cancelledRequest(res, params.url);
+		
 
-			// get tiles
-			if (type == 'pbf') ops.push(function (callback) {
-				pile.getVectorTile(params, storedLayer, callback);
-			});
+			// get stored layer
+			store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
+				if (err) return pile._getTileErrorHandler(res, err);
+				if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
-			if (type == 'png') ops.push(function (callback) {
-				pile.getRasterTile(params, storedLayer, callback);
-			});
+				var storedLayer = JSON.parse(storedLayerJSON);
 
-			if (type == 'grid') ops.push(function (callback) {
-				pile.getGridTile(params, storedLayer, callback);
-			});
-
-
-			// run ops
-			async.series(ops, function (err, data) {
-
-				if (err) {
-					console.error({
-						err_id : 2,
-						err_msg : 'render vector',
-						error : err
-					});
-					return res.end();
-				}
-
-				// timer
-				var end_time = new Date().getTime();
-				var create_tile_time = end_time - start_time;
-
-				// log tile request
-				console.tile({
-					z : params.z,
-					x : params.x,
-					y : params.y,
-					format : type,
-					layer_id : params.layerUuid,
-					render_time : create_tile_time
+				// get tiles
+				if (type == 'pbf') ops.push(function (callback) {
+					pile.getVectorTile(params, storedLayer, callback);
 				});
 
-				// send to client
-				res.writeHead(200, {'Content-Type': pile.headers[type]});
-				res.end(data[0]);
+				if (type == 'png') ops.push(function (callback) {
+					pile.getRasterTile(params, storedLayer, callback);
+				});
+
+				if (type == 'grid') ops.push(function (callback) {
+					pile.getGridTile(params, storedLayer, callback);
+				});
+
+
+				// run ops
+				async.series(ops, function (err, data) {
+
+					// if tile request is cancelled
+					if (err == 'removed') { 
+						console.log('removed!');
+						return res.end()
+					}
+
+					if (err) {
+						console.error({
+							err_id : 2,
+							err_msg : 'render vector',
+							error : err
+						});
+						return res.end();
+					}
+
+					// timer
+					var end_time = new Date().getTime();
+					var create_tile_time = end_time - start_time;
+
+					// log tile request
+					// console.tile({
+					// 	z : params.z,
+					// 	x : params.x,
+					// 	y : params.y,
+					// 	format : type,
+					// 	layer_id : params.layerUuid,
+					// 	render_time : create_tile_time
+					// });
+
+					// send to client
+					res.writeHead(200, {'Content-Type': pile.headers[type]});
+					res.end(data[0]);
+				});
 			});
-		});
+
+		})
 		
 	},
 
@@ -767,13 +915,39 @@ module.exports = pile = {
 			params : params,
 			storedLayer : storedLayer
 		}).priority('high').removeOnComplete(true).attempts(5).save();
+		// }).priority('high').attempts(5).save();
+		// }).priority('high').save();
 
 
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
+			console.log('job.on complete', job.id, result);
+
+			// console.log('COMPLETE', result);
 			// get tile
 			store._readRasterTile(params, done);
+		});
+
+		job.on('failed', function (result) {
+
+			console.log('job.on failed', result);
+
+			done('removed');
+		})
+
+		job.on('remove', function (result) {
+
+			console.log('job.on remove', result);
+
+			done('removed');
+		});
+
+		job.on('removed', function (result) {
+
+			console.log('job.on remove', result);
+
+			done('removed');
 		});
 
 	},
@@ -1311,20 +1485,29 @@ if (cluster.isMaster) {
 
 		var params = job.data.params;
 
-		// render
-		pile._renderRasterTile(params, function (err) {
-			if (err) console.error({
-				err_id : 9,
-				err_msg : 'create_tile cluster fuck',
-				error : err
+		// save job
+		pile._saveRenderJob({
+			job_id : job.id,
+			url : params.url
+		}, function (err) {
+
+			// render
+			pile._renderRasterTile(params, function (err) {
+				if (err) console.error({
+					err_id : 9,
+					err_msg : 'create_tile cluster fuck',
+					error : err
+				});
+
+				done(null);
 			});
-			done(null);
-		});
+		})
+
 
 	});
 
 	// render grid job
-	jobs.process('render_grid_tile', 1, function (job, done) {
+	jobs.process('render_grid_tile', 3, function (job, done) {
 
 		var params = job.data.params;
 		pile._renderGridTile(params, function (err) {
@@ -1369,5 +1552,13 @@ if (cluster.isMaster) {
 			});
 		});
 	});
+
+	jobs.on('job failed', function (id) {
+		console.log('jobs: job failed', id);
+	})
+
+	jobs.on('job remove', function (id) {
+		console.log('jobs: job remove', id);
+	})
 
 }

@@ -64,6 +64,11 @@ module.exports = function (pile) {
 		pile.fetchHistogram(req, res);
 	});
 
+	// cancel tile requests
+	app.post('/api/db/cancelTiles', checkAccess, function (req, res) {
+		pile.cancelTileRequests(req, res);
+	});
+
 	// proxy tiles
 	app.get('/proxy/*', checkAccess, function (req, res) {
 		pile.proxyTile(req, res);
