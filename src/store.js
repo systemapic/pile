@@ -116,7 +116,7 @@ module.exports = store = {
 	_saveRasterTileDisk : function (tile, params, done) {
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y + '.png';
 		var path = RASTERPATH + keyString;
-		tile.encode('png', function (err, buffer) {
+		tile.encode('png8', function (err, buffer) {
 			fs.outputFile(path, buffer, function (err) {
 				done(null);
 			});

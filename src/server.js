@@ -113,6 +113,9 @@ function checkAccess (req, res, next) {
 }
 
 console.tile = console.info;
+console.tile = function (tile) {
+	if (tile.render_time) console.info('rendered tile in ', tile.render_time, 'ms');
+};
 
 // // logger
 // var logger = new (winston.Logger)({
