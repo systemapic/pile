@@ -15,6 +15,7 @@ var numCPUs = require('os').cpus().length;
 var mongoose = require('mongoose');
 var request = require('request');
 var exec = require('child_process').exec;
+var pg = require('pg');
 
 // modules
 var server = require('./server');
@@ -398,6 +399,8 @@ module.exports = pile = {
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
 
 
+			
+			// create postgis layer
 			if (upload_status.data_type == 'vector') {
 
 				return pile._createPostGISLayer({
@@ -406,12 +409,13 @@ module.exports = pile = {
 				}, callback);
 			} 
 
+			// create raster overlay
 			if (upload_status.data_type == 'raster') {
 
 				return pile._createRasterLayer({
 					upload_status : upload_status,
 					options : options
-				}, callback)
+				}, callback);
 
 			}
 
@@ -434,6 +438,341 @@ module.exports = pile = {
 		});
 
 
+	},
+
+	vectorizeLayer : function (req, res) {
+		// vectorize raster (create postgis layer)
+
+			return pile.vectorizeRaster({
+				options : options,
+				upload_status : upload_status
+			}, callback);
+
+
+		var options 	= req.body,
+		    file_id 	= options.file_id,
+		    sql 	= options.sql,
+		    cartocss 	= options.cartocss,
+		    cartocss_version = options.cartocss_version,
+		    geom_column = options.geom_column,
+		    geom_type 	= options.geom_type,
+		    raster_band = options.raster_band,
+		    srid 	= options.srid,
+		    affected_tables = options.affected_tables,
+		    interactivity = options.interactivity,
+		    attributes 	= options.attributes,
+		    access_token = req.body.access_token;
+
+
+		// log to file
+		console.log({
+			type : 'createLayer',
+			options : options
+		});
+
+		// verify query
+		if (!file_id) return pile.error.missingInformation(res, 'Please provide a file_id.')
+		
+
+		var ops = [];
+
+		ops.push(function (callback) {
+
+			// // get upload status object from wu
+			// pile.request.get('/api/import/status', { 	// todo: write more pluggable
+			// 	file_id : file_id, 
+			// 	access_token : access_token
+			// }, callback);
+
+			callback()
+
+		});
+
+
+		ops.push(function (upload_status, callback) {
+			if (!upload_status) return callback('No such upload_status.');
+
+			var upload_status = JSON.parse(upload_status);
+
+			// check that done importing to postgis
+			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
+
+			// todo: errors
+
+			// check that done importing to postgis
+			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
+
+
+			
+			// create postgis layer
+			if (upload_status.data_type == 'vector') {
+
+				return pile._createPostGISLayer({
+					upload_status : upload_status,
+					options : options
+				}, callback);
+			} 
+
+			// create raster overlay
+			if (upload_status.data_type == 'raster') {
+
+				return pile._createRasterLayer({
+					upload_status : upload_status,
+					options : options
+				}, callback);
+
+			}
+
+			// error
+			callback('Invalid data_type: ' +  upload_status.data_type);
+		})
+		
+
+		async.waterfall(ops, function (err, layerObject) {
+			if (err) {
+				console.error({
+					err_id : 30,
+					err_msg : 'create layer',
+					error : err
+				});
+				return res.json({error : err});
+			}
+			// return layer to client
+			res.json(layerObject);
+		});
+
+
+
+	},
+
+
+	vectorizeRaster : function (data, done) {
+
+		// create vector table from raster
+		// create postgislayer (vector) from new table
+		// return layer
+
+		console.log('vectorizeRaster', data);
+
+		var status = data.upload_status;
+		var options = data.options;
+
+		var vectorized_raster_file_id;
+		var layerJSON;
+
+		var ops = [];
+
+		ops.push(function (callback) {
+
+			var VECTORIZE_SCRIPT_PATH = 'src/vectorize_raster.sh';
+
+			vectorized_raster_file_id = 'vectorized_raster_' + pile.getRandomChars(20);
+
+			// st_extent script 
+			var command = [
+				VECTORIZE_SCRIPT_PATH, 	// script
+				status.database_name, 	// database name
+				vectorized_raster_file_id,
+				status.table_name,	// table name
+			].join(' ');
+
+
+			console.log('command: ', command);
+
+			// create database in postgis
+			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+				console.log('err, stdout, stdin', err, stdout, stdin);
+
+
+				options.sql = "(SELECT * FROM " + vectorized_raster_file_id + ") as sub";
+				options.table_name = vectorized_raster_file_id;
+
+				console.log('no help', options);
+
+				// callback
+				callback(err);
+			});
+
+		});
+
+		ops.push(function (callback) {
+
+			pile._primeTableWithGeometries({
+				file_id : vectorized_raster_file_id,
+				postgis_db : status.database_name,
+			}, callback);
+
+		});
+
+		ops.push(function (callback) {
+
+			return pile._createPostGISLayer({
+				upload_status : status,
+				options : options
+			}, function (err, layer) {
+
+				layerJSON = layer;
+				callback(err);
+			});
+		});
+		
+
+		// ops.push(function (callback) {
+
+		// });
+
+		async.series(ops, function (err) {
+
+
+			console.log('JIPPO!', err);
+
+			done(err, layerJSON);
+
+		});
+
+	},
+
+
+
+	_primeTableWithGeometries : function (options, done) {
+
+		var file_id = options.file_id,
+		    postgis_db = options.postgis_db,
+		    ops = [];
+
+		console.log('_primeTableWithGeometries', options);
+
+
+		// get geometry type
+		ops.push(function (callback) {
+			pile.pgquery({
+				postgis_db : postgis_db,
+				query : 'SELECT ST_GeometryType(geom) from "' + file_id + '" limit 1'
+			}, function (err, results) {
+				if (err) return callback(err);
+				console.log('results', results);
+				if (!results || !results.rows || !results.rows.length) return callback('The dataset contains no valid geodata.');
+				var geometry_type = results.rows[0].st_geometrytype.split('ST_')[1];
+				callback(null, geometry_type);
+			})
+		});
+
+		// create geometry 3857
+		ops.push(function (geometry_type, callback) {
+			var column = ' the_geom_3857';
+			var geometry = ' geometry(' + geometry_type + ', 3857)';
+			var query = 'ALTER TABLE ' + file_id + ' ADD COLUMN' + column + geometry;
+
+			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(null, geometry_type);
+			});
+		});
+
+		// create geometry 4326
+		ops.push(function (geometry_type, callback) {
+			var column = ' the_geom_4326';
+			var geometry = ' geometry(' + geometry_type + ', 4326)';
+			var query = 'ALTER TABLE ' + file_id + ' ADD COLUMN' + column + geometry;
+
+			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(err, geometry_type);
+			});
+		});
+
+
+		// populate geometry
+		ops.push(function (geometry_type, callback) {
+			var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_3857 TYPE Geometry(' + geometry_type + ', 3857) USING ST_Transform(geom, 3857)'
+
+   			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(err, geometry_type);
+			});
+		});
+
+		// populate geometry
+		ops.push(function (geometry_type, callback) {
+			var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_4326 TYPE Geometry(' + geometry_type + ', 4326) USING ST_Transform(geom, 4326)'
+
+   			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(err);
+			});
+		});
+
+
+		// create index for 3857
+		ops.push(function (callback) {
+			var idx = file_id + '_the_geom_4326_idx';
+			var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_4326)'
+
+			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(null);
+			});
+		});
+
+		// create index for 4326
+		ops.push(function (callback) {
+			var idx = file_id + '_the_geom_3857_idx';
+			var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_3857)'
+
+			pile.pgquery({
+				postgis_db : postgis_db,
+				query : query
+			}, function (err, results) {
+				if (err) return callback(err);
+				callback(null, 'ok');
+			});
+		});
+
+
+		async.waterfall(ops, function (err, results) {
+			done(err);
+		});
+
+	},
+
+
+	pgquery : function (options, callback) {
+		var postgis_db = options.postgis_db,
+		    variables = options.variables,
+		    query = options.query;
+
+		// count rows and add to uploadStatus
+		var conString = 'postgres://docker:docker@postgis/' + postgis_db; // todo: put in config
+		pg.connect(conString, function(err, client, pgcb) {
+			if (err) return callback(err);
+			
+			// do query
+			client.query(query, variables, function(err, result) {
+				// clean up after pg
+				pgcb();
+				// client.end();
+
+				if (err) return callback(err); 
+				
+				// return result
+				callback(null, result);
+			});
+		});
 	},
 
 
@@ -478,6 +817,7 @@ module.exports = pile = {
 					metadata : options.metadata,
 					layer_id : layerUuid,
 					wicked : 'thing',
+					data_type : options.data_type || opts.options.data_type || 'vector',
 
 					// optional				// defaults
 					cartocss_version : cartocss_version 	|| '2.0.1',
@@ -498,6 +838,8 @@ module.exports = pile = {
 
 			var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
 
+			console.log('0---->>> come thru: ', layer);
+
 			// st_extent script 
 			var command = [
 				GET_EXTENT_SCRIPT_PATH, 	// script
@@ -508,6 +850,8 @@ module.exports = pile = {
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+
+				console.log('errr0r0', err, stdout, stdin);
 
 				// parse stdout
 				var extent = stdout.split('(')[1].split(')')[0];
@@ -544,6 +888,7 @@ module.exports = pile = {
 		    options = opts.upload_status,
 		    file_id = opts.options.file_id,
 		    srid 	= opts.options.srid,
+		    srid 	= options.srid,
 		    access_token = opts.options.access_token;
 
 		ops.push(function (callback) {
@@ -563,6 +908,7 @@ module.exports = pile = {
 					layer_id : layerUuid,
 					wicked : 'thing',
 					srid : srid || 3857,
+					data_type : 'raster',
 				}
 			}
 
@@ -919,8 +1265,6 @@ module.exports = pile = {
 		});
 	},
 
-		
-
 	// return tiles from redis/disk or created
 	getVectorTile : function (params, storedLayer, done) {
 
@@ -963,7 +1307,15 @@ module.exports = pile = {
 
 
 
-	
+	getRandomChars : function (len, charSet) {
+		charSet = charSet || 'abcdefghijklmnopqrstuvwxyz';
+		var randomString = '';
+		for (var i = 0; i < len; i++) {
+			var randomPoz = Math.floor(Math.random() * charSet.length);
+			randomString += charSet.substring(randomPoz,randomPoz+1);
+		}
+		return randomString;
+	},
 
 	// get tiles from redis
 	_getRasterTileFromRedis : function (params, done) {
