@@ -552,8 +552,6 @@ module.exports = pile = {
 		// create postgislayer (vector) from new table
 		// return layer
 
-		console.log('vectorizeRaster', data);
-
 		var status = data.upload_status;
 		var options = data.options;
 
@@ -587,7 +585,6 @@ module.exports = pile = {
 				options.sql = "(SELECT * FROM " + vectorized_raster_file_id + ") as sub";
 				options.table_name = vectorized_raster_file_id;
 
-				console.log('no help', options);
 
 				// callback
 				callback(err);
@@ -624,8 +621,6 @@ module.exports = pile = {
 		async.series(ops, function (err) {
 
 
-			console.log('JIPPO!', err);
-
 			done(err, layerJSON);
 
 		});
@@ -650,7 +645,6 @@ module.exports = pile = {
 				query : 'SELECT ST_GeometryType(geom) from "' + file_id + '" limit 1'
 			}, function (err, results) {
 				if (err) return callback(err);
-				console.log('results', results);
 				if (!results || !results.rows || !results.rows.length) return callback('The dataset contains no valid geodata.');
 				var geometry_type = results.rows[0].st_geometrytype.split('ST_')[1];
 				callback(null, geometry_type);
@@ -838,7 +832,6 @@ module.exports = pile = {
 
 			var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
 
-			console.log('0---->>> come thru: ', layer);
 
 			// st_extent script 
 			var command = [
@@ -851,7 +844,6 @@ module.exports = pile = {
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 
-				console.log('errr0r0', err, stdout, stdin);
 
 				// parse stdout
 				var extent = stdout.split('(')[1].split(')')[0];
