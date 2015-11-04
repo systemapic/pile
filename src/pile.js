@@ -1089,8 +1089,10 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
+			console.log('crated vecotr tile? ', result);
+
 			// get tile
-			pile._readVectorTile(params, storedLayer, done);
+			store._readVectorTile(params, done);
 		});
 
 
@@ -1132,9 +1134,135 @@ module.exports = pile = {
 		});
 	},
 
+	// _renderVectorTile : function (params, done) {
+
+	// 	pile._prepareTile(params, function (err, map) {
+	// 		if (err) console.error({
+	// 			err_id : 3,
+	// 			err_msg : 'render vector',
+	// 			error : err
+	// 		});
+	// 		if (err) return done(err);
+
+	// 		var map_options = {
+	// 			variables : { 
+	// 				zoom : params.z // insert min_max etc 
+	// 			}
+	// 		}
+
+	// 		// vector
+	// 		var im = new mapnik.VectorTile(params.z, params.x, params.y);
+			
+	// 		// check
+	// 		if (!im) return callback('Unsupported type.')
+
+	// 		// render
+	// 		map.render(im, map_options, function (err, tile) {
+	// 			if (err) console.error({
+	// 				err_id : 4,
+	// 				err_msg : 'render vector',
+	// 				error : err
+	// 			});
+
+	// 			store._saveVectorTile(tile, params, done);
+	// 		});
+	// 	});
+		
+	// },
+
 	_renderVectorTile : function (params, done) {
 
-		pile._prepareTile(params, function (err, map) {
+		// prepare tile: 
+		// parse url into layerUuid, zxy, type
+		var ops = [];
+		var map,
+		    layer,
+		    postgis,
+		    bbox;
+
+		// check params
+		if (!params.layerUuid) 	   return done('Invalid url: Missing layerUuid.');
+		if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
+		if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
+		if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
+		if (!params.type) 	   return done('Invalid url: Missing type extension.');
+
+
+		// look for stored layerUuid
+		ops.push(function (callback) {
+			store.layers.get(params.layerUuid, callback);
+		});
+
+		// define settings, xml
+		ops.push(function (storedLayer, callback) {
+			if (!storedLayer) return callback('No such layerUuid.');
+
+			var storedLayer = JSON.parse(storedLayer);
+
+			// default settings // todo: put in config
+			var default_postgis_settings = {
+				user : 'docker',
+				password : 'docker',
+				host : 'postgis',
+				type : 'postgis',
+				geometry_field : 'the_geom_3857',
+				srid : '3857'
+			}
+
+			// set bounding box
+			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+
+			console.log('bbox: ', bbox);
+
+			// insert layer settings 
+			var postgis_settings 			= default_postgis_settings;
+			postgis_settings.dbname 		= storedLayer.options.database_name;
+			postgis_settings.table 			= storedLayer.options.sql;
+			postgis_settings.extent 		= storedLayer.options.extent;
+			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
+			postgis_settings.srid 			= storedLayer.options.srid;
+			postgis_settings.asynchronous_request 	= true;
+			postgis_settings.max_async_connection 	= 10;
+			
+
+			// everything in spherical mercator (3857)!
+			try {  	
+				map = new mapnik.Map(256, 256, mercator.proj4);
+				layer = new mapnik.Layer('layer', mercator.proj4);
+				postgis = new mapnik.Datasource(postgis_settings);
+				
+			// catch errors
+			} catch (e) { return callback(e.message); }
+
+			// set buffer
+			map.bufferSize = 128;
+
+			// set extent
+			map.extent = bbox; // must have extent!
+
+			// set datasource
+			layer.datasource = postgis;
+
+			// add styles
+			layer.styles = ['layer']; // style names in xml
+			
+			// add layer to map
+			map.add_layer(layer);
+
+			// parse xml from cartocss
+			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+
+		});
+
+		// load xml to map
+		ops.push(function (xml, callback) {
+			map.fromString(xml, {strict : true}, callback);
+		});
+
+		// run ops
+		async.waterfall(ops, function (err, map) {
+
+			// render vector tile:
 			if (err) console.error({
 				err_id : 3,
 				err_msg : 'render vector',
@@ -1162,10 +1290,15 @@ module.exports = pile = {
 					error : err
 				});
 
-				pile._saveVectorTile(tile, params, done);
+				store._saveVectorTile(tile, params, done);
 			});
+
 		});
-		
+
+
+
+	
+
 	},
 
 	_renderRasterTile : function (params, done) {
@@ -1183,6 +1316,7 @@ module.exports = pile = {
 
 			var map_options = {
 				buffer_size : 128,
+				// buffer_size : 32,
 				variables : { 
 					zoom : params.z // insert min_max etc 
 				}
@@ -1190,6 +1324,7 @@ module.exports = pile = {
 			
 			// raster
 			var im = new mapnik.Image(256, 256);
+			// var im = new mapnik.Image(64, 64);
 
 			// render
 			map.render(im, map_options, function (err, tile) {
@@ -1261,7 +1396,7 @@ module.exports = pile = {
 	getVectorTile : function (params, storedLayer, done) {
 
 		// check redis
-		store._readVectorTile(params, storedLayer, function (err, data) {
+		store._readVectorTile(params, function (err, data) {
 
 			// return data
 			if (data) return done(null, data);
@@ -1375,6 +1510,8 @@ module.exports = pile = {
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
+			console.log('bbox: ', bbox);
+
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
 			postgis_settings.dbname 		= storedLayer.options.database_name;
@@ -1389,6 +1526,7 @@ module.exports = pile = {
 			// everything in spherical mercator (3857)!
 			try {  	
 				map = new mapnik.Map(256, 256, mercator.proj4);
+				// map = new mapnik.Map(64, 64, mercator.proj4);
 				layer = new mapnik.Layer('layer', mercator.proj4);
 				postgis = new mapnik.Datasource(postgis_settings);
 				
@@ -1396,6 +1534,7 @@ module.exports = pile = {
 			} catch (e) { return callback(e.message); }
 
 			// set buffer
+			// map.bufferSize = 32;
 			map.bufferSize = 128;
 
 			// set extent
