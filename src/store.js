@@ -68,6 +68,12 @@ module.exports = store = {
 		if (pile_settings.store == 'disk')  return store._saveVectorTileDisk(tile, params, done);
 		return done('pile_settings.store not set!');
 	},
+	_readVectorTile : function (params, done) {
+		console.log('_readVectorTile', params);
+		if (pile_settings.store == 'redis') return store._readVectorTileRedis(params, done);
+		if (pile_settings.store == 'disk')  return store._readVectorTileDisk(params, done);
+		return done('pile_settings.store not set!');
+	},
 	_saveRasterTile : function (tile, params, done) {
 		if (pile_settings.store == 'redis') return store._saveRasterTileRedis(tile, params, done);
 		if (pile_settings.store == 'disk')  return store._saveRasterTileDisk(tile, params, done);
@@ -91,6 +97,11 @@ module.exports = store = {
 		var key = new Buffer(keyString);
 		store.layers.set(key, tile.getData(), done);
 	},
+	_readVectorTileRedis : function (params, done) {
+		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		var key = new Buffer(keyString);
+		store.layers.get(key, done);
+	},
 	_saveRasterTileRedis : function (tile, params, done) {
 		// save png to redis
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
@@ -109,9 +120,18 @@ module.exports = store = {
 
 	// read/write to disk
 	_saveVectorTileDisk : function (tile, params, done) {
-		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y + '.pbf';
 		var path = VECTORPATH + keyString;
 		fs.outputFile(path, tile.getData(), done);
+	},
+	_readVectorTileDisk : function (params, done) {
+		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y + '.pbf';
+		var path = VECTORPATH + keyString;
+		fs.readFile(path, function (err, buffer) {
+			console.log('read vector tile: ', path);
+			if (err) return done(null);
+			done(null, buffer);
+		});
 	},
 	_saveRasterTileDisk : function (tile, params, done) {
 		var keyString = 'raster_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y + '.png';

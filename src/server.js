@@ -29,6 +29,11 @@ module.exports = function (pile) {
 		pile.createLayer(req, res);
 	});
 
+	// vectorize layer
+	app.post('/api/db/vectorizeLayer', checkAccess, function (req, res) {
+		pile.vectorizeLayer(req, res);
+	});
+
 	// update layer
 	app.post('/api/db/updateLayer', checkAccess, function (req, res) {
 		pile.updateLayer(req, res);
