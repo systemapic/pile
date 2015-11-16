@@ -1041,7 +1041,10 @@ module.exports = pile = {
 						err_msg : 'render vector',
 						error : err
 					});
-					return res.end();
+					// return res.end();
+					if (type == 'png') return pile._serveErrorTile(res);
+					
+					return res.json({});
 				}
 
 				// timer
@@ -1114,8 +1117,19 @@ module.exports = pile = {
 			store._readRasterTile(params, done);
 		});
 
+		job.on('failed', function (err) {
+			done(err);
+		});
+
 	},
 
+	_serveErrorTile : function (res) {
+		var errorTile = 'public/errorTile.png';
+		fs.readFile('public/noAccessTile.png', function (err, tile) {
+			res.writeHead(200, {'Content-Type': 'image/png'});
+			res.end(tile);
+		});
+	},
 
 	createGridTile : function (params, storedLayer, done) {
 
@@ -1131,6 +1145,10 @@ module.exports = pile = {
 
 			// get tile
 			pile._getGridTileFromRedis(params, done);
+		});
+
+		job.on('failed', function (err) {
+			done(err);
 		});
 	},
 
@@ -1781,11 +1799,15 @@ if (cluster.isMaster) {
 
 		// render
 		pile._renderRasterTile(params, function (err) {
-			if (err) console.error({
-				err_id : 9,
-				err_msg : 'create_tile cluster fuck',
-				error : err
-			});
+			if (err) {
+				console.error({
+					err_id : 9,
+					err_msg : 'create_tile cluster fuck',
+					error : err
+				});
+
+				return done(err);
+			}
 			done(null);
 		});
 
