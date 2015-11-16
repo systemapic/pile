@@ -9,6 +9,7 @@ var mercator = new mapnik.Projection(proj4);
  */
 function SphericalMercator() {
     var size = 256;
+    // var size = 64;
     this.Bc = [];
     this.Cc = [];
     this.zc = [];
