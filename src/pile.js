@@ -1042,7 +1042,7 @@ module.exports = pile = {
 						error : err
 					});
 					// return res.end();
-					if (type == 'png') return pile._serveErrorTile(res);
+					if (type == 'png') return pile.serveEmptyTile(res);
 					
 					return res.json({});
 				}
@@ -1126,6 +1126,13 @@ module.exports = pile = {
 	_serveErrorTile : function (res) {
 		var errorTile = 'public/errorTile.png';
 		fs.readFile('public/noAccessTile.png', function (err, tile) {
+			res.writeHead(200, {'Content-Type': 'image/png'});
+			res.end(tile);
+		});
+	},
+
+	serveEmptyTile : function (res) {
+		fs.readFile('public/emptyTile.png', function (err, tile) {
 			res.writeHead(200, {'Content-Type': 'image/png'});
 			res.end(tile);
 		});
