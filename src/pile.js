@@ -127,9 +127,8 @@ module.exports = pile = {
 				row
 			].join(' ');
 
-
 			// create database in postgis
-			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+			exec(command, {maxBuffer: 1024 * 1024 * 1000}, function (err, stdout, stdin) {
 				if (err) return callback(err);
 
 				// parse results
@@ -1385,6 +1384,8 @@ module.exports = pile = {
 					zoom : params.z // insert min_max etc 
 				}
 			}
+
+			console.log('params; ', params);
 
 			// raster
 			var im = new mapnik.Grid(map.width, map.height);
