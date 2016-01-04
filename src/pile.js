@@ -16,6 +16,8 @@ var mongoose = require('mongoose');
 var request = require('request');
 var exec = require('child_process').exec;
 var pg = require('pg');
+var gm = require('gm');
+var sanitize = require("sanitize-filename");
 
 // modules
 var server = require('./server');
@@ -882,6 +884,11 @@ module.exports = pile = {
 		    srid 	= options.srid,
 		    access_token = opts.options.access_token;
 
+
+		console.log('_createRasterLayer', opts);
+
+		var cutColor = opts.options.cutColor || false;
+
 		ops.push(function (callback) {
 
 			// create layer object
@@ -900,6 +907,7 @@ module.exports = pile = {
 					wicked : 'thing',
 					srid : srid || 3857,
 					data_type : 'raster',
+					cutColor : cutColor
 				}
 			}
 
@@ -973,19 +981,145 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
+			var cutColor = storedLayer.options.cutColor;
+
+			if (cutColor) {
+
+				var colorName = sanitize(cutColor);
+
+				console.log('colorNam', colorName);
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var originalPath = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				var path = originalPath + '.cut-' + colorName;
+				fs.readFile(path, function (err, buffer) {
+
+					// not created yet, do it!
+					if (err || !buffer) {
+
+						// cut white; todo: all colors (with threshold)
+						if (colorName == 'white') {
+
+							pile._cutWhite({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// cut black
+						} else if (colorName == 'black') {
+
+							console.log('cut black!');
+
+							pile._cutBlack({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// no cut
+						} else {
+							console.log('no cut raster! probably something wrong...')
+
+							// send to client
+							res.writeHead(200, {'Content-Type': pile.headers[type]});
+							res.end(buffer);
+						}
 
 
-			var file_id = storedLayer.options.file_id;
-			var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
-			fs.readFile(path, function (err, buffer) {
-				// send to client
-				res.writeHead(200, {'Content-Type': pile.headers[type]});
-				res.end(buffer);
-			});
+					} else {
+						
+						// send to client
+						res.writeHead(200, {'Content-Type': pile.headers[type]});
+						res.end(buffer);
+					}
+
+					
+				});
+
+
+			} else {
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				fs.readFile(path, function (err, buffer) {
+					
+					// send to client
+					res.writeHead(200, {'Content-Type': pile.headers[type]});
+					res.end(buffer);
+				});
+			}
+
+			
 
 		});
 	},
-	
+
+	_cutWhite : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.whiteThreshold(220, 220, 220, 1)
+		.transparent('#FFFFFF')
+		.write(path, function (err) {
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+		});
+
+	},
+	_cutBlack : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.blackThreshold(20, 20, 20, 1)
+		.transparent('#000000')
+		.write(path, function (err) {
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+		});
+	},
+
+	cutColor : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var color = options.color;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.whiteThreshold(220, 220, 220, 1)
+		.transparent('#FFFFFF')
+		.write(path, function (err) {
+
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+
+		});
+
+	},
+
 
 	getTile : function (req, res) {
 
@@ -1016,6 +1150,7 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
+
 
 			// get tiles
 			if (type == 'pbf') ops.push(function (callback) {
