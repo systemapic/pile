@@ -1011,10 +1011,8 @@ module.exports = pile = {
 								res.end(buffer);
 							});
 
-						// cut black
+						// cut black: todo: https://github.com/systemapic/wu/issues/256
 						} else if (colorName == 'black') {
-
-							console.log('cut black!');
 
 							pile._cutBlack({
 								path : path,
@@ -1037,7 +1035,7 @@ module.exports = pile = {
 
 
 					} else {
-						
+
 						// send to client
 						res.writeHead(200, {'Content-Type': pile.headers[type]});
 						res.end(buffer);
