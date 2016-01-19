@@ -12,7 +12,7 @@ var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
 var numCPUs = require('os').cpus().length;
-var mongoose = require('mongoose');
+// var mongoose = require('mongoose');
 var request = require('request');
 
 // global paths

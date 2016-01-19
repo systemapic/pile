@@ -16,6 +16,8 @@ var mongoose = require('mongoose');
 var request = require('request');
 var exec = require('child_process').exec;
 var pg = require('pg');
+var gm = require('gm');
+var sanitize = require("sanitize-filename");
 
 // modules
 var server = require('./server');
@@ -42,7 +44,7 @@ var Role 	 = require('../models/role');
 var Group 	 = require('../models/group');
 
 // connect to our database
-mongoose.connect(config.mongo.url); 
+// mongoose.connect(config.mongo.url); 
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
@@ -574,11 +576,11 @@ module.exports = pile = {
 			].join(' ');
 
 
-			console.log('command: ', command);
+			// console.log('command: ', command);
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log('err, stdout, stdin', err, stdout, stdin);
+				// console.log('err, stdout, stdin', err, stdout, stdin);
 
 
 				options.sql = "(SELECT * FROM " + vectorized_raster_file_id + ") as sub";
@@ -634,7 +636,7 @@ module.exports = pile = {
 		    postgis_db = options.postgis_db,
 		    ops = [];
 
-		console.log('_primeTableWithGeometries', options);
+		// console.log('_primeTableWithGeometries', options);
 
 
 		// get geometry type
@@ -882,6 +884,11 @@ module.exports = pile = {
 		    srid 	= options.srid,
 		    access_token = opts.options.access_token;
 
+
+		// console.log('_createRasterLayer', opts);
+
+		var cutColor = opts.options.cutColor || false;
+
 		ops.push(function (callback) {
 
 			// create layer object
@@ -900,6 +907,7 @@ module.exports = pile = {
 					wicked : 'thing',
 					srid : srid || 3857,
 					data_type : 'raster',
+					cutColor : cutColor
 				}
 			}
 
@@ -973,19 +981,143 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
+			var cutColor = storedLayer.options.cutColor;
+
+			if (cutColor) {
+
+				var colorName = sanitize(cutColor);
+
+				// console.log('colorNam', colorName);
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var originalPath = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				var path = originalPath + '.cut-' + colorName;
+				fs.readFile(path, function (err, buffer) {
+
+					// not created yet, do it!
+					if (err || !buffer) {
+
+						// cut white; todo: all colors (with threshold)
+						if (colorName == 'white') {
+
+							pile._cutWhite({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// cut black: todo: https://github.com/systemapic/wu/issues/256
+						} else if (colorName == 'black') {
+
+							pile._cutBlack({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// no cut
+						} else {
+							console.log('no cut raster! probably something wrong...')
+
+							// send to client
+							res.writeHead(200, {'Content-Type': pile.headers[type]});
+							res.end(buffer);
+						}
 
 
-			var file_id = storedLayer.options.file_id;
-			var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
-			fs.readFile(path, function (err, buffer) {
-				// send to client
-				res.writeHead(200, {'Content-Type': pile.headers[type]});
-				res.end(buffer);
-			});
+					} else {
+
+						// send to client
+						res.writeHead(200, {'Content-Type': pile.headers[type]});
+						res.end(buffer);
+					}
+
+					
+				});
+
+
+			} else {
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				fs.readFile(path, function (err, buffer) {
+					
+					// send to client
+					res.writeHead(200, {'Content-Type': pile.headers[type]});
+					res.end(buffer);
+				});
+			}
+
+			
 
 		});
 	},
-	
+
+	_cutWhite : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.whiteThreshold(220, 220, 220, 1)
+		.transparent('#FFFFFF')
+		.write(path, function (err) {
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+		});
+
+	},
+	_cutBlack : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.blackThreshold(20, 20, 20, 1)
+		.transparent('#000000')
+		.write(path, function (err) {
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+		});
+	},
+
+	cutColor : function (options, callback) {
+		var path = options.path;
+		var originalPath = options.originalPath;
+		var color = options.color;
+		var returnBuffer = options.returnBuffer;
+
+		gm(originalPath)
+		.whiteThreshold(220, 220, 220, 1)
+		.transparent('#FFFFFF')
+		.write(path, function (err) {
+
+			if (!err && returnBuffer) {
+				fs.readFile(path, callback);
+			} else {
+				callback(err);
+			}
+
+		});
+
+	},
+
 
 	getTile : function (req, res) {
 
@@ -1016,6 +1148,7 @@ module.exports = pile = {
 			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
 
 			var storedLayer = JSON.parse(storedLayerJSON);
+
 
 			// get tiles
 			if (type == 'pbf') ops.push(function (callback) {
@@ -1091,7 +1224,7 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
-			console.log('crated vecotr tile? ', result);
+			// console.log('crated vecotr tile? ', result);
 
 			// get tile
 			store._readVectorTile(params, done);
@@ -1235,8 +1368,6 @@ module.exports = pile = {
 
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-			console.log('bbox: ', bbox);
 
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
@@ -1384,8 +1515,6 @@ module.exports = pile = {
 					zoom : params.z // insert min_max etc 
 				}
 			}
-
-			console.log('params; ', params);
 
 			// raster
 			var im = new mapnik.Grid(map.width, map.height);
@@ -1535,8 +1664,6 @@ module.exports = pile = {
 
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-			console.log('bbox: ', bbox);
 
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
