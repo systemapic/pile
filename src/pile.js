@@ -44,7 +44,7 @@ var Role 	 = require('../models/role');
 var Group 	 = require('../models/group');
 
 // connect to our database
-mongoose.connect(config.mongo.url); 
+// mongoose.connect(config.mongo.url); 
 
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
