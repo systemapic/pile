@@ -576,11 +576,11 @@ module.exports = pile = {
 			].join(' ');
 
 
-			console.log('command: ', command);
+			// console.log('command: ', command);
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log('err, stdout, stdin', err, stdout, stdin);
+				// console.log('err, stdout, stdin', err, stdout, stdin);
 
 
 				options.sql = "(SELECT * FROM " + vectorized_raster_file_id + ") as sub";
@@ -636,7 +636,7 @@ module.exports = pile = {
 		    postgis_db = options.postgis_db,
 		    ops = [];
 
-		console.log('_primeTableWithGeometries', options);
+		// console.log('_primeTableWithGeometries', options);
 
 
 		// get geometry type
@@ -885,7 +885,7 @@ module.exports = pile = {
 		    access_token = opts.options.access_token;
 
 
-		console.log('_createRasterLayer', opts);
+		// console.log('_createRasterLayer', opts);
 
 		var cutColor = opts.options.cutColor || false;
 
@@ -987,7 +987,7 @@ module.exports = pile = {
 
 				var colorName = sanitize(cutColor);
 
-				console.log('colorNam', colorName);
+				// console.log('colorNam', colorName);
 
 				// get file etc.
 				var file_id = storedLayer.options.file_id;
@@ -1224,7 +1224,7 @@ module.exports = pile = {
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
 
-			console.log('crated vecotr tile? ', result);
+			// console.log('crated vecotr tile? ', result);
 
 			// get tile
 			store._readVectorTile(params, done);
@@ -1368,8 +1368,6 @@ module.exports = pile = {
 
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-			console.log('bbox: ', bbox);
 
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
@@ -1517,8 +1515,6 @@ module.exports = pile = {
 					zoom : params.z // insert min_max etc 
 				}
 			}
-
-			console.log('params; ', params);
 
 			// raster
 			var im = new mapnik.Grid(map.width, map.height);
@@ -1668,8 +1664,6 @@ module.exports = pile = {
 
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-			console.log('bbox: ', bbox);
 
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
