@@ -91,8 +91,16 @@ function checkAccess (req, res, next) {
 	request(verifyUrl, function (error, response, body) {
 		if (!response) return res.json({access : 'Unauthorized'});
 		
+		try {
+			var status = JSON.parse(body);
+		} catch (e) {
+			var status = false;
+		}
+
 		// allowed
-		if (response.statusCode == 200 && !error && body == 'OK') return next();
+		if (response.statusCode == 200 && !error && status && status.valid) {
+			return next();
+		} 
 
 		// check if raster request
 		if (req._parsedUrl && req._parsedUrl.pathname) {
