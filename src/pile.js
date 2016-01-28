@@ -847,7 +847,11 @@ module.exports = pile = {
 
 
 				// parse stdout
-				var extent = stdout.split('(')[1].split(')')[0];
+				try {
+					var extent = stdout.split('(')[1].split(')')[0];
+				} catch (e) {
+					return callback(e);
+				}
 
 				// set extent
 				layer.options.extent = extent;
