@@ -1073,7 +1073,8 @@ module.exports = pile = {
 		var returnBuffer = options.returnBuffer;
 
 		gm(originalPath)
-		.whiteThreshold(220, 220, 220, 1)
+		// .whiteThreshold(220, 220, 220, 1)
+		.whiteThreshold(200, 200, 200, 1)
 		.transparent('#FFFFFF')
 		.write(path, function (err) {
 			if (!err && returnBuffer) {
