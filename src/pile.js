@@ -33,19 +33,6 @@ var geojsonArea = require('geojson-area');
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
 
-// database schemas
-var Project 	 = require('../models/project');
-var Clientel 	 = require('../models/client');	
-var User  	 = require('../models/user');
-var File 	 = require('../models/file');
-var Layer 	 = require('../models/layer');
-var Hash 	 = require('../models/hash');
-var Role 	 = require('../models/role');
-var Group 	 = require('../models/group');
-
-// connect to our database
-// mongoose.connect(config.mongo.url); 
-
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
