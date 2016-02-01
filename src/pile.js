@@ -739,7 +739,7 @@ module.exports = pile = {
 		    query = options.query;
 
 		// count rows and add to uploadStatus
-		var conString = 'postgres://docker:docker@postgis/' + postgis_db; // todo: put in config
+		var conString = 'postgres://systemapic:docker@postgis/' + postgis_db; // todo: put in config
 		pg.connect(conString, function(err, client, pgcb) {
 			if (err) return callback(err);
 			
