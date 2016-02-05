@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# prod / dev mode
-if [ "$1" == "prod" ];then
-	PRODUCTIONMODE=true
-else 
-	PRODUCTIONMODE=false
-fi;
-
 # spin server
 if $PRODUCTIONMODE; then
 	echo 'Pile | PostGIS Tile Server | Production mode'
