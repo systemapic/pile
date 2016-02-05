@@ -4,7 +4,7 @@
 source /systemapic/config/env.sh
 
 # spin server
-if $PRODUCTIONMODE; then
+if $SYSTEMAPIC_PRODMODE; then
 	echo 'Pile | PostGIS Tile Server | Production mode'
 	forever src/pile.js production >> log/pile.log
 else
