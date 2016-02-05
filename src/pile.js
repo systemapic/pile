@@ -1359,7 +1359,7 @@ module.exports = pile = {
 
 			var storedLayer = JSON.parse(storedLayer);
 
-			// default settings // todo: put in config
+			// default settings
 			var default_postgis_settings = {
 				user : pgsql_options.dbuser,
 				password : pgsql_options.dbpass,
@@ -1655,7 +1655,7 @@ module.exports = pile = {
 
 			var storedLayer = JSON.parse(storedLayer);
 
-			// default settings // todo: put in config
+			// default settings
 			var default_postgis_settings = {
 				user : pgsql_options.dbuser,
 				password : pgsql_options.dbpass,
