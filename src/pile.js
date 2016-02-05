@@ -39,6 +39,13 @@ var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH 	 = '/data/proxy_tiles/';
 
+var pgsql_options = {
+  // TODO: move to config
+  dbhost: 'postgis',
+  dbuser: process.env.SYSTEMAPIC_PGSQL_USERNAME || 'docker',
+  dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
+};
+
 
 // #########################################
 // ### Vector, raster, utfgrid handling  ###
@@ -738,8 +745,12 @@ module.exports = pile = {
 		    variables = options.variables,
 		    query = options.query;
 
-		// count rows and add to uploadStatus
-		var conString = 'postgres://systemapic:docker@postgis/' + postgis_db; // todo: put in config
+		var dbhost = pgsql_options.dbhost;
+		var dbuser = pgsql_options.dbuser;
+		var dbpass = pgsql_options.dbpass;
+
+		var conString = 'postgres://'+dbuser+':'+dbpass+'@'+dbhost+'/' + postgis_db;
+
 		pg.connect(conString, function(err, client, pgcb) {
 			if (err) return callback(err);
 			
@@ -1350,9 +1361,9 @@ module.exports = pile = {
 
 			// default settings // todo: put in config
 			var default_postgis_settings = {
-				user : 'docker',
-				password : 'docker',
-				host : 'postgis',
+				user : pgsql_options.dbuser,
+				password : pgsql_options.dbpass,
+				host : pgsql_options.dbhost,
 				type : 'postgis',
 				geometry_field : 'the_geom_3857',
 				srid : '3857'
@@ -1646,9 +1657,9 @@ module.exports = pile = {
 
 			// default settings // todo: put in config
 			var default_postgis_settings = {
-				user : 'docker',
-				password : 'docker',
-				host : 'postgis',
+				user : pgsql_options.dbuser,
+				password : pgsql_options.dbpass,
+				host : pgsql_options.dbhost,
 				type : 'postgis',
 				geometry_field : 'the_geom_3857',
 				srid : '3857'
