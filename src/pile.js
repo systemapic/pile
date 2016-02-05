@@ -1929,7 +1929,7 @@ if (cluster.isMaster) {
 			if (err) {
 				console.error({
 					err_id : 9,
-					err_msg : 'create_tile cluster fuck',
+					err_msg : 'Error rendering raster tile',
 					error : err
 				});
 
@@ -1947,7 +1947,7 @@ if (cluster.isMaster) {
 		pile._renderGridTile(params, function (err) {
 			if (err) console.error({
 				err_id : 10,
-				err_msg : 'create_tile cluster fuck',
+				err_msg : 'Error rendering grid tile',
 				error : err
 			});
 			done(err);
