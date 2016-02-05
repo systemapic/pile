@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# source config
+source /systemapic/config/env.sh
+
 # spin server
 if $PRODUCTIONMODE; then
 	echo 'Pile | PostGIS Tile Server | Production mode'
