@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # source config
-source /systemapic/config/env.sh
+source /systemapic/config/env.sh || exit 1
 
 # spin server
 if $PRODUCTIONMODE; then
