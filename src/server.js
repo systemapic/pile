@@ -25,54 +25,54 @@ module.exports = function (pile) {
 	app.use(express.static(path.join(__dirname, 'public'))); 	// not secured
 
 	// create layer
-	app.post('/api/db/createLayer', checkAccess, function (req, res) {
+	app.post('/v2/tiles/create', checkAccess, function (req, res) {
 		pile.createLayer(req, res);
 	});
 
 	// vectorize layer
-	app.post('/api/db/vectorizeLayer', checkAccess, function (req, res) {
+	app.post('/v2/tiles/vectorize', checkAccess, function (req, res) {
 		pile.vectorizeLayer(req, res);
 	});
 
 	// update layer
-	app.post('/api/db/updateLayer', checkAccess, function (req, res) {
+	app.post('/v2/tiles/update', checkAccess, function (req, res) {
 		pile.updateLayer(req, res);
 	});
 
 	// get layer
-	app.get('/api/db/getLayer', checkAccess, function (req, res) {
+	app.get('/v2/tiles/layer', checkAccess, function (req, res) {
 		pile.getLayer(req, res);
 	});
 
 	// get tiles
-	app.get('/tiles/*', checkAccess, function (req, res) {
+	app.get('/v2/tiles/*', checkAccess, function (req, res) {
 		pile.getTile(req, res);
 	});
 
-	// get tiles
-	app.get('/overlay_tiles/*', checkAccess, function (req, res) {
-		pile.getOverlayTile(req, res);
-	});
+	// // get tiles
+	// app.get('/v2/tiles/*', checkAccess, function (req, res) {
+	// 	pile.getOverlayTile(req, res);
+	// });						// must be detected which type layer - tile, proxy, grid, overlay
 
 	// get data from point
-	app.post('/api/db/fetch', checkAccess, function (req, res) {
+	app.post('/v2/query/point', checkAccess, function (req, res) {
 		pile.fetchData(req, res);
 	});
 
 	// get data from area
-	app.post('/api/db/fetchArea', checkAccess, function (req, res) {
+	app.post('/v2/query/polygon', checkAccess, function (req, res) {
 		pile.fetchDataArea(req, res);
 	});
 
 	// get histogram from column
-	app.post('/api/db/fetchHistogram', checkAccess, function (req, res) {
+	app.post('/v2/query/histogram', checkAccess, function (req, res) {
 		pile.fetchHistogram(req, res);
 	});
 
-	// proxy tiles
-	app.get('/proxy/*', checkAccess, function (req, res) {
-		pile.proxyTile(req, res);
-	});
+	// // proxy tiles
+	// app.get('/proxy/*', checkAccess, function (req, res) {
+	// 	pile.proxyTile(req, res);
+	// });
 
 	// start server
 	app.listen(port);

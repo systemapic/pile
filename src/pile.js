@@ -33,24 +33,20 @@ var geojsonArea = require('geojson-area');
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
 
-// global paths
+// global paths (todo: move to config)
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH 	 = '/data/proxy_tiles/';
 
 var pgsql_options = {
-  // TODO: move to config
   dbhost: 'postgis',
   dbuser: process.env.SYSTEMAPIC_PGSQL_USERNAME || 'docker',
   dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
 };
 
 
-// #########################################
-// ### Vector, raster, utfgrid handling  ###
-// #########################################
-// vector/raster/utfgrid handling
+
 module.exports = pile = { 
 
 	headers : {
@@ -59,8 +55,260 @@ module.exports = pile = {
 		pbf : 'application/x-protobuf',
 		grid : 'application/json'
 	},
+	proxyProviders : ['google', 'norkart'],
 
-	proxyTile : function (req, res) {
+	// 
+	getTile : function (req, res) {
+		if (pile.tileIsProxy(req)) return pile.serveProxyTile(req, res);
+		if (pile.tileIsPostgis(req)) return pile.serveTile(req, res);
+		res.end(); // todo: error handling
+	},
+
+	tileIsProxy : function (req) {
+		var params = req.params[0].split('/');
+		var provider = params[0];
+		var isProxy = _.contains(pile.proxyProviders, provider);
+		return isProxy;
+	},
+
+	tileIsPostgis : function (req) {
+		var params = req.params[0].split('/');
+		var layer_id = params[0];
+		var isPostgis = _.contains(layer_id, 'layer_id-');
+		return isPostgis;
+	},
+
+	// decide whether postgis or overlay_raster... todo: refactor with rasters in postgis (no more overlays)
+	serveTile : function (req, res) {
+
+		// parse url into layerUuid, zxy, type
+		var ops = [];
+		var parsed = req._parsedUrl.pathname.split('/');
+		var params = {
+			layerUuid : parsed[3],
+			z : parseInt(parsed[4]),
+			x : parseInt(parsed[5]),
+			y : parseInt(parsed[6].split('.')[0]),
+			type : parsed[6].split('.')[1],
+		};
+		
+		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {
+			var storedLayer = JSON.parse(storedLayerJSON);
+		
+			console.log('storedLayer: ', storedLayer);
+
+			if (storedLayer.options.data_type == 'raster') { // todo: diff between overlay/raster
+				return pile.getOverlayTile(req, res);
+			}
+
+			if (storedLayer.options.data_type == 'vector') {
+				return pile._getTile(req, res);
+			}
+
+		});
+	},
+
+
+	_getTile : function (req, res) {
+
+		// parse url into layerUuid, zxy, type
+		var ops = [];
+		var parsed = req._parsedUrl.pathname.split('/');
+		var params = {
+			layerUuid : parsed[3],
+			z : parseInt(parsed[4]),
+			x : parseInt(parsed[5]),
+			y : parseInt(parsed[6].split('.')[0]),
+			type : parsed[6].split('.')[1],
+		};
+		var map;
+		var layer;
+		var postgis;
+		var bbox;
+		var type = params.type;
+		var ops = [];
+		var start_time = new Date().getTime();
+
+
+		// add access token to params
+		params.access_token = req.query.access_token || req.body.access_token;
+
+		// get stored layer
+		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
+			if (err) return pile._getTileErrorHandler(res, err);
+			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
+
+			var storedLayer = JSON.parse(storedLayerJSON);
+
+			console.log('storedLayer: ', storedLayer);
+
+
+			// get tiles
+			if (type == 'pbf') ops.push(function (callback) {
+				pile.getVectorTile(params, storedLayer, callback);
+			});
+
+			if (type == 'png') ops.push(function (callback) {
+				pile.getRasterTile(params, storedLayer, callback);
+			});
+
+			if (type == 'grid') ops.push(function (callback) {
+				pile.getGridTile(params, storedLayer, callback);
+			});
+
+
+			// run ops
+			async.series(ops, function (err, data) {
+
+				if (err) {
+					console.error({
+						err_id : 2,
+						err_msg : 'render vector',
+						error : err
+					});
+					// return res.end();
+					if (type == 'png') return pile.serveEmptyTile(res);
+					
+					return res.json({});
+				}
+
+				// timer
+				var end_time = new Date().getTime();
+				var create_tile_time = end_time - start_time;
+
+				// log tile request
+				console.tile({
+					z : params.z,
+					x : params.x,
+					y : params.y,
+					format : type,
+					layer_id : params.layerUuid,
+					render_time : create_tile_time
+				});
+
+				// send to client
+				res.writeHead(200, {'Content-Type': pile.headers[type]});
+				res.end(data[0]);
+			});
+		});
+		
+	},
+
+
+
+	// todo: REFACTOR with proper postgis raster instead
+	getOverlayTile : function (req, res) {
+
+		// parse url into layerUuid, zxy, type
+		var ops = [],
+		    parsed = req._parsedUrl.pathname.split('/'), 
+		    params = {
+			layerUuid : parsed[3],
+			z : parseInt(parsed[4]),
+			x : parseInt(parsed[5]),
+			y : parseInt(parsed[6].split('.')[0]),
+			type : parsed[6].split('.')[1],
+		    };
+
+		var map,
+		    layer,
+		    postgis,
+		    bbox;
+		var type = params.type;
+		var ops = [];
+
+		console.log('overlaye params', params);
+
+		// get stored layer
+		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
+			if (err) return pile._getTileErrorHandler(res, err);
+			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
+
+			var storedLayer = JSON.parse(storedLayerJSON);
+			var cutColor = storedLayer.options.cutColor;
+
+			if (cutColor) {
+
+				var colorName = sanitize(cutColor);
+
+				// console.log('colorNam', colorName);
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var originalPath = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				var path = originalPath + '.cut-' + colorName;
+				fs.readFile(path, function (err, buffer) {
+
+					// not created yet, do it!
+					if (err || !buffer) {
+
+						// cut white; todo: all colors (with threshold)
+						if (colorName == 'white') {
+
+							pile._cutWhite({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// cut black: todo: https://github.com/systemapic/wu/issues/256
+						} else if (colorName == 'black') {
+
+							pile._cutBlack({
+								path : path,
+								originalPath : originalPath,
+								returnBuffer : true
+							}, function (err, buffer) {
+								// send to client
+								res.writeHead(200, {'Content-Type': pile.headers[type]});
+								res.end(buffer);
+							});
+
+						// no cut
+						} else {
+							console.log('no cut raster! probably something wrong...')
+
+							// send to client
+							res.writeHead(200, {'Content-Type': pile.headers[type]});
+							res.end(buffer);
+						}
+
+
+					} else {
+
+						// send to client
+						res.writeHead(200, {'Content-Type': pile.headers[type]});
+						res.end(buffer);
+					}
+
+					
+				});
+
+
+			} else {
+
+				// get file etc.
+				var file_id = storedLayer.options.file_id;
+				var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
+				fs.readFile(path, function (err, buffer) {
+					
+					// send to client
+					res.writeHead(200, {'Content-Type': pile.headers[type]});
+					res.end(buffer);
+				});
+			}
+
+			
+
+		});
+	},
+
+
+	serveProxyTile : function (req, res) {
 
 		// parse url
 		var params = req.params[0].split('/');
@@ -956,117 +1204,7 @@ module.exports = pile = {
 		});
 	},
 
-	getOverlayTile : function (req, res) {
-
-		// parse url into layerUuid, zxy, type
-		var ops = [],
-		    parsed = req._parsedUrl.pathname.split('/'), 
-		    params = {
-			layerUuid : parsed[2],
-			z : parseInt(parsed[3]),
-			x : parseInt(parsed[4]),
-			y : parseInt(parsed[5].split('.')[0]),
-			type : parsed[5].split('.')[1],
-		    };
-
-		var map,
-		    layer,
-		    postgis,
-		    bbox;
-		var type = params.type;
-		var ops = [];
-
-
-		// add access token to params
-		// params.access_token = req.query.access_token || req.body.access_token;
-
-		// get stored layer
-		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
-			if (err) return pile._getTileErrorHandler(res, err);
-			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
-
-			var storedLayer = JSON.parse(storedLayerJSON);
-			var cutColor = storedLayer.options.cutColor;
-
-			if (cutColor) {
-
-				var colorName = sanitize(cutColor);
-
-				// console.log('colorNam', colorName);
-
-				// get file etc.
-				var file_id = storedLayer.options.file_id;
-				var originalPath = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
-				var path = originalPath + '.cut-' + colorName;
-				fs.readFile(path, function (err, buffer) {
-
-					// not created yet, do it!
-					if (err || !buffer) {
-
-						// cut white; todo: all colors (with threshold)
-						if (colorName == 'white') {
-
-							pile._cutWhite({
-								path : path,
-								originalPath : originalPath,
-								returnBuffer : true
-							}, function (err, buffer) {
-								// send to client
-								res.writeHead(200, {'Content-Type': pile.headers[type]});
-								res.end(buffer);
-							});
-
-						// cut black: todo: https://github.com/systemapic/wu/issues/256
-						} else if (colorName == 'black') {
-
-							pile._cutBlack({
-								path : path,
-								originalPath : originalPath,
-								returnBuffer : true
-							}, function (err, buffer) {
-								// send to client
-								res.writeHead(200, {'Content-Type': pile.headers[type]});
-								res.end(buffer);
-							});
-
-						// no cut
-						} else {
-							console.log('no cut raster! probably something wrong...')
-
-							// send to client
-							res.writeHead(200, {'Content-Type': pile.headers[type]});
-							res.end(buffer);
-						}
-
-
-					} else {
-
-						// send to client
-						res.writeHead(200, {'Content-Type': pile.headers[type]});
-						res.end(buffer);
-					}
-
-					
-				});
-
-
-			} else {
-
-				// get file etc.
-				var file_id = storedLayer.options.file_id;
-				var path = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
-				fs.readFile(path, function (err, buffer) {
-					
-					// send to client
-					res.writeHead(200, {'Content-Type': pile.headers[type]});
-					res.end(buffer);
-				});
-			}
-
-			
-
-		});
-	},
+	
 
 	_cutWhite : function (options, callback) {
 		var path = options.path;
@@ -1074,7 +1212,6 @@ module.exports = pile = {
 		var returnBuffer = options.returnBuffer;
 
 		gm(originalPath)
-		// .whiteThreshold(220, 220, 220, 1)
 		.whiteThreshold(200, 200, 200, 1)
 		.transparent('#FFFFFF')
 		.write(path, function (err) {
@@ -1124,88 +1261,6 @@ module.exports = pile = {
 
 	},
 
-
-	getTile : function (req, res) {
-
-		// parse url into layerUuid, zxy, type
-		var ops = [],
-		    parsed = req._parsedUrl.pathname.split('/'), 
-		    params = {
-			layerUuid : parsed[2],
-			z : parseInt(parsed[3]),
-			x : parseInt(parsed[4]),
-			y : parseInt(parsed[5].split('.')[0]),
-			type : parsed[5].split('.')[1],
-		    },
-		    map,
-		    layer,
-		    postgis,
-		    bbox,
-		    type = params.type,
-		    ops = [],
-		    start_time = new Date().getTime();
-
-		// add access token to params
-		params.access_token = req.query.access_token || req.body.access_token;
-
-		// get stored layer
-		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {	
-			if (err) return pile._getTileErrorHandler(res, err);
-			if (!storedLayerJSON) return pile._getTileErrorHandler(res, 'No stored layer.');
-
-			var storedLayer = JSON.parse(storedLayerJSON);
-
-
-			// get tiles
-			if (type == 'pbf') ops.push(function (callback) {
-				pile.getVectorTile(params, storedLayer, callback);
-			});
-
-			if (type == 'png') ops.push(function (callback) {
-				pile.getRasterTile(params, storedLayer, callback);
-			});
-
-			if (type == 'grid') ops.push(function (callback) {
-				pile.getGridTile(params, storedLayer, callback);
-			});
-
-
-			// run ops
-			async.series(ops, function (err, data) {
-
-				if (err) {
-					console.error({
-						err_id : 2,
-						err_msg : 'render vector',
-						error : err
-					});
-					// return res.end();
-					if (type == 'png') return pile.serveEmptyTile(res);
-					
-					return res.json({});
-				}
-
-				// timer
-				var end_time = new Date().getTime();
-				var create_tile_time = end_time - start_time;
-
-				// log tile request
-				console.tile({
-					z : params.z,
-					x : params.x,
-					y : params.y,
-					format : type,
-					layer_id : params.layerUuid,
-					render_time : create_tile_time
-				});
-
-				// send to client
-				res.writeHead(200, {'Content-Type': pile.headers[type]});
-				res.end(data[0]);
-			});
-		});
-		
-	},
 
 
 	_getTileErrorHandler : function (res, err) {
