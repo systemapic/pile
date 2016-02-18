@@ -231,8 +231,6 @@ module.exports = pile = {
 
 				var colorName = sanitize(cutColor);
 
-				// console.log('colorNam', colorName);
-
 				// get file etc.
 				var file_id = storedLayer.options.file_id;
 				var originalPath = '/data/raster_tiles/' + file_id + '/raster/' + params.z + '/' + params.x + '/' + params.y + '.png';
