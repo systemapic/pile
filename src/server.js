@@ -87,7 +87,8 @@ function checkAccess (req, res, next) {
 	var access_token = req.query.access_token || req.body.access_token;
 
 	// request wu for checking access tokens
-	var verifyUrl = 'http://wu:3001/api/token/check?access_token=' + access_token;
+	// var verifyUrl = 'http://wu:3001/api/token/check?access_token=' + access_token;
+	var verifyUrl = 'http://wu:3001/v2/users/token/check?access_token=' + access_token;
 	request(verifyUrl, function (error, response, body) {
 		if (!response) return res.json({access : 'Unauthorized'});
 		
