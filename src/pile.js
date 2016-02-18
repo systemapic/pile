@@ -92,22 +92,8 @@ module.exports = pile = {
 			type : parsed[6].split('.')[1],
 		};
 		
-		store.layers.get(params.layerUuid, function (err, storedLayerJSON) {
-			var storedLayer = JSON.parse(storedLayerJSON);
-		
-			console.log('storedLayer: ', storedLayer);
-
-			if (storedLayer.options.data_type == 'raster') { // todo: diff between overlay/raster
-				return pile.getOverlayTile(req, res);
-			}
-
-			if (storedLayer.options.data_type == 'vector') {
-				return pile._getTile(req, res);
-			}
-
-		});
+		return pile._getTile(req, res);
 	},
-
 
 	_getTile : function (req, res) {
 
@@ -644,24 +630,15 @@ module.exports = pile = {
 
 
 			
-			// create postgis layer
-			if (upload_status.data_type == 'vector') {
-
+			// create postgis layer for rasters and vector layers 
+			if (upload_status.data_type == 'vector'
+          || upload_status.data_type == 'raster')
+      {
 				return pile._createPostGISLayer({
 					upload_status : upload_status,
 					options : options
 				}, callback);
 			} 
-
-			// create raster overlay
-			if (upload_status.data_type == 'raster') {
-
-				return pile._createRasterLayer({
-					upload_status : upload_status,
-					options : options
-				}, callback);
-
-			}
 
 			// error
 			callback('Invalid data_type: ' +  upload_status.data_type);
@@ -748,24 +725,16 @@ module.exports = pile = {
 
 
 			
-			// create postgis layer
-			if (upload_status.data_type == 'vector') {
+			// create postgis layer for rasters and vector layers 
+			if (upload_status.data_type == 'vector'
+          || upload_status.data_type == 'raster')
+      {
 
 				return pile._createPostGISLayer({
 					upload_status : upload_status,
 					options : options
 				}, callback);
 			} 
-
-			// create raster overlay
-			if (upload_status.data_type == 'raster') {
-
-				return pile._createRasterLayer({
-					upload_status : upload_status,
-					options : options
-				}, callback);
-
-			}
 
 			// error
 			callback('Invalid data_type: ' +  upload_status.data_type);
