@@ -1003,9 +1003,8 @@ module.exports = pile = {
 		    attributes 	= opts.options.attributes,
 		    access_token = opts.options.access_token;
 
-
 		if (!sql) 	return done('Please provide a SQL statement.')
-		if (!cartocss) 	return done('Please provide CartoCSS.')
+		if (geom_type == 'geometry' && !cartocss) 	return done('Please provide CartoCSS.')
 
 		ops.push(function (callback) {
 
@@ -1686,7 +1685,7 @@ module.exports = pile = {
 				password : pgsql_options.dbpass,
 				host : pgsql_options.dbhost,
 				type : 'postgis',
-				geometry_field : 'the_geom_3857',
+				geometry_field : storedLayer.options.data_type == 'raster' ? 'rast' : 'the_geom_3857',
 				srid : '3857'
 			}
 
