@@ -1051,9 +1051,10 @@ module.exports = pile = {
 
 			// st_extent script 
 			var command = [
-				GET_EXTENT_SCRIPT_PATH, 	// script
+				GET_EXTENT_SCRIPT_PATH, 	    // script
 				layer.options.database_name, 	// database name
-				layer.options.table_name,	// table name
+				layer.options.table_name,     // table name
+				layer.options.geom_column,	  // geometry column
 			].join(' ');
 
 
