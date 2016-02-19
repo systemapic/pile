@@ -1802,6 +1802,11 @@ module.exports = pile = {
 	// convert CartoCSS to Mapnik XML
 	cartoRenderer : function (css, layer, callback) {
 
+		if ( ! css ) {
+			console.error( 'cartoRenderer called with undefined or empty css' );
+			css = "#layer {}";
+		}
+
 		var options = {
 			// srid 3857
 			"srs": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
@@ -1815,13 +1820,18 @@ module.exports = pile = {
 
 		try  {
 
+			//console.log("XXXX about to render " + JSON.stringify(options));
+
 			// carto renderer
 			var xml = new carto.Renderer().render(options);
+
+			//console.log("XXXX rendered xml " + xml);
 
 			callback(null, xml);
 
 		} catch (e) {
-			var err = { message : e }
+			//console.log("XXXX carto.Renderer().render() threw ", e);
+			var err = { message : 'CartoCSS rendering failed: ' + e.toString() }
 			callback(err);
 		}
 
