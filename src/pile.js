@@ -989,7 +989,7 @@ module.exports = pile = {
 
 	_createPostGISLayer : function (opts, done) {
 		var ops 	= [],
-		    options 	= opts.upload_status,
+		    options 	= opts,
 		    file_id 	= opts.options.file_id,
 		    sql 	= opts.options.sql,
 		    cartocss 	= opts.options.cartocss,
@@ -1003,8 +1003,8 @@ module.exports = pile = {
 		    attributes 	= opts.options.attributes,
 		    access_token = opts.options.access_token;
 
-		if (!sql) 	return done('Please provide a SQL statement.')
-		if (geom_type == 'geometry' && !cartocss) 	return done('Please provide CartoCSS.')
+		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
+		if (geom_type == 'geometry' && !cartocss) 	return done(new Error('Please provide CartoCSS.'))
 
 		ops.push(function (callback) {
 
@@ -1488,7 +1488,7 @@ module.exports = pile = {
 
 		pile._prepareTile(params, function (err, map) {
 			if (err) return done(err);
-			if (!map) return done('no map 7474');
+			if (!map) return done(new Error('no map 7474'));
 
 			// map options
 			var map_options = {
