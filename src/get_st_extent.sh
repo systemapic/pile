@@ -5,6 +5,8 @@ if [ -z "$2" ]; then
 	exit 1
 fi
 
+. `dirname $0`/run_in_docker.inc
+
 DATABASE=$1
 TABLE=$2
 COL=the_geom_3857
@@ -19,5 +21,5 @@ export PGHOST=postgis
 export PGDATABASE=$DATABASE
 
 cat<<EOF | psql
-SELECT ST_AsGeoJSON(ST_EXTENT("$COL"::geometry)) FROM "$TABLE";
+SELECT ST_EXTENT("$COL"::geometry) FROM "$TABLE";
 EOF
