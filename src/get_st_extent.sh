@@ -21,5 +21,5 @@ export PGHOST=postgis
 export PGDATABASE=$DATABASE
 
 cat<<EOF | psql
-SELECT ST_EXTENT("$COL"::geometry) FROM "$TABLE";
+SELECT ST_EXTENT(ST_Transform(ST_Envelope("$COL"),3857)) FROM "$TABLE";
 EOF
