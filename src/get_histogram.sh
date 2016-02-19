@@ -1,32 +1,20 @@
 #!/bin/bash
 
-if [ "$1" == "" ]; then
+. `dirname $0`/run_in_docker.inc
+
+if [ -z "$3" ]; then
 	echo "Must provide database as first argument,"
 	echo ""
-	echo "Usage: ./get_histogram.sh DATABASE TABLE COLUMN num_buckets [bar] (if you want to show bar in console)"
-	exit 1 # missing args
+	echo "Usage: $0 <database> <table> <column> [<num_buckets>] [bar]"
+  echo " Pass 'bar'  if you want to show bar in console"
+	exit 1
 fi
 
-if [ "$2" == "" ]; then
-	echo "Must provide table as second argument,"
-	echo ""
-	exit 1 # missing args
-fi
-
-if [ "$3" == "" ]; then
-	echo "Must provide column as third argument,"
-	echo ""
-	exit 1 # missing args
-fi
-
-if [ "$4" == "" ]; then
-	BUCKETS=50
-else 
-	BUCKETS=$4
-fi
+BUCKETS=50
+test -n "$4" && BUCKETS=$4
 
 # get config
-source /systemapic/config/env.sh
+source /systemapic/config/env.sh || exit 1
 
 # set -f
 if [ "$5" == "bar" ]; then
