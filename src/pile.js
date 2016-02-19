@@ -1050,6 +1050,10 @@ module.exports = pile = {
 
 			var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
 
+			if ( ! layer.options.database_name )
+				return callback(new Error("Unknown database_name in layer options"));
+			if ( ! layer.options.table_name )
+				return callback(new Error("Unknown table_name in layer options"));
 
 			// st_extent script 
 			var command = [
