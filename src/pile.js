@@ -150,7 +150,8 @@ module.exports = pile = {
 					console.error({
 						err_id : 2,
 						err_msg : 'render vector',
-						error : err
+						error : err,
+						stack : err.stack
 					});
 					// return res.end();
 					if (type == 'png') return pile.serveEmptyTile(res);
