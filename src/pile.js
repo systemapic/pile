@@ -1006,7 +1006,7 @@ module.exports = pile = {
 		    access_token = opts.options.access_token;
 
 		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
-		if (geom_type == 'geometry' && !cartocss) 	return done(new Error('Please provide CartoCSS.'))
+		if (!cartocss) 	return done(new Error('Please provide CartoCSS.'))
 
 		ops.push(function (callback) {
 
