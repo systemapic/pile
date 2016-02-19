@@ -991,7 +991,7 @@ module.exports = pile = {
 
 	_createPostGISLayer : function (opts, done) {
 		var ops 	= [],
-		    options 	= opts,
+		    options 	= opts.upload_status,
 		    file_id 	= opts.options.file_id,
 		    sql 	= opts.options.sql,
 		    cartocss 	= opts.options.cartocss,
