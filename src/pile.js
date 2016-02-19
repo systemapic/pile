@@ -651,9 +651,10 @@ module.exports = pile = {
 				console.error({
 					err_id : 30,
 					err_msg : 'create layer',
-					error : err
+					error : err,
+					stack : err.stack
 				});
-				return res.json({error : err});
+				return res.json({error : err.toString() });
 			}
 			// return layer to client
 			res.json(layerObject);
@@ -1062,6 +1063,10 @@ module.exports = pile = {
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 
+
+				if ( err ) {
+					return callback(new Error(stdout));
+				}
 
 				// parse stdout
 				try {
