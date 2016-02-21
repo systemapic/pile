@@ -76,8 +76,6 @@ module.exports = proxy = {
 		// provider
 		var provider = options.provider;
 
-		console.tile(options);
-
 		// pass to provider
 		if (provider == 'norkart') return proxy._getNorkartTile(options, done);
 		if (provider == 'google') return proxy._getGoogleTile(options, done);
@@ -141,7 +139,6 @@ module.exports = proxy = {
 					if (err) console.error({
 						err_id : 16,
 						err_msg : 'fetch tile',
-						// error : err
 						error : 'tile_on_disk_path: ' + tile_on_disk_path
 					});
 					
@@ -151,9 +148,7 @@ module.exports = proxy = {
 					});
 
 					// didn't get tile, something wrong					
-					callback({
-						error: 'Could not get tile from disk nor http.'
-					});
+					callback({ error: 'Could not get tile from disk nor http.' });
 				});
 			});
 		});
@@ -203,12 +198,8 @@ module.exports = proxy = {
 			hybrid: "webatlas-standard-hybrid"
 		}
 
+		// set url and header
 		var url = 'https://www.webatlas.no/maptiles/tiles/' + norkart_types[options.type] + '/wa_grid/' + options.z + '/' + options.x + '/' + options.y + '.' + options.format;
-
-		// var bbox = this._getNorkartBBOX(options);
-		// var url ='http://www.webatlas.no/wms-orto/hist1881/?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=Saltfjellet-2014&STYLES=&FORMAT=image%2Fjpeg&TRANSPARENT=false&HEIGHT=256&WIDTH=256&DETECTRETINA=true&SRS=EPSG%3A3857&BBOX=1591724.6770105103,9931921.707262663,1592336.1732367915,9932533.203488942'
-		// var url ='http://www.webatlas.no/wms-orto/hist1881/?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=Saltfjellet-2014&STYLES=&FORMAT=image%2Fjpeg&TRANSPARENT=false&HEIGHT=256&WIDTH=256&DETECTRETINA=true&SRS=EPSG%3A3857&BBOX=1592336.1732367915,9928252.72990497,1594782.158141917,9930698.714810098'
-		// set url, headers
 		options.url = url;
 		options.headers = {
 			'User-Agent' : 'Systemapic Tile Proxy',
@@ -222,41 +213,6 @@ module.exports = proxy = {
 
 	},
 
-	// _getNorkartBBOX : function (options) {
-		
-	// 	var z = options.z,
-	// 	    x = options.x,
-	// 	    y = options.y;
-
-	// 	var lng = this._tile2lng(x, z);
-	// 	console.log('lng: ', lng);
-
-	// 	var lat = this._tile2lat(y, z);
-	// 	console.log('lat: ', lat); 
-
-	// 	// var bbox = this._getbbox([lat, lng]);
-	// 	console.log('converter: ', converter);
-
-	// 	console.log('fN: ', fn);
-	// 	var fn = converter('latlong', 'utm');
-	// 	var bbox = fn(lat, lng, z);
-
-	// 	console.log('bbox: :: : ', bbox);
-	// },
-
-	// _getbbox : function (latlng) {
-	// 	var map = this._map,
-	// 	    crs = map.options.crs,
-	// 	    tileSize = this.options.tileSize,
-
-	// 	    nwPoint = tilePoint.multiplyBy(tileSize),
-	// 	    sePoint = nwPoint.add([tileSize, tileSize]),
-
-	// 	    nw = crs.project(map.unproject(nwPoint, zoom)),
-	// 	    se = crs.project(map.unproject(sePoint, zoom)),
-
-	// 	    bbox = [nw.x, se.y, se.x, nw.y].join(','),
-	// },
 
 	_tile2lng : function (x,z) {
 		return (x/Math.pow(2,z)*360-180);
@@ -267,9 +223,7 @@ module.exports = proxy = {
 		return (180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))));
 	},
 
-
 	_getHistoricalNorkartTile : function (options, done) {
-
 
 	}
 }
