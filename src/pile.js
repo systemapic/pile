@@ -632,12 +632,11 @@ module.exports = pile = {
 		ops.push(function (upload_status, callback) {
 			if (!upload_status) return callback('No such upload_status.');
 
-			var upload_status = JSON.parse(upload_status);
+			// safe parse
+			var upload_status = pile.safeParse(upload_status);
 
 			// check that done importing to postgis
-			if (!upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
-
-			// todo: errors
+			if (!upload_status || !upload_status.upload_success) return callback('The data was not uploaded correctly. Please check your data and error messages, and try again.')
 
 			// check that done importing to postgis
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
@@ -687,10 +686,10 @@ module.exports = pile = {
 	vectorizeLayer : function (req, res) {
 		// vectorize raster (create postgis layer)
 
-			return pile.vectorizeRaster({
-				options : options,
-				upload_status : upload_status
-			}, callback);
+		return pile.vectorizeRaster({
+			options : options,
+			upload_status : upload_status
+		}, callback);
 
 
 		var options 	= req.body,
@@ -1876,6 +1875,15 @@ module.exports = pile = {
 	},
 
 
+	safeParse : function (string) {
+		try {
+			var o = JSON.parse(string);
+			return o;
+		} catch (e) {
+			console.log('JSON.parse error of string:', string, e);
+			return false;
+		}
+	},
 
 	request : {
 
