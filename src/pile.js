@@ -1345,7 +1345,7 @@ module.exports = pile = {
 		ops.push(function (storedLayer, callback) {
 			if (!storedLayer) return callback('No such layerUuid.');
 
-			var storedLayer = JSON.parse(storedLayer);
+			var storedLayer = pile.safeParse(storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -1396,7 +1396,8 @@ module.exports = pile = {
 			map.add_layer(layer);
 
 			// parse xml from cartocss
-			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+			// pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+			pile.cartoRenderer(storedLayer, layer, callback);
 
 		});
 
@@ -1615,7 +1616,8 @@ module.exports = pile = {
 			map.add_layer(layer);
 
 			// parse xml from cartocss
-			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+			// pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+			pile.cartoRenderer(storedLayer, layer, callback);
 
 		});
 
@@ -1753,7 +1755,9 @@ module.exports = pile = {
 
 
 	// convert CartoCSS to Mapnik XML
-	cartoRenderer : function (css, layer, callback) {
+	cartoRenderer : function (storedLayer, layer, callback) {
+
+		var css = storedLayer.options.cartocss;
 
 		var options = {
 			// srid 3857
@@ -1770,9 +1774,11 @@ module.exports = pile = {
 
 			// carto renderer
 			var xml = new carto.Renderer().render(options);
-
-			console.log('xml:', xml);
 			callback(null, xml);
+
+			// debug write xml
+			if (1) pile._debugXML(storedLayer.options.layer_id, xml);
+			
 
 		} catch (e) {
 			var err = { message : e }
@@ -1780,6 +1786,14 @@ module.exports = pile = {
 		}
 
 
+	},
+
+	_debugXML : function (layer_id, xml) {
+		console.log('xml:', xml);
+		var xml_filename = 'tmp/' + layer_id + '.debug.xml';
+		fs.outputFile(xml_filename, xml, function (err) {
+			if (!err) console.log('wrote xml to ', xml_filename);
+		});
 	},
 
 
