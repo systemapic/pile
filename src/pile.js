@@ -1444,6 +1444,8 @@ module.exports = pile = {
 
 	_renderRasterTile : function (params, done) {
 
+		console.log('_renderRasterTile', params);
+
 		pile._prepareTile(params, function (err, map) {
 			if (err) return done(err);
 			if (!map) return done(new Error('no map 7474'));
@@ -1457,7 +1459,6 @@ module.exports = pile = {
 
 			var map_options = {
 				buffer_size : 128,
-				// buffer_size : 32,
 				variables : { 
 					zoom : params.z // insert min_max etc 
 				}
@@ -1531,6 +1532,101 @@ module.exports = pile = {
 				});
 			});
 		});
+	},
+
+	_prepareTile : function (params, done) {
+
+		// parse url into layerUuid, zxy, type
+		var ops = [];
+		var map,
+		    layer,
+		    postgis,
+		    bbox;
+
+		// check params
+		if (!params.layerUuid) 	   return done('Invalid url: Missing layerUuid.');
+		if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
+		if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
+		if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
+		if (!params.type) 	   return done('Invalid url: Missing type extension.');
+
+
+		// look for stored layerUuid
+		ops.push(function (callback) {
+			store.layers.get(params.layerUuid, callback);
+		});
+
+		// define settings, xml
+		ops.push(function (storedLayer, callback) {
+			if (!storedLayer) return callback('No such layerUuid.');
+
+			var storedLayer = pile.safeParse(storedLayer);
+
+			console.log('pile._prepareTile(), storedLayer: ', storedLayer);
+
+			// default settings
+			var default_postgis_settings = {
+				user : pgsql_options.dbuser,
+				password : pgsql_options.dbpass,
+				host : pgsql_options.dbhost,
+				type : 'postgis',
+				geometry_field : storedLayer.options.data_type == 'raster' ? 'rast' : 'the_geom_3857',
+				srid : '3857'
+			}
+
+			// set bounding box
+			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+
+			// insert layer settings 
+			var postgis_settings 			= default_postgis_settings;
+			postgis_settings.dbname 		= storedLayer.options.database_name;
+			postgis_settings.table 			= storedLayer.options.sql;
+			postgis_settings.extent 		= storedLayer.options.extent;
+			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
+			postgis_settings.srid 			= storedLayer.options.srid;
+			postgis_settings.asynchronous_request 	= true;
+			postgis_settings.max_async_connection 	= 10;
+
+			// https://github.com/mapnik/node-mapnik/blob/ea012648beb476aafc747732e955027c99212c4c/src/mapnik_datasource.cpp#L72
+			
+
+			// everything in spherical mercator (3857)!
+			try {  	
+				map 	= new mapnik.Map(256, 256, mercator.proj4);
+				layer 	= new mapnik.Layer('layer', mercator.proj4);
+				postgis = new mapnik.Datasource(postgis_settings);
+				
+			// catch errors
+			} catch (e) { return callback(e.message); }
+
+			// set buffer
+			map.bufferSize = 128;
+
+			// set extent
+			map.extent = bbox; // must have extent!
+
+			// set datasource
+			layer.datasource = postgis;
+
+			// add styles
+			layer.styles = ['layer']; // style names in xml
+			
+			// add layer to map
+			map.add_layer(layer);
+
+			// parse xml from cartocss
+			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
+
+		});
+
+		// load xml to map
+		ops.push(function (xml, callback) {
+			map.fromString(xml, {strict : true}, callback);
+		});
+
+		// run ops
+		async.waterfall(ops, done);
+
 	},
 
 	// return tiles from redis/disk or created
@@ -1610,96 +1706,7 @@ module.exports = pile = {
 		return done(null);
 	},
 
-	_prepareTile : function (params, done) {
-
-		// parse url into layerUuid, zxy, type
-		var ops = [];
-		var map,
-		    layer,
-		    postgis,
-		    bbox;
-
-		// check params
-		if (!params.layerUuid) 	   return done('Invalid url: Missing layerUuid.');
-		if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
-		if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
-		if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
-		if (!params.type) 	   return done('Invalid url: Missing type extension.');
-
-
-		// look for stored layerUuid
-		ops.push(function (callback) {
-			store.layers.get(params.layerUuid, callback);
-		});
-
-		// define settings, xml
-		ops.push(function (storedLayer, callback) {
-			if (!storedLayer) return callback('No such layerUuid.');
-
-			var storedLayer = JSON.parse(storedLayer);
-
-			// default settings
-			var default_postgis_settings = {
-				user : pgsql_options.dbuser,
-				password : pgsql_options.dbpass,
-				host : pgsql_options.dbhost,
-				type : 'postgis',
-				geometry_field : storedLayer.options.data_type == 'raster' ? 'rast' : 'the_geom_3857',
-				srid : '3857'
-			}
-
-			// set bounding box
-			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
-
-			// insert layer settings 
-			var postgis_settings 			= default_postgis_settings;
-			postgis_settings.dbname 		= storedLayer.options.database_name;
-			postgis_settings.table 			= storedLayer.options.sql;
-			postgis_settings.extent 		= storedLayer.options.extent;
-			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
-			postgis_settings.srid 			= storedLayer.options.srid;
-			postgis_settings.asynchronous_request 	= true;
-			postgis_settings.max_async_connection 	= 10;
-			
-
-			// everything in spherical mercator (3857)!
-			try {  	
-				map = new mapnik.Map(256, 256, mercator.proj4);
-				layer = new mapnik.Layer('layer', mercator.proj4);
-				postgis = new mapnik.Datasource(postgis_settings);
-				
-			// catch errors
-			} catch (e) { return callback(e.message); }
-
-			// set buffer
-			map.bufferSize = 128;
-
-			// set extent
-			map.extent = bbox; // must have extent!
-
-			// set datasource
-			layer.datasource = postgis;
-
-			// add styles
-			layer.styles = ['layer']; // style names in xml
-			
-			// add layer to map
-			map.add_layer(layer);
-
-			// parse xml from cartocss
-			pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
-
-		});
-
-		// load xml to map
-		ops.push(function (xml, callback) {
-			map.fromString(xml, {strict : true}, callback);
-		});
-
-		// run ops
-		async.waterfall(ops, done);
-
-	},
+	
 
 	_checkTileIntersect : function (bbox, extentString) {
 
@@ -1764,6 +1771,7 @@ module.exports = pile = {
 			// carto renderer
 			var xml = new carto.Renderer().render(options);
 
+			console.log('xml:', xml);
 			callback(null, xml);
 
 		} catch (e) {
