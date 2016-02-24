@@ -608,7 +608,7 @@ module.exports = pile = {
 		ops.push(function (callback) {
 
 			// get upload status object from wu
-			pile.request.get('/api/import/status', { 	// todo: write more pluggable
+			pile.request.get('/v2/data/import/status', { 	// todo: write more pluggable
 				file_id : file_id, 
 				access_token : access_token
 			}, callback);
