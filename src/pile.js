@@ -78,19 +78,18 @@ module.exports = pile = {
 		return isPostgis;
 	},
 
-	// decide whether postgis or overlay_raster... todo: refactor with rasters in postgis (no more overlays)
 	serveTile : function (req, res) {
 
 		// parse url into layerUuid, zxy, type
-		var ops = [];
-		var parsed = req._parsedUrl.pathname.split('/');
-		var params = {
-			layerUuid : parsed[3],
-			z : parseInt(parsed[4]),
-			x : parseInt(parsed[5]),
-			y : parseInt(parsed[6].split('.')[0]),
-			type : parsed[6].split('.')[1],
-		};
+		// var ops = [];
+		// var parsed = req._parsedUrl.pathname.split('/');
+		// var params = {
+		// 	layerUuid : parsed[3],
+		// 	z : parseInt(parsed[4]),
+		// 	x : parseInt(parsed[5]),
+		// 	y : parseInt(parsed[6].split('.')[0]),
+		// 	type : parsed[6].split('.')[1],
+		// };
 		
 		return pile._getTile(req, res);
 	},
@@ -98,7 +97,6 @@ module.exports = pile = {
 	_getTile : function (req, res) {
 
 		// parse url into layerUuid, zxy, type
-		var ops = [];
 		var parsed = req._parsedUrl.pathname.split('/');
 		var params = {
 			layerUuid : parsed[3],
@@ -126,7 +124,7 @@ module.exports = pile = {
 
 			var storedLayer = JSON.parse(storedLayerJSON);
 
-			console.log('storedLayer: ', storedLayer);
+			console.log('pile._getTile(), storedLayer: ', storedLayer);
 
 
 			// get tiles
