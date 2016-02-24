@@ -57,7 +57,6 @@ module.exports = pile = {
 	},
 	proxyProviders : ['google', 'norkart'],
 
-	// 
 	getTile : function (req, res) {
 		if (pile.tileIsProxy(req)) return pile.serveProxyTile(req, res);
 		if (pile.tileIsPostgis(req)) return pile.serveTile(req, res);
@@ -151,9 +150,11 @@ module.exports = pile = {
 						error : err,
 						stack : err.stack
 					});
-					// return res.end();
+
+					// return png for raster-tile requests
 					if (type == 'png') return pile.serveEmptyTile(res);
 					
+					// return empty
 					return res.json({});
 				}
 
@@ -171,7 +172,7 @@ module.exports = pile = {
 					render_time : create_tile_time
 				});
 
-				// send to client
+				// return tile to client
 				res.writeHead(200, {'Content-Type': pile.headers[type]});
 				res.end(data[0]);
 			});
@@ -293,10 +294,8 @@ module.exports = pile = {
 
 	serveProxyTile : function (req, res) {
 
-		// parse url
+		// parse url, set options
 		var params = req.params[0].split('/');
-
-		// set options
 		var options = {
 			provider : params[0],
 			type 	 : params[1],
@@ -332,7 +331,7 @@ module.exports = pile = {
 			// retrieve layer and return it to client
 			store.layers.get(layer_id, function (err, layer) {
 				if (err || !layer) return callback(err || 'no layer');
-				callback(null, JSON.parse(layer));
+				callback(null, pile.safeParse(layer));
 			});
 
 		});
@@ -360,7 +359,7 @@ module.exports = pile = {
 
 				// parse results
 				var json = stdout.split('\n')[2];
-				var data = JSON.parse(json);
+				var data = pile.safeParse(json);
 				
 				// remove geom columns
 				data.geom = null;
@@ -398,7 +397,7 @@ module.exports = pile = {
 			// retrieve layer and return it to client
 			store.layers.get(layer_id, function (err, layer) {
 				if (err || !layer) return callback(err || 'no layer');
-				callback(null, JSON.parse(layer));
+				callback(null, pile.safeParse(layer));
 			});
 		});
 
@@ -495,7 +494,7 @@ module.exports = pile = {
 			// retrieve layer and return it to client
 			store.layers.get(layer_id, function (err, layer) {
 				if (err || !layer) return callback(err || 'no layer');
-				callback(null, JSON.parse(layer));
+				callback(null, pile.safeParse(layer));
 			});
 		});
 
@@ -525,10 +524,8 @@ module.exports = pile = {
 				    result = [];
 
 				arr.forEach(function (arrr) {
-					try {
-						var item = JSON.parse(arrr);
-						result.push(item);
-					} catch (e) {};
+					var item = pile.safeParse(arrr);
+					item && result.push(item);
 				});
 
 				callback(null, result);
@@ -576,21 +573,20 @@ module.exports = pile = {
 
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
-		var options 	= req.body,
-		    file_id 	= options.file_id,
-		    sql 	= options.sql,
-		    cartocss 	= options.cartocss,
-		    cartocss_version = options.cartocss_version,
-		    geom_column = options.geom_column,
-		    geom_type 	= options.geom_type,
-		    raster_band = options.raster_band,
-		    srid 	= options.srid,
-		    affected_tables = options.affected_tables,
-		    interactivity = options.interactivity,
-		    attributes 	= options.attributes,
-		    access_token = req.body.access_token;
-
-
+		var options 	= req.body;
+		var file_id 	= options.file_id;
+		var sql 	= options.sql;
+		var cartocss 	= options.cartocss;
+		var cartocss_version = options.cartocss_version;
+		var geom_column = options.geom_column;
+		var geom_type 	= options.geom_type;
+		var raster_band = options.raster_band;
+		var srid 	= options.srid;
+		var affected_tables = options.affected_tables;
+		var interactivity = options.interactivity;
+		var attributes 	= options.attributes;
+		var access_token = req.body.access_token;
+		var ops = [];
 		// log to file
 		console.log({
 			type : 'createLayer',
@@ -601,7 +597,6 @@ module.exports = pile = {
 		if (!file_id) return pile.error.missingInformation(res, 'Please provide a file_id.')
 		
 
-		var ops = [];
 
 		ops.push(function (callback) {
 
@@ -626,20 +621,17 @@ module.exports = pile = {
 			// check that done importing to postgis
 			if (!upload_status.processing_success) return callback('The data is not done processing yet. Please try again in a little while.')
 
-
-			
 			// create postgis layer for rasters and vector layers 
-			if (upload_status.data_type == 'vector'
-          || upload_status.data_type == 'raster')
-      {
-				return pile._createPostGISLayer({
-					upload_status : upload_status,
-					options : options
-				}, callback);
+			if (upload_status.data_type != 'vector' && upload_status.data_type != 'raster') {
+				// error
+				return callback('Invalid data_type: ' +  upload_status.data_type);
 			} 
 
-			// error
-			callback('Invalid data_type: ' +  upload_status.data_type);
+			// create tileserver layer
+			pile._createPostGISLayer({
+				upload_status : upload_status,
+				options : options
+			}, callback);
 		})
 		
 
@@ -653,6 +645,7 @@ module.exports = pile = {
 				});
 				return res.json({error : err.toString() });
 			}
+
 			// return layer to client
 			res.json(layerObject);
 		});
@@ -725,18 +718,16 @@ module.exports = pile = {
 
 			
 			// create postgis layer for rasters and vector layers 
-			if (upload_status.data_type == 'vector'
-          || upload_status.data_type == 'raster')
-      {
-
-				return pile._createPostGISLayer({
-					upload_status : upload_status,
-					options : options
-				}, callback);
+			if (upload_status.data_type != 'vector' && upload_status.data_type != 'raster') {
+				// error
+				return callback('Invalid data_type: ' +  upload_status.data_type);
 			} 
 
-			// error
-			callback('Invalid data_type: ' +  upload_status.data_type);
+			// create tileserver layer
+			pile._createPostGISLayer({
+				upload_status : upload_status,
+				options : options
+			}, callback);
 		})
 		
 
@@ -753,8 +744,6 @@ module.exports = pile = {
 			res.json(layerObject);
 		});
 
-
-
 	},
 
 
@@ -766,10 +755,8 @@ module.exports = pile = {
 
 		var status = data.upload_status;
 		var options = data.options;
-
 		var vectorized_raster_file_id;
 		var layerJSON;
-
 		var ops = [];
 
 		ops.push(function (callback) {
@@ -787,16 +774,12 @@ module.exports = pile = {
 			].join(' ');
 
 
-			// console.log('command: ', command);
-
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 				// console.log('err, stdout, stdin', err, stdout, stdin);
 
-
 				options.sql = "(SELECT * FROM " + vectorized_raster_file_id + ") as sub";
 				options.table_name = vectorized_raster_file_id;
-
 
 				// callback
 				callback(err);
@@ -819,22 +802,13 @@ module.exports = pile = {
 				upload_status : status,
 				options : options
 			}, function (err, layer) {
-
 				layerJSON = layer;
 				callback(err);
 			});
 		});
 		
-
-		// ops.push(function (callback) {
-
-		// });
-
 		async.series(ops, function (err) {
-
-
 			done(err, layerJSON);
-
 		});
 
 	},
@@ -846,9 +820,6 @@ module.exports = pile = {
 		var file_id = options.file_id,
 		    postgis_db = options.postgis_db,
 		    ops = [];
-
-		// console.log('_primeTableWithGeometries', options);
-
 
 		// get geometry type
 		ops.push(function (callback) {
@@ -958,14 +929,12 @@ module.exports = pile = {
 
 
 	pgquery : function (options, callback) {
-		var postgis_db = options.postgis_db,
-		    variables = options.variables,
-		    query = options.query;
-
+		var postgis_db = options.postgis_db;
+		var variables = options.variables;
+		var query = options.query;
 		var dbhost = pgsql_options.dbhost;
 		var dbuser = pgsql_options.dbuser;
 		var dbpass = pgsql_options.dbpass;
-
 		var conString = 'postgres://'+dbuser+':'+dbpass+'@'+dbhost+'/' + postgis_db;
 
 		pg.connect(conString, function(err, client, pgcb) {
@@ -973,10 +942,11 @@ module.exports = pile = {
 			
 			// do query
 			client.query(query, variables, function(err, result) {
+				
 				// clean up after pg
 				pgcb();
-				// client.end();
 
+				// catch err
 				if (err) return callback(err); 
 				
 				// return result
@@ -987,23 +957,23 @@ module.exports = pile = {
 
 
 	_createPostGISLayer : function (opts, done) {
-		var ops 	= [],
-		    options 	= opts.upload_status,
-		    file_id 	= opts.options.file_id,
-		    sql 	= opts.options.sql,
-		    cartocss 	= opts.options.cartocss,
-		    cartocss_version = opts.options.cartocss_version,
-		    geom_column = opts.options.geom_column,
-		    geom_type 	= opts.options.geom_type,
-		    raster_band = opts.options.raster_band,
-		    srid 	= opts.options.srid,
-		    affected_tables = opts.options.affected_tables,
-		    interactivity = opts.options.interactivity,
-		    attributes 	= opts.options.attributes,
-		    access_token = opts.options.access_token;
+		var ops 	= [];
+		var options 	= opts.upload_status;
+		var file_id 	= opts.options.file_id;
+		var sql 	= opts.options.sql;
+		var cartocss 	= opts.options.cartocss;
+		var cartocss_version = opts.options.cartocss_version;
+		var geom_column = opts.options.geom_column;
+		var geom_type 	= opts.options.geom_type;
+		var raster_band = opts.options.raster_band;
+		var srid 	= opts.options.srid;
+		var affected_tables = opts.options.affected_tables;
+		var interactivity = opts.options.interactivity;
+		var attributes 	= opts.options.attributes;
+		var access_token = opts.options.access_token;
 
-		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
-		if (geom_type == 'geometry' && !cartocss) 	return done(new Error('Please provide CartoCSS.'))
+		if (!sql) return done(new Error('Please provide a SQL statement.'))
+		if (geom_type == 'geometry' && !cartocss) return done(new Error('Please provide CartoCSS.'))
 
 		ops.push(function (callback) {
 
@@ -1025,7 +995,6 @@ module.exports = pile = {
 					table_name : options.table_name, 
 					metadata : options.metadata,
 					layer_id : layerUuid,
-					wicked : 'thing',
 					data_type : options.data_type || opts.options.data_type || 'vector',
 
 					// optional				// defaults
@@ -1047,10 +1016,8 @@ module.exports = pile = {
 
 			var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
 
-			if ( ! layer.options.database_name )
-				return callback(new Error("Unknown database_name in layer options"));
-			if ( ! layer.options.table_name )
-				return callback(new Error("Unknown table_name in layer options"));
+			if (!layer.options.database_name) return callback(new Error("Unknown database_name in layer options"));
+			if (!layer.options.table_name) return callback(new Error("Unknown table_name in layer options"));
 
 			// st_extent script 
 			var command = [
@@ -1131,7 +1098,6 @@ module.exports = pile = {
 					file_id : file_id, 	
 					metadata : options.metadata,
 					layer_id : layerUuid,
-					wicked : 'thing',
 					srid : srid || 3857,
 					data_type : 'raster',
 					cutColor : cutColor
@@ -1230,12 +1196,8 @@ module.exports = pile = {
 			} else {
 				callback(err);
 			}
-
 		});
-
 	},
-
-
 
 	_getTileErrorHandler : function (res, err) {
 		if (err) console.error({
@@ -1246,7 +1208,6 @@ module.exports = pile = {
 		res.end();
 	},
 
-
 	createVectorTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
@@ -1255,16 +1216,12 @@ module.exports = pile = {
 			storedLayer : storedLayer
 		}).priority('high').attempts(5).save();
 
-
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
-
-			// console.log('crated vecotr tile? ', result);
 
 			// get tile
 			store._readVectorTile(params, done);
 		});
-
 
 	},
 
@@ -1275,7 +1232,6 @@ module.exports = pile = {
 			params : params,
 			storedLayer : storedLayer
 		}).priority('high').removeOnComplete(true).attempts(5).save();
-
 
 		// KUE DONE: raster created
 		job.on('complete', function (result) {
@@ -1482,12 +1438,7 @@ module.exports = pile = {
 
 				store._saveVectorTile(tile, params, done);
 			});
-
 		});
-
-
-
-	
 
 	},
 
@@ -1714,7 +1665,6 @@ module.exports = pile = {
 			// everything in spherical mercator (3857)!
 			try {  	
 				map = new mapnik.Map(256, 256, mercator.proj4);
-				// map = new mapnik.Map(64, 64, mercator.proj4);
 				layer = new mapnik.Layer('layer', mercator.proj4);
 				postgis = new mapnik.Datasource(postgis_settings);
 				
@@ -1722,7 +1672,6 @@ module.exports = pile = {
 			} catch (e) { return callback(e.message); }
 
 			// set buffer
-			// map.bufferSize = 32;
 			map.bufferSize = 128;
 
 			// set extent
@@ -1826,30 +1775,30 @@ module.exports = pile = {
 	},
 
 
-	// todo: old code, but we prob need this?
-	getFile : function (req, res) {
+	// // todo: old code, but we prob need this?
+	// getFile : function (req, res) {
 		
-		// get access token
-		var access_token = pile._getAccessToken(req),
-		    file_id = req.query.file_id,
-		    ops = [];
+	// 	// get access token
+	// 	var access_token = pile._getAccessToken(req),
+	// 	    file_id = req.query.file_id,
+	// 	    ops = [];
 
-		// no access
-		if (!access_token) return pile.error.noAccess(res);
+	// 	// no access
+	// 	if (!access_token) return pile.error.noAccess(res);
 
-		// check for missing info
-		if (!file_id) return pile.error.missingInformation(res, 'file_id');
+	// 	// check for missing info
+	// 	if (!file_id) return pile.error.missingInformation(res, 'file_id');
 
-		// todo: check permission to access file
+	// 	// todo: check permission to access file
 		
-		// get from wu
-		pile.request.get('/api/bridge/getFile', {
-			file_id : file_id,
-			access_token : access_token
-		}, function (err, results) {
+	// 	// get from wu
+	// 	pile.request.get('/api/bridge/getFile', {
+	// 		file_id : file_id,
+	// 		access_token : access_token
+	// 	}, function (err, results) {
 		
-		});
-	},
+	// 	});
+	// },
 
 
 	safeParse : function (string) {
@@ -1927,6 +1876,7 @@ jobs.watchStuckJobs();
 // #########################################
 // ###  Clusters                         ###
 // #########################################
+
 // master cluster:
 if (cluster.isMaster) { 
 
@@ -1949,8 +1899,11 @@ if (cluster.isMaster) {
 	});
 
 
+
+
+
+// worker clusters
 } else {
-// worker clusters, kues:
 
 	console.log('...clustering!');
 
@@ -2007,7 +1960,7 @@ if (cluster.isMaster) {
 	});
 
 
-	// render grid job
+	// proxy tiles
 	jobs.process('proxy_tile', 100, function (job, done) {
 
 		var options = job.data.options;
@@ -2029,7 +1982,7 @@ if (cluster.isMaster) {
 			var params = job.data.params;
 			var job_id = job.id;
 
-			job.remove( function (err) {
+			job.remove(function (err) {
 				if (err) console.error({
 					err_id : 13,
 					err_msg : 'job remove',
