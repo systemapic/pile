@@ -1633,27 +1633,51 @@ module.exports = pile = {
 			console.log('')
 			console.log('')
 			console.log('')
+			console.log('================')
+			console.log('layer:');
+			console.log('================')
+			console.log(layer);
 			console.log('')
-			console.log('')
-			console.log('')
-			console.log('')
+			console.log('----------------')
 			console.log('layer.datasource');
+			console.log('----------------')
 			console.log(layer.datasource);
+			console.log('')
+			console.log('----------------')
+			console.log('describe:');
+			console.log('----------------')
 			console.log(layer.datasource.describe());
+			console.log('')
+			console.log('----------------')
+			console.log('extent:');
+			console.log('----------------')
 			console.log(layer.datasource.extent());
+			console.log('')
+			console.log('----------------')
+			console.log('parameters:');
+			console.log('----------------')
 			console.log(layer.datasource.parameters());
 			console.log('')
+			console.log('----------------')
+			console.log('featureset:');
+			console.log('----------------')
+			console.log(layer.datasource.featureset());
 			console.log('')
+			console.log('----------------')
+			console.log('fields:');
+			console.log('----------------')
+			console.log(layer.datasource.fields());
+			console.log('')
+			console.log('================')
 			console.log('map:');
+			console.log('================')
 			console.log(map);
 			console.log('')
+			console.log('----------------')
+			console.log('map.toXML()');
+			console.log('----------------')
+			console.log(map.toXML())
 			console.log('')
-			console.log('postgis (datasource)');
-			console.log(postgis);
-			console.log('')
-			console.log('')
-			console.log('layer:');
-			console.log(layer);
 			console.log('')
 			console.log('')
 			console.log('================ debug logging END ==================');
