@@ -1579,7 +1579,6 @@ module.exports = pile = {
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
 			postgis_settings.dbname 		= storedLayer.options.database_name;
-			postgis_settings.table 			= storedLayer.options.sql;
 			postgis_settings.extent 		= storedLayer.options.extent;
 			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
 			postgis_settings.srid 			= storedLayer.options.srid;
@@ -1589,9 +1588,11 @@ module.exports = pile = {
 			if ( storedLayer.options.data_type == 'raster' ) {
 				postgis_settings.type = 'pgraster';
 				postgis_settings.geometry_field = 'rast';
+				postgis_settings.table 	= storedLayer.options.file_id;
 			 } else {
 				postgis_settings.type = 'postgis';
 				postgis_settings.geometry_field = 'the_geom_3857';
+				postgis_settings.table 	= storedLayer.options.sql;
 			}
 
 			// https://github.com/mapnik/node-mapnik/blob/ea012648beb476aafc747732e955027c99212c4c/src/mapnik_datasource.cpp#L72
@@ -1658,11 +1659,11 @@ module.exports = pile = {
 			console.log('----------------')
 			console.log(layer.datasource.parameters());
 			console.log('')
-			console.log('----------------')
-			console.log('featureset:');
-			console.log('----------------')
-			console.log(layer.datasource.featureset());
-			console.log('')
+			// console.log('----------------')
+			// console.log('featureset:');
+			// console.log('----------------')
+			// console.log(layer.datasource.featureset());
+			// console.log('')
 			console.log('----------------')
 			console.log('fields:');
 			console.log('----------------')
