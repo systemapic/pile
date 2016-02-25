@@ -1451,6 +1451,10 @@ module.exports = pile = {
 			if (err) return done(err);
 			if (!map) return done(new Error('no map 7474'));
 
+			console.log('preparedTile XML: ', map.toXML());
+			// debug write xml
+			if (1) pile._debugXML(params.layerUuid, map.toXML());
+
 			// map options
 			var map_options = {
 				variables : { 
@@ -1627,63 +1631,6 @@ module.exports = pile = {
 			// pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
 			pile.cartoRenderer(storedLayer, layer, callback);
 
-
-			console.log('=====================================================');
-			console.log('================= DEBUG LOGGING =====================');
-			console.log('=====================================================');
-			console.log('')
-			console.log('')
-			console.log('')
-			console.log('================')
-			console.log('layer:');
-			console.log('================')
-			console.log(layer);
-			console.log('')
-			console.log('----------------')
-			console.log('layer.datasource');
-			console.log('----------------')
-			console.log(layer.datasource);
-			console.log('')
-			console.log('----------------')
-			console.log('describe:');
-			console.log('----------------')
-			console.log(layer.datasource.describe());
-			console.log('')
-			console.log('----------------')
-			console.log('extent:');
-			console.log('----------------')
-			console.log(layer.datasource.extent());
-			console.log('')
-			console.log('----------------')
-			console.log('parameters:');
-			console.log('----------------')
-			console.log(layer.datasource.parameters());
-			console.log('')
-			// console.log('----------------')
-			// console.log('featureset:');
-			// console.log('----------------')
-			// console.log(layer.datasource.featureset());
-			// console.log('')
-			console.log('----------------')
-			console.log('fields:');
-			console.log('----------------')
-			console.log(layer.datasource.fields());
-			console.log('')
-			console.log('================')
-			console.log('map:');
-			console.log('================')
-			console.log(map);
-			console.log('')
-			console.log('----------------')
-			console.log('map.toXML()');
-			console.log('----------------')
-			console.log(map.toXML())
-			console.log('')
-			console.log('')
-			console.log('')
-			console.log('================ debug logging END ==================');
-			console.log('=====================================================');
-
 		});
 
 		// load xml to map
@@ -1847,10 +1794,6 @@ module.exports = pile = {
 			// carto renderer
 			var xml = new carto.Renderer().render(options);
 			callback(null, xml);
-
-			// debug write xml
-			if (1) pile._debugXML(storedLayer.options.layer_id, xml);
-			
 
 		} catch (e) {
 			//console.log("XXXX carto.Renderer().render() threw ", e);
