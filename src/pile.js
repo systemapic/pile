@@ -1567,10 +1567,10 @@ module.exports = pile = {
 
 			// default settings
 			var default_postgis_settings = {
-				user : pgsql_options.dbuser,
+				user 	 : pgsql_options.dbuser,
 				password : pgsql_options.dbpass,
-				host : pgsql_options.dbhost,
-				srid : '3857'
+				host 	 : pgsql_options.dbhost,
+				srid 	 : '3857'
 			}
 
 			// set bounding box
@@ -1590,7 +1590,7 @@ module.exports = pile = {
 				postgis_settings.type = 'pgraster';
 				postgis_settings.geometry_field = 'rast';
 			 } else {
-				postgis_settings.type= 'postgis';
+				postgis_settings.type = 'postgis';
 				postgis_settings.geometry_field = 'the_geom_3857';
 			}
 
@@ -1615,8 +1615,6 @@ module.exports = pile = {
 			// set datasource
 			layer.datasource = postgis;
 
-			console.log('layer.datasource');
-			console.log(layer.datasource);
 
 			// add styles
 			layer.styles = ['layer']; // style names in xml
@@ -1627,6 +1625,39 @@ module.exports = pile = {
 			// parse xml from cartocss
 			// pile.cartoRenderer(storedLayer.options.cartocss, layer, callback);
 			pile.cartoRenderer(storedLayer, layer, callback);
+
+
+			console.log('=====================================================');
+			console.log('================= DEBUG LOGGING =====================');
+			console.log('=====================================================');
+			console.log('')
+			console.log('')
+			console.log('')
+			console.log('')
+			console.log('')
+			console.log('')
+			console.log('')
+			console.log('layer.datasource');
+			console.log(layer.datasource);
+			console.log(layer.datasource.describe());
+			console.log(layer.datasource.extent());
+			console.log(layer.datasource.parameters());
+			console.log('')
+			console.log('')
+			console.log('map:');
+			console.log(map);
+			console.log('')
+			console.log('')
+			console.log('postgis (datasource)');
+			console.log(postgis);
+			console.log('')
+			console.log('')
+			console.log('layer:');
+			console.log(layer);
+			console.log('')
+			console.log('')
+			console.log('================ debug logging END ==================');
+			console.log('=====================================================');
 
 		});
 
