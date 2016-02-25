@@ -1570,8 +1570,6 @@ module.exports = pile = {
 				user : pgsql_options.dbuser,
 				password : pgsql_options.dbpass,
 				host : pgsql_options.dbhost,
-				type : 'postgis',
-				geometry_field : storedLayer.options.data_type == 'raster' ? 'rast' : 'the_geom_3857',
 				srid : '3857'
 			}
 
@@ -1587,6 +1585,14 @@ module.exports = pile = {
 			postgis_settings.srid 			= storedLayer.options.srid;
 			postgis_settings.asynchronous_request 	= true;
 			postgis_settings.max_async_connection 	= 10;
+
+			if ( storedLayer.options.data_type == 'raster' ) {
+				postgis_settings.type = 'pgraster';
+				postgis_settings.geometry_field = 'rast';
+			 } else {
+				postgis_settings.type= 'postgis';
+				postgis_settings.geometry_field = 'the_geom_3857';
+			}
 
 			// https://github.com/mapnik/node-mapnik/blob/ea012648beb476aafc747732e955027c99212c4c/src/mapnik_datasource.cpp#L72
 			
