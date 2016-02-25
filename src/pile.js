@@ -1609,6 +1609,9 @@ module.exports = pile = {
 			// set datasource
 			layer.datasource = postgis;
 
+			console.log('layer.datasource');
+			console.log(layer.datasource);
+
 			// add styles
 			layer.styles = ['layer']; // style names in xml
 			
