@@ -461,13 +461,20 @@ module.exports = pile = {
 				return callback('Invalid data_type: ' +  upload_status.data_type);
 			} 
 
-			// create tileserver layer
+			// verified, next
+			callback(null, upload_status);
+
+			
+		});
+		
+
+		// create tileserver layer
+		ops.push(function (upload_status, callback) {
 			pile._createPostGISLayer({
 				upload_status : upload_status,
 				options : options
 			}, callback);
-		})
-		
+		});
 
 		// run ops
 		async.waterfall(ops, function (err, layerObject) {
@@ -753,59 +760,7 @@ module.exports = pile = {
 		async.waterfall(ops, done);
 	},
 
-	_createRasterLayer : function (opts, done) {
-		var ops = [];
-		var options = opts.upload_status;
-		var file_id = opts.options.file_id;
-		var srid = opts.options.srid;
-		var srid = options.srid;
-		var access_token = opts.options.access_token;
-		var cutColor = opts.options.cutColor || false;
-
-		ops.push(function (callback) {
-
-			// create layer object
-			var layerUuid = 'layer_id-' + uuid.v4();
-			var layer = { 	
-
-				layerUuid : layerUuid,
-				options : {			
-					
-					// required
-					sql : false,
-					cartocss : false,
-					file_id : file_id, 	
-					metadata : options.metadata,
-					layer_id : layerUuid,
-					srid : srid || 3857,
-					data_type : 'raster',
-					cutColor : cutColor
-				}
-			}
-
-			callback(null, layer);
-
-		});
-
-		// save layer to store.redis
-		ops.push(function (layer, callback) {
-
-			// save layer to store.redis
-			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
-				if (err) console.error({
-					err_id : 2,
-					err_msg : 'create raster',
-					error : err
-				});
-				callback(err, layer);
-			});
-		});
-
-		// layer created, return
-		async.waterfall(ops, done);
-	},
-
-
+	
 	// get layer from redis and return
 	getLayer : function (req, res) {
 
