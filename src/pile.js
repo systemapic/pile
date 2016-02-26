@@ -122,7 +122,7 @@ module.exports = pile = {
 				if (err) {
 					console.error({
 						err_id : 2,
-						err_msg : 'render vector',
+						err_msg : 'serve tile',
 						error : err,
 						stack : err.stack
 					});
@@ -817,7 +817,7 @@ module.exports = pile = {
 		store.layers.get(layerUuid, function (err, layer) {
 			if (err) console.error({
 				err_id : 21,
-				err_msg : 'render vector',
+				err_msg : 'get layer error',
 				error : err
 			});
 			res.end(layer);
