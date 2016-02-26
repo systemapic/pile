@@ -122,7 +122,7 @@ module.exports = pile = {
 				if (err) {
 					console.error({
 						err_id : 2,
-						err_msg : 'render vector',
+						err_msg : 'serve tile',
 						error : err,
 						stack : err.stack
 					});
@@ -461,13 +461,20 @@ module.exports = pile = {
 				return callback('Invalid data_type: ' +  upload_status.data_type);
 			} 
 
-			// create tileserver layer
+			// verified, next
+			callback(null, upload_status);
+
+			
+		});
+		
+
+		// create tileserver layer
+		ops.push(function (upload_status, callback) {
 			pile._createPostGISLayer({
 				upload_status : upload_status,
 				options : options
 			}, callback);
-		})
-		
+		});
 
 		// run ops
 		async.waterfall(ops, function (err, layerObject) {
@@ -753,59 +760,7 @@ module.exports = pile = {
 		async.waterfall(ops, done);
 	},
 
-	_createRasterLayer : function (opts, done) {
-		var ops = [];
-		var options = opts.upload_status;
-		var file_id = opts.options.file_id;
-		var srid = opts.options.srid;
-		var srid = options.srid;
-		var access_token = opts.options.access_token;
-		var cutColor = opts.options.cutColor || false;
-
-		ops.push(function (callback) {
-
-			// create layer object
-			var layerUuid = 'layer_id-' + uuid.v4();
-			var layer = { 	
-
-				layerUuid : layerUuid,
-				options : {			
-					
-					// required
-					sql : false,
-					cartocss : false,
-					file_id : file_id, 	
-					metadata : options.metadata,
-					layer_id : layerUuid,
-					srid : srid || 3857,
-					data_type : 'raster',
-					cutColor : cutColor
-				}
-			}
-
-			callback(null, layer);
-
-		});
-
-		// save layer to store.redis
-		ops.push(function (layer, callback) {
-
-			// save layer to store.redis
-			store.layers.set(layer.layerUuid, JSON.stringify(layer), function (err) {
-				if (err) console.error({
-					err_id : 2,
-					err_msg : 'create raster',
-					error : err
-				});
-				callback(err, layer);
-			});
-		});
-
-		// layer created, return
-		async.waterfall(ops, done);
-	},
-
-
+	
 	// get layer from redis and return
 	getLayer : function (req, res) {
 
@@ -817,7 +772,7 @@ module.exports = pile = {
 		store.layers.get(layerUuid, function (err, layer) {
 			if (err) console.error({
 				err_id : 21,
-				err_msg : 'render vector',
+				err_msg : 'get layer error',
 				error : err
 			});
 			res.end(layer);
@@ -1237,7 +1192,50 @@ module.exports = pile = {
 
 	},
 
-	
+
+
+
+	// convert CartoCSS to Mapnik XML
+	cartoRenderer : function (storedLayer, layer, callback) {
+
+		var css = storedLayer.options.cartocss;
+
+		if (!css) {
+			console.error( 'cartoRenderer called with undefined or empty css' );
+			css = "#layer {}";
+		}
+
+		var options = {
+			// srid 3857
+			"srs": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
+
+			"Stylesheet": [{
+				"id" : 'tile_style',
+				"data" : css
+			}],
+			"Layer" : [layer]
+		}
+
+		try  {
+			// carto renderer
+			var xml = new carto.Renderer().render(options);
+			callback(null, xml);
+
+		} catch (e) {
+			var err = { message : 'CartoCSS rendering failed: ' + e.toString() }
+			callback(err);
+		}
+
+	},
+
+	_debugXML : function (layer_id, xml) {
+		var xml_filename = 'tmp/' + layer_id + '.debug.xml';
+		fs.outputFile(xml_filename, xml, function (err) {
+			if (!err) console.log('wrote xml to ', xml_filename);
+		});
+	},
+
+
 	// return tiles from redis/disk or create
 	getRasterTile : function (params, storedLayer, done) {
 
@@ -1285,47 +1283,6 @@ module.exports = pile = {
 	_getGridTileFromRedis : function (params, done) {
 		var keyString = 'grid_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
 		store.layers.get(keyString, done);
-	},
-
-
-	// convert CartoCSS to Mapnik XML
-	cartoRenderer : function (storedLayer, layer, callback) {
-
-		var css = storedLayer.options.cartocss;
-
-		if (!css) {
-			console.error( 'cartoRenderer called with undefined or empty css' );
-			css = "#layer {}";
-		}
-
-		var options = {
-			// srid 3857
-			"srs": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
-
-			"Stylesheet": [{
-				"id" : 'tile_style',
-				"data" : css
-			}],
-			"Layer" : [layer]
-		}
-
-		try  {
-			// carto renderer
-			var xml = new carto.Renderer().render(options);
-			callback(null, xml);
-
-		} catch (e) {
-			var err = { message : 'CartoCSS rendering failed: ' + e.toString() }
-			callback(err);
-		}
-
-	},
-
-	_debugXML : function (layer_id, xml) {
-		var xml_filename = 'tmp/' + layer_id + '.debug.xml';
-		fs.outputFile(xml_filename, xml, function (err) {
-			if (!err) console.log('wrote xml to ', xml_filename);
-		});
 	},
 
 
