@@ -21,7 +21,7 @@ var sanitize = require("sanitize-filename");
 
 // modules
 var server = require('./server');
-var config = require('../config/pile-config');
+var config = require('../../config/pile-config');
 var store  = require('./store');
 var proxy = require('./proxy');
 var tools = require('./tools');
@@ -49,6 +49,8 @@ var pgsql_options = {
 
 
 module.exports = pile = { 
+
+	config : config,
 
 	headers : {
 		jpeg : 'image/jpeg',
@@ -1371,6 +1373,46 @@ module.exports = pile = {
 				error : 'Unauthenicated.'
 			});
 		},
+	},
+
+
+	// helper fn's for auth
+	checkAccess : function (req, res, next) {
+		var access_token = req.query.access_token || req.body.access_token;
+
+		// request wu for checking access tokens
+		var verifyUrl = 'http://wu:3001/v2/users/token/check?access_token=' + access_token;
+		request(verifyUrl, function (error, response, body) {
+			if (!response) return res.json({access : 'Unauthorized'});
+			
+			var status = tools.safeParse(body);
+
+			// allowed
+			if (response.statusCode == 200 && !error && status && status.valid) {
+				return next();
+			} 
+
+			// check if raster request
+			if (req._parsedUrl && req._parsedUrl.pathname) {
+				var parsed = req._parsedUrl.pathname.split('/');
+				if (parsed[5]) {
+					var ext = parsed[5].split('.');
+					if (ext.length > 0) {
+						var type = ext[1];
+						if (type == 'png') {
+							// serve noAccessTile
+							return fs.readFile('public/noAccessTile.png', function (err, tile) {
+								res.writeHead(200, {'Content-Type': 'image/png'});
+								res.end(tile);
+							});
+						}
+					}
+				}
+			}
+
+			// not allowed
+			res.json({access : 'Unauthorized'});
+		});
 	}
 }
 
