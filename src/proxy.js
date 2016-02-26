@@ -54,7 +54,7 @@ module.exports = proxy = {
 			});
 
 			// error tile
-			if (err) return proxy._serveErrorTile(res);
+			if (err) return proxy.serveErrorTile(res);
 
 			// send tile to client
 			res.writeHead(200, {'Content-Type': pile.headers[options.format]}); 
@@ -63,7 +63,7 @@ module.exports = proxy = {
 
 	},
 
-	_serveErrorTile : function (res) {
+	serveErrorTile : function (res) {
 		var errorTile = 'public/errorTile.png';
 		fs.readFile('public/noAccessTile.png', function (err, tile) {
 			res.writeHead(200, {'Content-Type': 'image/png'});
@@ -71,7 +71,7 @@ module.exports = proxy = {
 		});
 	},
 
-	_getTile : function (options, done) {
+	serveTile : function (options, done) {
 
 		// provider
 		var provider = options.provider;
