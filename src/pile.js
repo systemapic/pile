@@ -1476,7 +1476,7 @@ if (cluster.isMaster) {
 	jobs.process('proxy_tile', 100, function (job, done) {
 
 		var options = job.data.options;
-		proxy.serveTile(options, function (err) {
+		proxy._serveTile(options, function (err) {
 			if (err) console.error({
 				err_id : 11,
 				err_msg : 'proxy tile job',

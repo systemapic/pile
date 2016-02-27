@@ -71,7 +71,7 @@ module.exports = proxy = {
 		});
 	},
 
-	serveTile : function (options, done) {
+	_serveTile : function (options, done) {
 
 		// provider
 		var provider = options.provider;
