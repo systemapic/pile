@@ -44,7 +44,7 @@ module.exports = function (pile) {
 
 	// get tiles
 	app.get('/v2/tiles/*', pile.checkAccess, function (req, res) {
-		pile.getTile(req, res);
+		pile.getTileEntryPoint(req, res);
 	});
 
 	// get data from point

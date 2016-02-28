@@ -21,38 +21,32 @@ var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 
 // config
-var config = require('../config/pile-config');
+var config = require('../../config/pile-config');
 
 var pile_settings = {
 	store : 'disk' // or redis
 }
 
+var silentLog = function (err) {
+	if (err) console.log(err);
+}
+
 var redisLayers = redis.createClient(config.redis.layers.port, config.redis.layers.host, {detect_buffers : true});
 redisLayers.auth(config.redis.layers.auth);
-redisLayers.on('error', function (err) { console.error({err_msg : 'redisLayers err: ', error : err}); });
-redisLayers.select(config.redis.layers.db, function (err) {
-	// console.log('selected db', config.redis.layers.db, err);
-})
+redisLayers.on('error', silentLog);
+redisLayers.select(config.redis.layers.db, silentLog)
 
 var redisTemp = redis.createClient(config.redis.temp.port, config.redis.temp.host);
 redisTemp.auth(config.redis.temp.auth);
-redisTemp.on('error', function (err) { console.error({err_msg : 'redisTemp err: ', error : err}); });
-redisTemp.select(config.redis.temp.db, function (err) {
-	// console.log('redisTemp db', config.redis.temp.db, err);
-});
-redisTemp.flushdb(function (err) {
-	// console.log('redisTemp flushed db !', err);
-});
+redisTemp.on('error', silentLog);
+redisTemp.select(config.redis.temp.db, silentLog);
+redisTemp.flushdb(silentLog);
 
 var redisStats = redis.createClient(config.redis.stats.port, config.redis.stats.host);
 redisStats.auth(config.redis.stats.auth);
-redisStats.on('error', function (err) { console.error({err_msg : 'redisStats err: ', error : err}); });
-redisStats.select(config.redis.stats.db, function (err) {
-	// console.log('redisStats db', config.redis.stats.db, err);
-})
-redisTemp.flushdb(function (err) {
-	// console.log('redisTemp flushed db !', err);
-});
+redisStats.on('error', silentLog);
+redisStats.select(config.redis.stats.db, silentLog)
+redisTemp.flushdb(silentLog);
 
 
 module.exports = store = { 
@@ -69,7 +63,6 @@ module.exports = store = {
 		return done('pile_settings.store not set!');
 	},
 	_readVectorTile : function (params, done) {
-		console.log('_readVectorTile', params);
 		if (pile_settings.store == 'redis') return store._readVectorTileRedis(params, done);
 		if (pile_settings.store == 'disk')  return store._readVectorTileDisk(params, done);
 		return done('pile_settings.store not set!');
@@ -128,7 +121,6 @@ module.exports = store = {
 		var keyString = 'vector_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y + '.pbf';
 		var path = VECTORPATH + keyString;
 		fs.readFile(path, function (err, buffer) {
-			console.log('read vector tile: ', path);
 			if (err) return done(null);
 			done(null, buffer);
 		});
@@ -150,6 +142,14 @@ module.exports = store = {
 			done(null, buffer);
 		});
 	},
+
+
+	// get grid tiles from redis
+	getGridTile : function (params, done) {
+		var keyString = 'grid_tile:' + params.layerUuid + ':' + params.z + ':' + params.x + ':' + params.y;
+		store.layers.get(keyString, done);
+	},
+
 
 
 }

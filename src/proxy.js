@@ -16,16 +16,11 @@ var mongoose = require('mongoose');
 var request = require('request');
 var http = require('http-request');
 
-// var converter = require('../test/node-coordinator/coordinator');
-
 // global paths
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH 	 = '/data/proxy_tiles/';
-
-// config
-var config = require('../config/pile-config');
 
 var pile_settings = {
 	store : 'disk' // or redis
@@ -187,7 +182,6 @@ module.exports = proxy = {
 		// fetch
 		proxy._fetchTile(options, done);
 	},
-	
 
 	_getNorkartTile : function (options, done) {
 
@@ -207,12 +201,10 @@ module.exports = proxy = {
 			'X-Message-For-Norkart' : 'We are proxying because we need four subdomains for speedy tile requests. Logging is done as normal in browser! – knutole@systemapic.com'
 		}
 
-
 		// fetch
 		proxy._fetchTile(options, done);
 
 	},
-
 
 	_tile2lng : function (x,z) {
 		return (x/Math.pow(2,z)*360-180);
@@ -223,7 +215,4 @@ module.exports = proxy = {
 		return (180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))));
 	},
 
-	_getHistoricalNorkartTile : function (options, done) {
-
-	}
 }

@@ -16,20 +16,6 @@ var mongoose = require('mongoose');
 var request = require('request');
 var http = require('http-request');
 
-// var converter = require('../test/node-coordinator/coordinator');
-
-// global paths
-var VECTORPATH   = '/data/vector_tiles/';
-var RASTERPATH   = '/data/raster_tiles/';
-var GRIDPATH     = '/data/grid_tiles/';
-var PROXYPATH 	 = '/data/proxy_tiles/';
-
-// config
-var config = require('../config/pile-config');
-
-var pile_settings = {
-	store : 'disk' // or redis
-}
 
 module.exports = tools = { 
 
@@ -82,8 +68,6 @@ module.exports = tools = {
 		}
 	},
 
-
-
 	// deprecated, but keeping for now
 	_cutWhite : function (options, callback) {
 		var path = options.path;
@@ -118,7 +102,6 @@ module.exports = tools = {
 			}
 		});
 	},
-
 	cutColor : function (options, callback) {
 		var path = options.path;
 		var originalPath = options.originalPath;
@@ -158,17 +141,14 @@ module.exports = tools = {
 	},
 
 	_checkTileIntersect : function (bbox, extentString) {
-
 		var extent = [
 			parseFloat(extentString.split(' ')[0]),
 			parseFloat(extentString.split(' ')[1].split(',')[0]),
 			parseFloat(extentString.split(',')[1].split(' ')[0]),
 			parseFloat(extentString.split(',')[1].split(' ')[1]),
 		]
-
 		return pile._intersects(bbox, extent);
 	},
-
 
 	_intersects : function (box1, box2) {
 		// return true if boxes intersect, quick n dirty
@@ -185,19 +165,63 @@ module.exports = tools = {
 		var box2_xmax = box2[2]
 		var box2_ymax = box2[3]
 
-		// if both sides of tile is further north than extent, no overlap possible
+		// if both sides of tile is further north than extent, not intersecting
 		if (box1_ymax > box2_ymax && box1_ymin > box2_ymax) return false;
 
-		// if both sides of tile is further west than extent, no overlap possible
+		// if both sides of tile is further west than extent, not intersecting
 		if (box1_xmin < box2_xmin && box1_xmax < box2_xmin) return false;
 
-		// if both sides of tile is further south than extent, no overlap possible
+		// if both sides of tile is further south than extent, not intersecting
 		if (box1_ymin < box2_ymin && box1_ymax < box2_ymin) return false;
 
-		// if both sides of tile is further east than extent, no overlap possible
+		// if both sides of tile is further east than extent, not intersecting
 		if (box1_xmax > box2_xmax && box1_xmin > box2_xmax) return false;
 
 		return true;
+	},
+
+	// helper fn's for auth
+	checkAccess : function (req, res, next) {
+		// request wu for checking access tokens
+		var access_token = req.query.access_token || req.body.access_token;
+		var verifyUrl = 'http://wu:3001/v2/users/token/check?access_token=' + access_token;
+		request(verifyUrl, function (error, response, body) {
+			if (!response) return res.json({access : 'Unauthorized'});
+			
+			var status = tools.safeParse(body);
+
+			// allowed
+			if (status && status.valid && response.statusCode == 200 && !error) {
+				return next();
+			} 
+
+			// return noAccess tile if raster request
+			if (tools.isRasterRequest(req)) {
+				return fs.readFile('public/noAccessTile.png', function (err, tile) {
+					res.writeHead(200, {'Content-Type': 'image/png'});
+					res.end(tile);
+				});
+			}
+
+			// not allowed
+			res.json({access : 'Unauthorized'});
+		});
+	},
+
+	isRasterRequest : function (req) {
+		if (req._parsedUrl && req._parsedUrl.pathname) {
+			var parsed = req._parsedUrl.pathname.split('/');
+			if (parsed[5]) {
+				var ext = parsed[5].split('.');
+				if (ext.length > 0) {
+					var type = ext[1];
+					if (type == 'png') {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	},
 
 }
