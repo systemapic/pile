@@ -1,6 +1,7 @@
 // dependencies
 var _ = require('lodash');
 var fs = require('fs-extra');
+var pg = require('pg');
 var kue = require('kue');
 var path = require('path');
 var zlib = require('zlib');
@@ -16,6 +17,13 @@ var mongoose = require('mongoose');
 var exec = require('child_process').exec;
 var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
+
+
+var pgsql_options = {
+	dbhost: 'postgis',
+	dbuser: process.env.SYSTEMAPIC_PGSQL_USERNAME || 'docker',
+	dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
+};
 
 module.exports = queries = { 
 
@@ -242,7 +250,7 @@ module.exports = queries = {
 	primeTableGeometry : function (options, done) {
 
 		var file_id = options.file_id,
-		    postgis_db = options.postgis_db,
+		    postgis_db = options.database_name,
 		    ops = [];
 
 		// get geometry type

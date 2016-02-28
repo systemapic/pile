@@ -39,11 +39,15 @@ var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH 	 = '/data/proxy_tiles/';
 
+
+
 var pgsql_options = {
 	dbhost: 'postgis',
 	dbuser: process.env.SYSTEMAPIC_PGSQL_USERNAME || 'docker',
 	dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
 };
+
+
 
 module.exports = pile = { 
 
@@ -249,9 +253,13 @@ module.exports = pile = {
 
 		// create tileserver layer
 		ops.push(function (upload_status, callback) {
+
+			console.log('upload_status', upload_status);
+			console.log('==================== options =====================', options);
+
 			pile._createPostGISLayer({
 				upload_status : upload_status,
-				options : options
+				requested_layer : options
 			}, callback);
 		});
 
@@ -328,18 +336,18 @@ module.exports = pile = {
 		var defaultCartocss = '#layer { polygon-opacity: 1; polygon-fill: red; }';
 
 		var newLayer = {
-			"geom_column": "the_geom_3857",
-			"geom_type": "geometry",
-			"raster_band": "",
-			"srid": "",
-			"affected_tables": "",
-			"interactivity": "",
-			"attributes": "",
-			"cartocss_version": "2.0.1",
+			// "geom_column": "the_geom_3857",
+			// "geom_type": "geometry",
+			// "raster_band": "",
+			// "srid": "",
+			// "affected_tables": "",
+			// "interactivity": "",
+			// "attributes": "",
+			// "cartocss_version": "2.0.1",
 			"cartocss": defaultCartocss, 	// save default cartocss style (will be active on first render)
 			"sql": "(SELECT * FROM " + vectorized_raster_file_id + ") as sub",
 			"file_id": vectorized_raster_file_id,
-			"return_model" : true,
+			// "return_model" : true,
 		};
 
 
@@ -360,7 +368,7 @@ module.exports = pile = {
 
 			queries.primeTableGeometry({
 				file_id : vectorized_raster_file_id,
-				postgis_db : database_name
+				database_name : database_name
 			}, callback)
 
 		});
@@ -369,12 +377,8 @@ module.exports = pile = {
 
 			pile._createPostGISLayer({
 				upload_status : upload_status,
-				options : newLayer
-			}, function (err, layer) {
-
-				console.log('craeted postgislayer: ', err, layer);
-				callback(err, layer);
-			});
+				requested_layer : newLayer
+			}, callback);
 		});
 		
 		async.series(ops, function (err, results) {
@@ -389,53 +393,124 @@ module.exports = pile = {
 		// return done('DEPRECATED!');
 	},
 
-	_createPostGISLayer : function (opts, done) {
-		var ops 	= [];
-		var options 	= opts.upload_status; 		// TODO: fix this insanity
-		var file_id 	= opts.options.file_id;
-		var sql 	= opts.options.sql;
-		var cartocss 	= opts.options.cartocss;
-		var cartocss_version = opts.options.cartocss_version;
-		var geom_column = opts.options.geom_column;
-		var geom_type 	= opts.options.geom_type;
-		var raster_band = opts.options.raster_band;
-		var srid 	= opts.options.srid;
-		var affected_tables = opts.options.affected_tables;
-		var interactivity = opts.options.interactivity;
-		var attributes 	= opts.options.attributes;
-		var access_token = opts.options.access_token;
+	_createPostGISLayer : function (options, done) {
 
-		if (!sql) return done(new Error('Please provide a SQL statement.'))
-		if (!cartocss) return done(new Error('Please provide CartoCSS.'))
+
+		// -----------------------------------------------------------
+		//      upload_status
+		// -----------------------------------------------------------
+		// { 
+		// 	file_id: 'file_incluvknxcojauozeucv',
+		// 	user_id: 'user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6',
+		// 	filename: 'Akersvatn (1).tar.gz',
+		// 	timestamp: 1456612911816,
+		// 	status: 'Done',
+		// 	size: 2664853,
+		// 	upload_success: true,
+		// 	error_code: null,
+		// 	error_text: null,
+		// 	processing_success: true,
+		// 	rows_count: '14874',
+		// 	import_took_ms: 1174,
+		// 	data_type: 'vector',
+		// 	original_format: null,
+		// 	table_name: 'file_incluvknxcojauozeucv',
+		// 	database_name: 'vkztdvcqkm',
+		// 	uniqueIdentifier: '2664853-1455124339000-user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6-Akersvatn (1).tar.gz',
+		// 	default_layer: null,
+		// 	default_layer_model: null,
+		// 	metadata: '{"extent":  // ... '}' 
+		// }
+
+
+
+		// -----------------------------------------------------------
+		//      requested_layer
+		// -----------------------------------------------------------
+		// { 
+		// 	geom_column: 'the_geom_3857',
+		// 	geom_type: 'geometry',
+		// 	raster_band: '',
+		// 	srid: '',
+		// 	affected_tables: '',
+		// 	interactivity: '',
+		// 	attributes: '',
+		// 	access_token: 'pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8',
+		// 	cartocss_version: '2.0.1',
+		// 	cartocss: '@point_opacity: 1;\n@marker_size_factor: 2;\n[zoom<10] { marker-width: 0.2 * @marker_size_factor; }\n[zoom=10] { marker-width: 0.3 * @marker_size_factor; }\n[zoom=11] { marker-width: 0.5 * @marker_size_factor; }\n[zoom=12] { marker-width: 1   * @marker_size_factor; }\n[zoom=13] { marker-width: 1   * @marker_size_factor; }\n[zoom=14] { marker-width: 2   * @marker_size_factor; }\n[zoom=15] { marker-width: 4   * @marker_size_factor; }\n[zoom=16] { marker-width: 6   * @marker_size_factor; }\n[zoom=17] { marker-width: 8   * @marker_size_factor; }\n[zoom>=18] { marker-width: 12  * @marker_size_factor; }\n\n#layer {\n\n\tmarker-allow-overlap: true;\n\tmarker-clip: false;\n\tmarker-comp-op: screen;\n\n\tmarker-opacity: @point_opacity;\n\n\tmarker-fill: #12411d;\n\n}',
+		// 	sql: '(SELECT * FROM file_incluvknxcojauozeucv \nwhere coherence > 0.8\nand coherence < 1) as sub',
+		// 	file_id: 'file_incluvknxcojauozeucv',
+		// 	return_model: true,
+		// 	layerUuid: 'layer-4d2ad916-a9e5-4e01-8b9c-dd8e21ae3c57' 
+		// }
+
+		var defaultLayer = {
+			geom_column: 'the_geom_3857',
+			geom_type: 'geometry',
+			raster_band: '',
+			srid: '',
+			affected_tables: '',
+			interactivity: '',
+			attributes: '',
+			// access_token: 'pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8',
+			cartocss_version: '2.0.1',
+			// cartocss: '@point_opacity: 1;\n@marker_size_factor: 2;\n[zoom<10] { marker-width: 0.2 * @marker_size_factor; }\n[zoom=10] { marker-width: 0.3 * @marker_size_factor; }\n[zoom=11] { marker-width: 0.5 * @marker_size_factor; }\n[zoom=12] { marker-width: 1   * @marker_size_factor; }\n[zoom=13] { marker-width: 1   * @marker_size_factor; }\n[zoom=14] { marker-width: 2   * @marker_size_factor; }\n[zoom=15] { marker-width: 4   * @marker_size_factor; }\n[zoom=16] { marker-width: 6   * @marker_size_factor; }\n[zoom=17] { marker-width: 8   * @marker_size_factor; }\n[zoom>=18] { marker-width: 12  * @marker_size_factor; }\n\n#layer {\n\n\tmarker-allow-overlap: true;\n\tmarker-clip: false;\n\tmarker-comp-op: screen;\n\n\tmarker-opacity: @point_opacity;\n\n\tmarker-fill: #12411d;\n\n}',
+			// sql: '(SELECT * FROM file_incluvknxcojauozeucv \nwhere coherence > 0.8\nand coherence < 1) as sub',
+			// file_id: 'file_incluvknxcojauozeucv',
+			return_model: true,
+			// layerUuid: 'layer-4d2ad916-a9e5-4e01-8b9c-dd8e21ae3c57' 
+		}
+
+
+		var upload_status 	= options.upload_status;
+		var requested_layer 	= options.requested_layer; // previously opts.options
+		var file_id 		= requested_layer.file_id;
+		var sql 		= requested_layer.sql;
+		var cartocss 		= requested_layer.cartocss;
+		var cartocss_version 	= requested_layer.cartocss_version;
+		var geom_column 	= requested_layer.geom_column;
+		var geom_type 		= requested_layer.geom_type;
+		var raster_band 	= requested_layer.raster_band;
+		var srid 		= requested_layer.srid;
+		var affected_tables 	= requested_layer.affected_tables;
+		var interactivity 	= requested_layer.interactivity;
+		var attributes 		= requested_layer.attributes;
+		var access_token 	= requested_layer.access_token;
+		var ops 		= [];
+
+
+		// ensure mandatory fields
+		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
+		if (!cartocss) 	return done(new Error('Please provide CartoCSS.'))
 
 		ops.push(function (callback) {
 
 			// inject table name into sql
-			var done_sql = sql.replace('table', options.table_name);
+			var done_sql = sql.replace('table', upload_status.table_name);
 
 			// create layer object
-			var layerUuid = 'layer_id-' + uuid.v4();
+			var layer_id = 'layer_id-' + uuid.v4();
 			var layer = { 	
 
-				layerUuid : layerUuid,
+				layerUuid : layer_id,
 				options : {			
 					
 					// required
-					sql : done_sql,
-					cartocss : cartocss,
-					file_id : file_id, 	
-					database_name : options.database_name, 
-					table_name : options.table_name, 
-					metadata : options.metadata,
-					layer_id : layerUuid,
-					data_type : options.data_type || opts.options.data_type || 'vector',
+					layer_id 	 : layer_id,
+					sql 		 : done_sql,
+					cartocss 	 : cartocss,
+					file_id 	 : file_id, 	
+					database_name 	 : upload_status.database_name, 
+					table_name 	 : upload_status.table_name, 
+					metadata 	 : upload_status.metadata,
+					data_type 	 : upload_status.data_type || requested_layer.data_type || 'vector',
 
 					// optional				// defaults
 					cartocss_version : cartocss_version 	|| '2.0.1',
-					geom_column : geom_column 		|| 'geom',
-					geom_type : geom_type 			|| 'geometry',
-					raster_band : raster_band 		|| 0,
-					srid : srid 				|| 3857,
+					geom_column 	 : geom_column 		|| 'the_geom_3857',
+					geom_type 	 : geom_type 		|| 'geometry',
+					raster_band 	 : raster_band 		|| 0,
+					srid 		 : srid 		|| 3857,
 				}
 			}
 
@@ -447,21 +522,21 @@ module.exports = pile = {
 			
 			// todo: move to queries.js
 
-
 			// debug!
-			// return callback(null, layer); // debug!!
+			return callback(null, layer); // debug!!
 
 			var GET_EXTENT_SCRIPT_PATH = 'src/get_st_extent.sh';
 
+			// ensure mandatory fields
 			if (!layer.options.database_name) return callback(new Error("Unknown database_name in layer options"));
 			if (!layer.options.table_name) return callback(new Error("Unknown table_name in layer options"));
 
 			// st_extent script 
 			var command = [
-				GET_EXTENT_SCRIPT_PATH, 	    // script
+				GET_EXTENT_SCRIPT_PATH, 	// script
 				layer.options.database_name, 	// database name
-				layer.options.table_name,     // table name
-				layer.options.geom_column,	  // geometry column
+				layer.options.table_name,     	// table name
+				layer.options.geom_column,	// geometry column
 			].join(' ');
 
 
@@ -987,7 +1062,7 @@ module.exports = pile = {
 		store._readVectorTile(params, function (err, data) {
 
 			// return data
-			// if (data) return done(null, data);
+			// if (data) return done(null, data); 	// debug, turned off to create every time
 
 			// create
 			pile.createVectorTile(params, storedLayer, done);
@@ -1009,7 +1084,7 @@ module.exports = pile = {
 	},
 
 	getUploadStatus : function (options, done) {
-		pile.GET(pile.routes.upload_status, options, function (err, json) {
+		pile.GET(pile.routes.base + pile.routes.upload_status, options, function (err, json) {
 			var result = tools.safeParse(json);
 			done(err, result);
 		});
