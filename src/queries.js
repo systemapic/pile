@@ -281,20 +281,20 @@ module.exports = queries = {
 			});
 		});
 
-		// create geometry 4326
-		ops.push(function (geometry_type, callback) {
-			var column = ' the_geom_4326';
-			var geometry = ' geometry(' + geometry_type + ', 4326)';
-			var query = 'ALTER TABLE ' + file_id + ' ADD COLUMN' + column + geometry;
+		// // create geometry 4326
+		// ops.push(function (geometry_type, callback) {
+		// 	var column = ' the_geom_4326';
+		// 	var geometry = ' geometry(' + geometry_type + ', 4326)';
+		// 	var query = 'ALTER TABLE ' + file_id + ' ADD COLUMN' + column + geometry;
 
-			queries.postgis({
-				postgis_db : postgis_db,
-				query : query
-			}, function (err, results) {
-				if (err) return callback(err);
-				callback(err, geometry_type);
-			});
-		});
+		// 	queries.postgis({
+		// 		postgis_db : postgis_db,
+		// 		query : query
+		// 	}, function (err, results) {
+		// 		if (err) return callback(err);
+		// 		callback(err, geometry_type);
+		// 	});
+		// });
 
 
 		// populate geometry
@@ -306,38 +306,39 @@ module.exports = queries = {
 				query : query
 			}, function (err, results) {
 				if (err) return callback(err);
-				callback(err, geometry_type);
-			});
-		});
-
-		// populate geometry
-		ops.push(function (geometry_type, callback) {
-			var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_4326 TYPE Geometry(' + geometry_type + ', 4326) USING ST_Transform(geom, 4326)'
-
-   			queries.postgis({
-				postgis_db : postgis_db,
-				query : query
-			}, function (err, results) {
-				if (err) return callback(err);
+				// callback(err, geometry_type);
 				callback(err);
 			});
 		});
 
+		// // populate geometry
+		// ops.push(function (geometry_type, callback) {
+		// 	var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_4326 TYPE Geometry(' + geometry_type + ', 4326) USING ST_Transform(geom, 4326)'
+
+  //  			queries.postgis({
+		// 		postgis_db : postgis_db,
+		// 		query : query
+		// 	}, function (err, results) {
+		// 		if (err) return callback(err);
+		// 		callback(err);
+		// 	});
+		// });
+
+		// // create index for 4326
+		// ops.push(function (callback) {
+		// 	var idx = file_id + '_the_geom_4326_idx';
+		// 	var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_4326)'
+
+		// 	queries.postgis({
+		// 		postgis_db : postgis_db,
+		// 		query : query
+		// 	}, function (err, results) {
+		// 		if (err) return callback(err);
+		// 		callback(null);
+		// 	});
+		// });
+
 		// create index for 3857
-		ops.push(function (callback) {
-			var idx = file_id + '_the_geom_4326_idx';
-			var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_4326)'
-
-			queries.postgis({
-				postgis_db : postgis_db,
-				query : query
-			}, function (err, results) {
-				if (err) return callback(err);
-				callback(null);
-			});
-		});
-
-		// create index for 4326
 		ops.push(function (callback) {
 			var idx = file_id + '_the_geom_3857_idx';
 			var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_3857)'

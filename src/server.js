@@ -29,7 +29,7 @@ module.exports = function (pile) {
 
 	// vectorize layer
 	app.post('/v2/tiles/vectorize', pile.checkAccess, function (req, res) {
-		pile.vectorizeLayer(req, res);
+		pile.vectorizeDataset(req, res);
 	});
 
 	// update layer

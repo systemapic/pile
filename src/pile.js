@@ -56,7 +56,8 @@ module.exports = pile = {
 	// todo: move to routes, or share with wu somehow (get routes by querying wu API?)
 	routes : {
 		base : 'http://wu:3001',
-		upload_status : '/v2/data/import/status'
+		upload_status : '/v2/data/import/status',
+		create_dataset : '/v2/data/create',
 	},
 
 	headers : {
@@ -155,6 +156,12 @@ module.exports = pile = {
 					render_time : create_tile_time
 				});
 
+				// return vector tiles gzipped
+				if (type == 'pbf') {
+					res.writeHead(200, {'Content-Type': pile.headers[type], 'Content-Encoding': 'gzip'});
+					return zlib.gzip(data[0], function (err, zipped) { res.end(zipped); });
+				}
+
 				// return tile to client
 				res.writeHead(200, {'Content-Type': pile.headers[type]});
 				res.end(data[0]);
@@ -234,6 +241,16 @@ module.exports = pile = {
 		ops.push(function (upload_status, callback) {
 			if (!upload_status) return callback('No such upload_status.');
 
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('upload_status', upload_status);
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+			console.log('!!!!!!!!!!!!!!!!!!!!!!');
+
 			// ensure data was uploaded successfully
 			var error_message = 'The data was not uploaded correctly. Please check your data and error messages, and try again.';
 			if (!upload_status || !upload_status.upload_success) return callback(error_message);
@@ -285,7 +302,7 @@ module.exports = pile = {
 		console.log('async done:', err, result);
 	},
 
-	vectorizeLayer : function (req, res) {
+	vectorizeDataset : function (req, res) {
 		var options = req.body;
 		var access_token = options.access_token;
 		var file_id = options.file_id;
@@ -301,13 +318,24 @@ module.exports = pile = {
 		ops.push(function (upload_status, callback) {
 			// vectorize raster
 			pile.vectorizeRaster({
-				upload_status : upload_status
+				upload_status : upload_status,
+				access_token : access_token
 			}, callback);
 		});
 
-		ops.push(function (layer, callback) {
-			res.send(layer);
-			callback(null, layer);
+		// ops.push(function (dataset, callback) {
+		// 	// add to user
+		// 	api.file.addNewFileToUser({
+		// 		user : user,
+		// 		file : doc
+		// 	}, callback);
+		// });
+
+	
+
+		ops.push(function (dataset, callback) {
+			res.send(dataset);
+			callback(null, dataset);
 		});
 
 		async.waterfall(ops, pile.asyncDone);
@@ -318,37 +346,36 @@ module.exports = pile = {
 
 		console.log('vectorizeRaster! data', data);
 
+		var ops = [];
 		var upload_status = data.upload_status;
-
+		var access_token = data.access_token;
 		var database_name = upload_status.database_name;
 		var raster_table_name = upload_status.table_name;
-		// var query = 'create table file_wwfaqeqnzjsmvabwnpsl as select min(rid), st_union(rast) rast from file_wwfaqeqnzjsmvabwnpsl_backup;'
 		var vectorized_raster_file_id = 'vectorized_raster_' + tools.getRandomChars(20);
 
-		// SELECT val, geom INTO $2 FROM (SELECT (ST_DumpAsPolygons(rast)).* FROM $3) As foo ORDER BY val;
+		// todo: `val` is custom value, need to find name of column in raster
 		var query = 'SELECT val, geom INTO ' + vectorized_raster_file_id + ' FROM (SELECT (ST_DumpAsPolygons(rast)).* FROM ' + raster_table_name + ') As foo ORDER BY val;'
+		var defaultCartocss = '#layer { polygon-opacity: 1; polygon-fill: red; }';
 		
 		console.log('query:', query);
 		console.log('vectorized_raster_file_id', vectorized_raster_file_id);
 
-		var ops = [];
-
-		var defaultCartocss = '#layer { polygon-opacity: 1; polygon-fill: red; }';
-
-		var newLayer = {
-			// "geom_column": "the_geom_3857",
-			// "geom_type": "geometry",
-			// "raster_band": "",
-			// "srid": "",
-			// "affected_tables": "",
-			// "interactivity": "",
-			// "attributes": "",
-			// "cartocss_version": "2.0.1",
-			"cartocss": defaultCartocss, 	// save default cartocss style (will be active on first render)
-			"sql": "(SELECT * FROM " + vectorized_raster_file_id + ") as sub",
-			"file_id": vectorized_raster_file_id,
-			// "return_model" : true,
-		};
+		// var newLayer = {
+		// 	// "geom_column": "the_geom_3857",
+		// 	// "geom_type": "geometry",
+		// 	// "raster_band": "",
+		// 	// "srid": "",
+		// 	// "affected_tables": "",
+		// 	// "interactivity": "",
+		// 	// "attributes": "",
+		// 	// "cartocss_version": "2.0.1",
+		// 	"cartocss": defaultCartocss, 	// save default cartocss style (will be active on first render)
+		// 	"sql": "(SELECT * FROM " + vectorized_raster_file_id + ") as sub",
+		// 	"file_id": vectorized_raster_file_id,
+		// 	"table_name" : vectorized_raster_file_id,
+		// 	"data_type" : 'vector',
+		// 	// "return_model" : true,
+		// };
 
 
 		ops.push(function (callback) {
@@ -356,12 +383,7 @@ module.exports = pile = {
 			queries.postgis({
 				postgis_db : database_name,
 				query : query
-			}, function (err, results) {
-				console.log('pgquery vectorize:', err, results);
-
-				// return done(err, results);
-				callback(err, results);
-			});
+			}, callback);
 		});
 
 		ops.push(function (callback) {
@@ -373,24 +395,92 @@ module.exports = pile = {
 
 		});
 
+		// todo: get metadata
+
 		ops.push(function (callback) {
 
-			pile._createPostGISLayer({
-				upload_status : upload_status,
-				requested_layer : newLayer
-			}, callback);
+			// create Wu.File.model
+			var fileModel = {
+				data : {
+					postgis : { 				// postgis data
+						database_name : database_name,
+						table_name : vectorized_raster_file_id,
+						data_type : 'vector', 		// raster or vector
+						original_format : 'raster', 	// GeoTIFF, etc.
+						metadata : String,
+					}, 	
+				},
+				name : 'Vectorized raster',
+				access_token : access_token
+			}
+
+			request({
+				method : 'POST',
+				uri : pile.routes.base + pile.routes.create_dataset,
+				json : true,
+				body : fileModel
+			}, function (err, response, body) {
+				console.log('created 88887777 datatset!', err, body);
+				callback(err, body);
+			}); 
+
 		});
+
+
+		// create upload status
+		ops.push(function (callback) {
+
+		// { 
+		// 	file_id: 'file_tniivqbcibrnikcglsjz',
+		// 	user_id: 'user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6',
+		// 	filename: 'SCF_MOD_2014_003.tif',
+		// 	timestamp: 1456854405167,
+		// 	status: 'Done',
+		// 	size: 1573508,
+		// 	upload_success: true,
+		// 	error_code: null,
+		// 	error_text: null,
+		// 	processing_success: true,
+		// 	rows_count: null,
+		// 	import_took_ms: 454,
+		// 	data_type: 'raster',
+		// 	original_format: 'GeoTIFF',
+		// 	table_name: 'file_tniivqbcibrnikcglsjz',
+		// 	database_name: 'vkztdvcqkm',
+		// 	uniqueIdentifier: '1573508-1444921336000-user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6-SCF_MOD_2014_003.tif',
+		// 	default_layer: null,
+		// 	default_layer_model: null,
+		// 	metadata: '{"extent_geojson":{"type":"Polygon","coordinates":[[[3.61898984696375,57.6034919970039],[3.61898984696375,64.2036679193228],[12.3357480094751,64.2036679193228],[12.3357480094751,57.6034919970039],[3.61898984696375,57.6034919970039]]]},"total_area":346497325610.33765,"geometry_type":false,"size_bytes":"984 kB"}' 
+		// }
+
+			var upload_status = data.upload_status;
+			upload_status.file_id = vectorized_raster_file_id;
+			upload_status.data_type = 'vector';
+			upload_status.table_name = vectorized_raster_file_id;
+				
+			var options = {
+				access_token : access_token,
+				upload_status : upload_status
+			}
+
+			pile.setUploadStatus(options, function (err, response) {
+				console.log('setUploadStatus', err, response);
+				callback();
+			})
+		});
+
+		// ops.push(function (callback) {
+
+		// 	pile._createPostGISLayer({
+		// 		upload_status : upload_status,
+		// 		requested_layer : newLayer
+		// 	}, callback);
+		// });
 		
 		async.series(ops, function (err, results) {
 			console.log('async done', err, results);
-			done(err, results);
-		})
-
-
-		// this fn was used to create vectors from raster files
-		// we'll do this from postgis instead, so this is all deprecated
-		console.error('DEPRECATED');
-		// return done('DEPRECATED!');
+			done(err, results[2]);
+		});
 	},
 
 	_createPostGISLayer : function (options, done) {
@@ -501,9 +591,9 @@ module.exports = pile = {
 					cartocss 	 : cartocss,
 					file_id 	 : file_id, 	
 					database_name 	 : upload_status.database_name, 
-					table_name 	 : upload_status.table_name, 
+					table_name 	 : requested_layer.table_name || upload_status.table_name, 
 					metadata 	 : upload_status.metadata,
-					data_type 	 : upload_status.data_type || requested_layer.data_type || 'vector',
+					data_type 	 : requested_layer.data_type || upload_status.data_type || 'vector',
 
 					// optional				// defaults
 					cartocss_version : cartocss_version 	|| '2.0.1',
@@ -726,12 +816,15 @@ module.exports = pile = {
 			var postgis_settings 			= default_postgis_settings;
 			postgis_settings.dbname 		= storedLayer.options.database_name;
 			postgis_settings.table 			= storedLayer.options.sql;
-			postgis_settings.extent 		= storedLayer.options.extent;
+			postgis_settings.extent 		= storedLayer.options.extent || bbox;
 			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
 			postgis_settings.srid 			= storedLayer.options.srid;
-			postgis_settings.asynchronous_request 	= true;
 			postgis_settings.max_async_connection 	= 10;
 			
+
+			console.log('---------------- creating vector tile ---------------');
+			console.log('postgis_settings', postgis_settings);
+
 
 			// everything in spherical mercator (3857)!
 			try {  	
@@ -743,7 +836,7 @@ module.exports = pile = {
 			} catch (e) { return callback(e.message); }
 
 			// set buffer
-			map.bufferSize = 128;
+			// map.bufferSize = 128;
 
 			// set extent
 			map.extent = bbox; // must have extent!
@@ -818,7 +911,7 @@ module.exports = pile = {
 
 			
 			// debug write xml
-			if (1) pile._debugXML(params.layerUuid, map.toXML());
+			if (0) pile._debugXML(params.layerUuid, map.toXML());
 
 			// map options
 			var map_options = {
@@ -926,7 +1019,7 @@ module.exports = pile = {
 
 			// parse layer
 			var storedLayer = tools.safeParse(storedLayerJSON);
-			console.log('pile._prepareTile(), storedLayer: ', storedLayer);
+			// console.log('pile._prepareTile(), storedLayer: ', storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -1095,6 +1188,26 @@ module.exports = pile = {
 			var result = tools.safeParse(json);
 			done(err, result);
 		});
+	},
+
+	setUploadStatus : function (options, done) {
+		pile.POST(pile.routes.base + pile.routes.upload_status, options, function (err, json) {
+			console.log('setUploadStatus ---> done!', err, json, typeof json);
+			// var result = tools.safeParse(json);
+			done(err, json);
+		});
+	},
+
+	// shorthand
+	POST : function (endpoint, options, callback) {
+		request({
+			method : 'POST',
+			uri : endpoint,
+			json : true,
+			body : options
+		}, function (err, response, body) {
+			callback(err, body);
+		}); 
 	},
 
 	// shorthand
