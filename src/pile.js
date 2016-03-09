@@ -158,7 +158,11 @@ module.exports = pile = {
 
 				// return vector tiles gzipped
 				if (type == 'pbf') {
-					res.writeHead(200, {'Content-Type': pile.headers[type], 'Content-Encoding': 'gzip'});
+					res.writeHead(200, {
+						'Content-Type': pile.headers[type], 
+						'Content-Encoding': 'gzip',
+						'Cache-Control' : 'private, max-age=3600'
+					});
 					return zlib.gzip(data[0], function (err, zipped) { res.end(zipped); });
 				}
 
@@ -822,8 +826,8 @@ module.exports = pile = {
 			postgis_settings.max_async_connection 	= 10;
 			
 
-			console.log('---------------- creating vector tile ---------------');
-			console.log('postgis_settings', postgis_settings);
+			// console.log('---------------- creating vector tile ---------------');
+			// console.log('postgis_settings', postgis_settings);
 
 
 			// everything in spherical mercator (3857)!
