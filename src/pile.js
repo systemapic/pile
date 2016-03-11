@@ -29,6 +29,10 @@ var proxy = require('./proxy');
 var tools = require('./tools');
 var queries = require('./queries');
 
+// register system-installed pgraster.input
+// See https://github.com/mapnik/node-mapnik/issues/613
+mapnik.register_datasource('/usr/local/lib/mapnik/input/pgraster.input');
+
 // register mapnik plugins
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
