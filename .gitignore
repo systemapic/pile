@@ -1,5 +1,4 @@
 config/*
 node_modules/*
-test/*
 log/*
 tmp/
