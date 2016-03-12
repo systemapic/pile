@@ -33,6 +33,7 @@ var queries = require('./queries');
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
 
+
 // global paths (todo: move to config)
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
