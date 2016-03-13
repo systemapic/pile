@@ -258,7 +258,7 @@ module.exports = pile = {
 
 			// ensure data was uploaded successfully
 			var error_message = 'The data was not uploaded correctly. Please check your data and error messages, and try again.';
-			if (!upload_status || !upload_status.upload_success) return callback(error_message);
+			// if (!upload_status || !upload_status.upload_success) return callback(error_message);
 
 			// ensure data was processed succesfully
 			var error_message = 'The data is not done processing yet. Please try again in a little while.';
@@ -311,6 +311,8 @@ module.exports = pile = {
 		var options = req.body;
 		var access_token = options.access_token;
 		var file_id = options.file_id;
+		var raster_upload_status;
+		var vector_upload_status;
 		var ops = [];
 
 		ops.push(function (callback) {
@@ -318,29 +320,62 @@ module.exports = pile = {
 				file_id : file_id,
 				access_token : access_token
 			}, callback);
-		})
-
-		ops.push(function (upload_status, callback) {
-			// vectorize raster
-			pile.vectorizeRaster({
-				upload_status : upload_status,
-				access_token : access_token
-			}, callback);
 		});
 
-		// ops.push(function (dataset, callback) {
-		// 	// add to user
-		// 	api.file.addNewFileToUser({
-		// 		user : user,
-		// 		file : doc
-		// 	}, callback);
-		// });
+		ops.push(function (upload_status, callback) {
 
-	
+			console.log('upload_status', upload_status);
+			
+			// { file_id: 'file_kvgcmvexfhynwyrnxflu',
+			// user_id: 'user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6',
+			// filename: 'snow-raster.tif',
+			// timestamp: 1457810803810,
+			// status: 'Done',
+			// size: 1573508,
+			// upload_success: true,
+			// error_code: null,
+			// error_text: null,
+			// data_type: 'raster',
+			// original_format: 'GeoTIFF',
+			// import_took_ms: 472,
+			// table_name: 'file_kvgcmvexfhynwyrnxflu',
+			// database_name: 'vkztdvcqkm',
+			// metadata: '{"extent_geojson":{"type":"Polygon","coordinates":[[[3.61898984696375,57.6034919970039],[3.61898984696375,64.2036679193228],[12.3357480094751,64.2036679193228],[12.3357480094751,57.6034919970039],[3.61898984696375,57.6034919970039]]]},"total_area":346497325610.33765,"geometry_type":false,"size_bytes":"984 kB"}',
+			// processing_success: true }
 
-		ops.push(function (dataset, callback) {
-			res.send(dataset);
-			callback(null, dataset);
+			raster_upload_status = upload_status;
+
+			vector_upload_status = {
+				user_id 	: raster_upload_status.user_id,
+				filename 	: raster_upload_status.filename,
+				file_id 	: 'file_' + tools.getRandomChars(20),
+				status 		: 'Processing',
+				timestamp 	: new Date().getTime(),
+				data_type 	: 'vector',
+				source 		: {
+					type 	: 'raster:vectorized',
+					id 	: raster_upload_status.file_id
+				}
+			};
+
+			
+
+			pile.setUploadStatus({
+				access_token : access_token,
+				upload_status : vector_upload_status
+			}, function (err) {
+				res.send(err || vector_upload_status);
+				callback(err);
+			});
+		});
+
+		ops.push(function (callback) {
+			// vectorize raster
+			pile.vectorizeRaster({
+				raster_upload_status : raster_upload_status,
+				vector_upload_status : vector_upload_status,
+				access_token : access_token
+			}, callback);
 		});
 
 		async.waterfall(ops, pile.asyncDone);
@@ -352,13 +387,17 @@ module.exports = pile = {
 		console.log('vectorizeRaster! data', data);
 
 		var ops = [];
-		var upload_status = data.upload_status;
+		var raster_upload_status = data.raster_upload_status;
+		var vector_upload_status = data.vector_upload_status;
 		var access_token = data.access_token;
-		var database_name = upload_status.database_name;
-		var raster_table_name = upload_status.table_name;
-		var vectorized_raster_file_id = 'vectorized_raster_' + tools.getRandomChars(20);
+		var database_name = raster_upload_status.database_name;
+		var raster_table_name = raster_upload_status.table_name;
 
-		// todo: `val` is custom value, need to find name of column in raster
+		// var vectorized_raster_file_id = 'vectorized_raster_' + tools.getRandomChars(20);
+		var vectorized_raster_file_id = vector_upload_status.file_id;
+
+		// TODO: `val` is custom value, need to find name of column in raster
+		// TODO: improve this vectorization.. it's SLOW. @strk
 		var query = 'SELECT val, geom INTO ' + vectorized_raster_file_id + ' FROM (SELECT (ST_DumpAsPolygons(rast)).* FROM ' + raster_table_name + ') As foo ORDER BY val;'
 		var defaultCartocss = '#layer { polygon-opacity: 1; polygon-fill: red; }';
 		
@@ -458,11 +497,13 @@ module.exports = pile = {
 		// 	metadata: '{"extent_geojson":{"type":"Polygon","coordinates":[[[3.61898984696375,57.6034919970039],[3.61898984696375,64.2036679193228],[12.3357480094751,64.2036679193228],[12.3357480094751,57.6034919970039],[3.61898984696375,57.6034919970039]]]},"total_area":346497325610.33765,"geometry_type":false,"size_bytes":"984 kB"}' 
 		// }
 
-			var upload_status = data.upload_status;
-			upload_status.file_id = vectorized_raster_file_id;
+			var upload_status = vector_upload_status;
 			upload_status.data_type = 'vector';
 			upload_status.table_name = vectorized_raster_file_id;
-				
+			upload_status.status = 'Done';
+			upload_status.processing_success = true;
+			upload_status.processing_took_ms = (new Date().getTime() - upload_status.timestamp);
+
 			var options = {
 				access_token : access_token,
 				upload_status : upload_status
@@ -471,7 +512,7 @@ module.exports = pile = {
 			pile.setUploadStatus(options, function (err, response) {
 				console.log('setUploadStatus', err, response);
 				callback();
-			})
+			});
 		});
 
 		// ops.push(function (callback) {
@@ -484,7 +525,12 @@ module.exports = pile = {
 		
 		async.series(ops, function (err, results) {
 			console.log('async done', err, results);
-			done(err, results[2]);
+			// done(err, results[2]);
+
+			done(err, {
+				dataset : results[2],
+				upload_status : results[3]
+			});
 		});
 	},
 
