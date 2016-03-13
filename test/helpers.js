@@ -1,7 +1,7 @@
 var assert = require('assert');
 var mongoose = require('mongoose');
 var async = require('async');
-var fs = require('fs');
+var fs = require('fs-extra');
 var crypto = require('crypto');
 var request = require('request');
 var _ = require('lodash');
@@ -79,35 +79,6 @@ module.exports = util = {
         }
         return parsed;
     },
-
-    // create_user : function (done) {
-    //     var user = new User();
-    //     user.local.email = util.test_user.email;    
-    //     user.local.password = user.generateHash(util.test_user.password);
-    //     user.uuid = util.test_user.uuid;
-    //     user.firstName = util.test_user.firstName;
-    //     user.lastName = util.test_user.lastName;
-    //     user.username = util.test_user.username;
-    //     user.save(done);
-    // },
-
-    // delete_user : function (done) {
-    //     User
-    //     .findOne({uuid : util.test_user.uuid})
-    //     .remove()
-    //     .exec(done);
-    // },
-
-    // create_user_by_parameters : function (_user, callback) {
-    //     var user = new User();
-    //     user.local.email = _user.email;    
-    //     user.local.password = user.generateHash(_user.password);
-    //     user.uuid = _user.uuid;
-    //     user.firstName = _user.firstName;
-    //     user.lastName = _user.lastName;
-    //     user.files = _user.files;
-    //     user.save(callback);
-    // },
 
     delete_user: function (user_id, callback) {
         util.token(function (err, access_token) {
@@ -187,169 +158,22 @@ module.exports = util = {
         });
     },
 
-    // create_project_by_info : function (info, callback) {
-    //     var project = new Project();
-    //     project.uuid = info.uuid;
-    //     project.createdBy = info.createdBy;
-    //     project.createdByName = info.createdByName;
-    //     project.createdByUsername = info.createdByUsername;
-    //     project.name = info.name;
-    //     project.slug = info.slug;
-    //     project.description = info.description;
-    //     project.keywords = info.keywords;
-    //     project.categories = info.categories;
-    //     project.layers = info.layers;
-    //     project.access = info.access;
-    //     project.state = info.state;
-    //     project.settings = info.settings;
-    //     project.save(callback);
-    // },
+    equalFiles : function (files, done) {
+        if (!_.isArray(files) || files.length != 2) return done('Error: missing files');
+        fs.readFile(files[0], function (err, a) {
+            if (err) return done(err);
 
-    // delete_project_by_id : function (id, callback) {
-    //     Project
-    //     .findOne({uuid : id})
-    //     .remove()
-    //     .exec(callback);
-    // },
+            fs.readFile(files[1], function (err, b) {
+                if (err) return done(err);
 
-    // create_file : function (callback) {
-    //     var file = new File();
-    //     file.uuid = util.test_file.uuid;
-    //     file.family = util.test_file.family;
-    //     file.createdBy = util.test_file.createdBy;
-    //     file.createdByName = util.test_file.createdByName;
-    //     file.files = util.test_file.files;
-    //     file.folder = util.test_file.folder;
-    //     file.absfolder = util.test_file.absfolder;
-    //     file.name = util.test_file.name;
-    //     file.absfolder = util.test_file.absfolder;
-    //     file.originalName = util.test_file.originalName;
-    //     file.description = util.test_file.description;
-    //     file.copyright = util.test_file.copyright;
-    //     file.keywords = util.test_file.keywords;
-    //     file.category = util.test_file.category;
-    //     file.version = util.test_file.version;
-    //     file.status = util.test_file.status;
-    //     file.keywords = util.test_file.keywords;
-    //     file.type = util.test_file.type;
-    //     file.format = util.test_file.format;
-    //     file.save(callback);
-    // },
+                var similar = (a.toString() === b.toString());
+                if (!similar) return done('Not expected file!');
+                done();
+            })
 
-    // delete_file: function (callback) {
-    //     File
-    //     .findOne({uuid : util.test_file.uuid})
-    //     .remove()
-    //     .exec(callback);
-    // },
+        });
 
-    // create_file_by_parameters : function (newFile, callback) {
-    //     var file = new File();
-    //     file.uuid = newFile.uuid;
-    //     file.family = newFile.family;
-    //     file.createdBy = newFile.createdBy;
-    //     file.createdByName = newFile.createdByName;
-    //     file.files = newFile.files;
-    //     file.folder = newFile.folder;
-    //     file.absfolder = newFile.absfolder;
-    //     file.name = newFile.name;
-    //     file.absfolder = newFile.absfolder;
-    //     file.originalName = newFile.originalName;
-    //     file.description = newFile.description;
-    //     file.copyright = newFile.copyright;
-    //     file.keywords = newFile.keywords;
-    //     file.category = newFile.category;
-    //     file.version = newFile.version;
-    //     file.status = newFile.status;
-    //     file.keywords = newFile.keywords;
-    //     file.type = newFile.type;
-    //     file.format = newFile.format;
-    //     file.data = newFile.data;
-    //     file.save(callback);
-    // },
 
-    // delete_file_by_id : function (fileId, callback) {
-    //     File
-    //     .findOne({uuid : fileId})
-    //     .remove()
-    //     .exec(callback);
-    // },
+    },
 
-    // createLayer: function (callback) {
-    //     var layer = new Layer();
-    //     layer.uuid = util.test_layer.uuid;
-    //     layer.title = util.test_layer.title;
-    //     layer.description = util.test_layer.description;
-    //     layer.file = util.test_layer.file;
-    //     layer.data = util.test_layer.data;
-    //     layer.save(callback);
-    // },
-
-    // deleteLayer: function (callback) {
-    //     Layer
-    //     .findOne({uuid : util.test_layer.uuid})
-    //     .remove()
-    //     .exec(callback);
-    // },
-
-    // create_layer_by_parameters: function (layerInfo, callback) {
-    //     var layer = new Layer();
-    //     layer.uuid = layerInfo.uuid;
-    //     layer.title = layerInfo.title;
-    //     layer.description = layerInfo.description;
-    //     layer.file = layerInfo.file;
-    //     layer.data = layerInfo.data;
-    //     layer.save(callback);
-    // },
-
-    // delete_layer_by_id: function (layerId, callback) {
-    //     Layer
-    //     .findOne({uuid: layerId})
-    //     .remove()
-    //     .exec(callback);
-    // },
-
-    // createInviteToken: function (inviteParameters, done) {
-    //     var ops = [];
-
-    //     ops.push(function (callback) {
-    //         User.findOne({uuid: util.test_user.uuid})
-    //             .exec(function (err, user) {
-    //                 if (err) {
-    //                     return callback(err);
-    //                 }
-
-    //                 if (!user) {
-    //                     return callback(new Error('No such user'));
-    //                 }
-
-    //                 return callback(null, user);
-    //             });
-    //     });
-
-    //     ops.push(function (user, callback) {
-
-    //         var inviteToken = apiModule.utils.getRandomChars(7, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890');
-    //         var invite_options = JSON.stringify(inviteParameters);
-
-    //         // save token to redis
-    //         var redis_key = 'invite:token:' + inviteToken;
-    //         apiModule.redis.tokens.set(redis_key, invite_options, function (err) {
-    //             if (err) {
-    //                 return callback(err);
-    //             }
-                
-    //             callback(null, inviteToken);
-    //         });
-
-    //     });
-
-    //     async.waterfall(ops, function (err, inviteToken) {
-    //         if (err) {
-    //             return done(err);
-    //         }
-
-    //         done(null, inviteToken);
-    //     });
-    // }
 };

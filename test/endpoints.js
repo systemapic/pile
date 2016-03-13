@@ -31,6 +31,11 @@ module.exports = endpoint = {
     	carto           : '/v2/layers/carto/json'
     },
 
+    tiles : {
+        create          : '/v2/tiles/create',
+        get             : '/v2/tiles/',
+    },
+
     users : {
         token : {
             check       : '/v2/users/token/check',
