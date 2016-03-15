@@ -324,7 +324,7 @@ module.exports = pile = {
 
 		ops.push(function (upload_status, callback) {
 
-			console.log('upload_status', upload_status);
+			console.log('pile.vectorizeDataset: upload_status', upload_status);
 			
 			// { file_id: 'file_kvgcmvexfhynwyrnxflu',
 			// user_id: 'user-0eec3893-3ac0-4d97-9cf2-694a20cbd5d6',
@@ -343,20 +343,35 @@ module.exports = pile = {
 			// metadata: '{"extent_geojson":{"type":"Polygon","coordinates":[[[3.61898984696375,57.6034919970039],[3.61898984696375,64.2036679193228],[12.3357480094751,64.2036679193228],[12.3357480094751,57.6034919970039],[3.61898984696375,57.6034919970039]]]},"total_area":346497325610.33765,"geometry_type":false,"size_bytes":"984 kB"}',
 			// processing_success: true }
 
+			// remember
 			raster_upload_status = upload_status;
 
-			vector_upload_status = {
-				user_id 	: raster_upload_status.user_id,
-				filename 	: raster_upload_status.filename,
-				file_id 	: 'file_' + tools.getRandomChars(20),
-				status 		: 'Processing',
-				timestamp 	: new Date().getTime(),
-				data_type 	: 'vector',
-				source 		: {
-					type 	: 'raster:vectorized',
-					id 	: raster_upload_status.file_id
-				}
-			};
+			// create upload status
+			vector_upload_status = _.clone(raster_upload_status);
+			vector_upload_status.data_type = 'vector';
+			vector_upload_status.file_id = 'file_' + tools.getRandomChars(20);
+			vector_upload_status.status = 'Processing';
+			vector_upload_status.timestamp = new Date().getTime();
+			vector_upload_status.source = {
+				type 	: 'raster:vectorized',
+				id 	: raster_upload_status.file_id
+			}
+			vector_upload_status.processing_success = false; // reset
+
+			// raster_upload_status = upload_status;
+
+			// vector_upload_status = {
+			// 	user_id 	: raster_upload_status.user_id,
+			// 	filename 	: raster_upload_status.filename,
+			// 	file_id 	: 'file_' + tools.getRandomChars(20),
+			// 	status 		: 'Processing',
+			// 	timestamp 	: new Date().getTime(),
+			// 	data_type 	: 'vector',
+			// 	source 		: {
+			// 		type 	: 'raster:vectorized',
+			// 		id 	: raster_upload_status.file_id
+			// 	}
+			// };
 
 			
 
@@ -1070,7 +1085,7 @@ module.exports = pile = {
 
 			// parse layer
 			var storedLayer = tools.safeParse(storedLayerJSON);
-			// console.log('pile._prepareTile(), storedLayer: ', storedLayer);
+			console.log('pile._prepareTile(), storedLayer: ', storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -1094,12 +1109,12 @@ module.exports = pile = {
 
 			if ( storedLayer.options.data_type == 'raster' ) {
 				postgis_settings.type = 'pgraster';
-        // clip_rasters is to avoid sending unneeded data
-        // over the wires
+        			// clip_rasters is to avoid sending unneeded data
+        			// over the wires
 				postgis_settings.clip_rasters = 'true';
-        // prescale_rasters is needed to both reduce traffic
-        // and align tiles,
-        // see http://github.com/mapnik/mapnik/issues/2375
+        			// prescale_rasters is needed to both reduce traffic
+        			// and align tiles,
+        			// see http://github.com/mapnik/mapnik/issues/2375
 				postgis_settings.prescale_rasters = 'true';
 				postgis_settings.geometry_field = 'rast';
 				postgis_settings.table 	= storedLayer.options.file_id;
@@ -1164,9 +1179,9 @@ module.exports = pile = {
 		var options = {
 			// srid 3857
 			// NOTE: map srs should be already set at this point,
-			//			 and hard-coding it is not a good idea, see
-			//			 https://github.com/systemapic/pile/issues/35
-      //"srs": mercator.proj4,
+			// and hard-coding it is not a good idea, see
+			// https://github.com/systemapic/pile/issues/35
+      			// "srs": mercator.proj4,
 
 			"Stylesheet": [{
 				"id" : 'tile_style',
@@ -1181,6 +1196,7 @@ module.exports = pile = {
 			callback(null, xml);
 
 		} catch (e) {
+			console.log('css:', css);
 			var err = { message : 'CartoCSS rendering failed: ' + e.toString() }
 			callback(err);
 		}
