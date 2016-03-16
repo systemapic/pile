@@ -113,6 +113,8 @@ module.exports = pile = {
 			// parse layer JSON
 			var storedLayer = tools.safeParse(storedLayerJSON);
 
+			console.log('TYYYPPPEEE', type);
+
 			// get tiles
 			if (type == 'pbf') ops.push(function (callback) {
 				pile.getVectorTile(params, storedLayer, callback);
@@ -846,7 +848,10 @@ module.exports = pile = {
 		var postgis;
 		var bbox;
 
+		console.log('params::', params);
+
 		// check params
+		if (!params) 	   	   return done('Invalid url: Missing params.');
 		if (!params.layerUuid) 	   return done('Invalid url: Missing layerUuid.');
 		if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
 		if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
@@ -864,6 +869,8 @@ module.exports = pile = {
 			if (!storedLayer) return callback('No such layerUuid.');
 
 			var storedLayer = tools.safeParse(storedLayer);
+
+			console.log('_renderVectorTile', storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -885,14 +892,16 @@ module.exports = pile = {
 			postgis_settings.extent 		= storedLayer.options.extent || bbox;
 			postgis_settings.geometry_field 	= storedLayer.options.geom_column;
 			postgis_settings.srid 			= storedLayer.options.srid;
-			postgis_settings.max_async_connection 	= 10;
-			
+			postgis_settings.max_async_connection 	= 6;
+			postgis_settings.simplify_geometries 	= true; // no effect :(
+			postgis_settings.simplify_clip_resolution = 3.0;
 
-			// console.log('---------------- creating vector tile ---------------');
-			// console.log('postgis_settings', postgis_settings);
+			console.log('---------------- creating vector tile ---------------');
+			console.log('postgis_settings', postgis_settings);
+			console.log('mercator.proj4', mercator.proj4);
 
-
-			// everything in spherical mercator (3857)!
+			// everything in spherical mercator (3857)! ... 
+			// mercator.proj4 == 3857 == +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
 			try {  	
 				map = new mapnik.Map(256, 256, mercator.proj4);
 				layer = new mapnik.Layer('layer', mercator.proj4);
@@ -917,14 +926,15 @@ module.exports = pile = {
 			map.add_layer(layer);
 
 			// parse xml from cartocss
-			pile.cartoRenderer(storedLayer, layer, callback);
+			// pile.cartoRenderer(storedLayer, layer, callback);
 
+			callback(null, map);
 		});
 
-		// load xml to map
-		ops.push(function (xml, callback) {
-			map.fromString(xml, {strict : true}, callback);
-		});
+		// // load xml to map
+		// ops.push(function (xml, callback) {
+		// 	map.fromString(xml, {strict : true}, callback);
+		// });
 
 		// run ops
 		async.waterfall(ops, function (err, map) {

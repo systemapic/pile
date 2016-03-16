@@ -18,7 +18,7 @@ var tmp = {};
 var http = require('http-request');
 var assert = require('assert');
 // var debugMode = process.env.SYSTEMAPIC_DEBUG;
-var debugMode = false;
+var debugMode = true;
 if (debugMode) {
     console.log('Debug mode!');
 }
@@ -299,6 +299,13 @@ describe('Raster', function () {
 
                     var status = res.body;
 
+                    if (debugMode) {
+                        console.log('\n\n\n');
+                        console.log('Layer returned from', endpoints.tiles.create, '[pile]:');
+                        console.log('------------------------------------------')
+                        console.log(status);
+                    }
+
                     expect(status.layerUuid).to.exist;
                     expect(status.options.layer_id).to.exist;
                     expect(status.options.file_id).to.be.equal(tmp.vectorized_status.file_id);
@@ -312,7 +319,7 @@ describe('Raster', function () {
         });
 
 
-        it('should get expected raster-tile from raster', function (done) {
+        it('should get expected raster-tile from vectorized raster', function (done) {
             this.timeout(40000);
             token(function (err, access_token) {
 
@@ -326,6 +333,36 @@ describe('Raster', function () {
                 // files (todo: cleanup)
                 var expected = 'test/open-data/vectorized-tile.expected.png';
                 var actual = 'test/tmp/vectorized-test-tile.png'
+
+                http.get({
+                    url : tiles_url
+                }, actual, function (err, result) {
+                    if (err) return done(err);
+
+                    var e = fs.readFileSync(actual);
+                    var a = fs.readFileSync(expected);
+                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    done();
+                });
+            });
+        }); 
+
+        it('should get expected vector-tile from vectorized raster', function (done) {
+            this.timeout(40000);
+            token(function (err, access_token) {
+                https://tiles-txa.systemapic.com/v2/tiles/layer_id-93aa971e-8fb2-47f4-913c-00157555a2db/10/570/234.pbf?access_token=pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8
+                var type = 'pbf';
+                // var tile = [7,67,37];
+                var tile = [10,570,234];
+                var subdomain = config.servers.tiles.uri;
+                // var layer_id = tmp.vector_layer.options.layer_id;
+                var layer_id = 'layer_id-0de35268-a062-4e53-a384-c5157dc5feaa';
+                var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
+                tiles_url += layer_id + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
+                
+                // files (todo: cleanup)
+                var expected = 'test/open-data/vectorized-tile.expected.pbf';
+                var actual = 'test/tmp/vectorized-test-tile.pbf'
 
                 http.get({
                     url : tiles_url

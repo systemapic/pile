@@ -18,13 +18,21 @@ var proto_file = '/data/vector_tiles/' + file;
 
 var proto_file = 'test.pbf';
 var proto_file_gz = 'test.pbf.gz';
+
+if (process.argv[2]) {
+	proto_file = process.argv[2];
+}
+
+console.log('proto_file', proto_file);
+
+// read file
 var data = fs.readFileSync(proto_file);
 var tile = new VectorTile(new Protobuf(data));
 
 
 console.log('');
 console.log('===========================');
-console.log('   Data:')
+console.log('   Da2ta:')
 console.log('===========================');
 var f = file.split(':');
 var layer_id = f[1];
