@@ -56,20 +56,28 @@ var params = {
 // output path
 var vector_tile_path = 'test/tmp/vector-tile-size.debug.pbf'
 
+// process.argv[0] is the  "node" executable
+// process.argv[1] is this script path
+if ( process.argv[2] )
+{
+  proto_path = process.argv[2];
+  debug_vector_tile(proto_path);
+  process.exit(0);
+}
+else
+{
+  // render, then debug
+  render_vector_tile(params, function (err, proto_path) {
 
+      if ( err ) throw new Error(err);
 
+      // print debug
+      debug_vector_tile(proto_path);
 
-
-
-// run ops
-render_vector_tile(params, function (err, proto_path) {
-
-    // print debug
-    debug_vector_tile(proto_path);
-
-    // quit
-    process.exit(0);
-});
+      // quit
+      process.exit(0);
+  });
+}
 
 
 
