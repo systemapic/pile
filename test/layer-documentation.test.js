@@ -194,7 +194,9 @@ describe('Documentation', function () {
                 var actual = 'test/tmp/test-tile.png'
 
                 http.get({
-                    url : tiles_url
+                    url : tiles_url,
+                    // We don't need ssl validation during tests
+                    noSslVerifier : true
                 }, actual, function (err, result) {
                     if (err) return done(err);
 
@@ -327,7 +329,9 @@ describe('Documentation', function () {
                 var actual = 'test/tmp/vectorized-test-tile.png'
 
                 http.get({
-                    url : tiles_url
+                    url : tiles_url,
+                    // We don't need ssl validation during tests
+                    noSslVerifier : true
                 }, actual, function (err, result) {
                     if (err) return done(err);
                     var e = fs.readFileSync(actual);
