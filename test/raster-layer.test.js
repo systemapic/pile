@@ -28,7 +28,7 @@ if (debugMode) {
 
 // Avoids DEPTH_ZERO_SELF_SIGNED_CERT error for self-signed certs
 // See https://github.com/systemapic/pile/issues/38
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 function base_tiles_url()
 {
@@ -211,7 +211,9 @@ describe('Raster', function () {
                 var actual = 'test/tmp/test-tile.png'
 
                 http.get({
-                    url : tiles_url
+                    url : tiles_url,
+                    // We don't need ssl validation during tests
+                    noSslVerifier : true
                 }, actual, function (err, result) {
                     if (err) return done(err);
 
@@ -351,7 +353,9 @@ describe('Raster', function () {
                 var actual = 'test/tmp/vectorized-test-tile.png'
 
                 http.get({
-                    url : tiles_url
+                    url : tiles_url,
+                    // We don't need ssl validation during tests
+                    noSslVerifier : true
                 }, actual, function (err, result) {
                     if (err) return done(err);
 
@@ -381,7 +385,9 @@ describe('Raster', function () {
                 var actual = 'test/tmp/vectorized-test-tile.pbf'
 
                 http.get({
-                    url : tiles_url
+                    url : tiles_url,
+                    // We don't need ssl validation during tests
+                    noSslVerifier : true
                 }, actual, function (err, result) {
                     if (err) return done(err);
 
