@@ -13,7 +13,11 @@ var path = require('path');
 var httpStatus = require('http-status');
 var chai = require('chai');
 var expect = chai.expect;
-var config = require('/systemapic/config/wu-config.js').clientConfig;
+var config = require(
+  process.env.WU_CONFIG_PATH ||
+  '/systemapic/config/wu-config.js'
+).clientConfig;
+
 var tmp = {};
 var http = require('http-request');
 var assert = require('assert');
