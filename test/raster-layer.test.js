@@ -377,7 +377,9 @@ describe('Raster', function () {
                 var tile = [10,570,234];
                 var tiles_url = base_tiles_url();
                 // var layer_id = tmp.vector_layer.options.layer_id;
-                var layer_id = 'layer_id-0de35268-a062-4e53-a384-c5157dc5feaa';
+                // var layer_id = 'layer_id-0de35268-a062-4e53-a384-c5157dc5feaa';
+                var layer_id = tmp.vector_layer.options.layer_id;
+                var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
                 tiles_url += layer_id + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
                 
                 // files (todo: cleanup)
