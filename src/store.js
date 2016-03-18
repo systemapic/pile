@@ -21,7 +21,9 @@ var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 
 // config
-var config = require('../../config/pile-config');
+var config = require(
+    process.env.PILE_CONFIG_PATH ||
+    '../../config/pile-config');
 
 var pile_settings = {
 	store : 'disk' // or redis

@@ -22,8 +22,10 @@ var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
 // modules
+var config = require(
+    process.env.PILE_CONFIG_PATH ||
+    '../../config/pile-config');
 var server = require('./server');
-var config = require('../../config/pile-config');
 var store  = require('./store');
 var proxy = require('./proxy');
 var tools = require('./tools');

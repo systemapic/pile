@@ -24,7 +24,9 @@ var sanitize = require("sanitize-filename");
 var mercator = require('../src/sphericalmercator');
 var geojsonArea = require('geojson-area');
 var server = require('../src/server');
-var config = require('../../config/pile-config');
+var config = require(
+    process.env.PILE_CONFIG_PATH ||
+    '../../config/pile-config');
 var store  = require('../src/store');
 var proxy = require('../src/proxy');
 var tools = require('../src/tools');
