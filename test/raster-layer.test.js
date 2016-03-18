@@ -26,6 +26,10 @@ if (debugMode) {
     console.log('Debug mode!');
 }
 
+// Avoids DEPTH_ZERO_SELF_SIGNED_CERT error for self-signed certs
+// See https://github.com/systemapic/pile/issues/38
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+
 function base_tiles_url()
 {
   var subdomain = config.servers.tiles.uri;
