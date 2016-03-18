@@ -28,8 +28,8 @@ module.exports = util = {
     get_access_token : function (done) {
         api.get(endpoints.users.token.token)
             .query({
-                username : 'knutole@systemapic.com',
-                password : 'o1bbxb1q'
+                username : testData.test_user.username,
+                password : testData.test_user.password
             })
             .send()
             .end(function (err, res) {
@@ -106,19 +106,26 @@ module.exports = util = {
 
     },
 
-    create_user : function (done) {
+    ensure_test_user_exists: function (done) {
         console.log('create_user', endpoints.users.create, testData.test_user);
         api.post(endpoints.users.create)
         .send(testData.test_user)
         .end(function (err, res) {
             console.log('err, res', err, res.text);
             assert.ifError(err);
-            assert.equal(res.status, 200);
             var user = util.parse(res.text);
-            assert.ok(user);
-            assert.ok(user.uuid);
-            // assert.equal(user.uuid, testData.test_user.uuid);
-            // assert.equal(user.firstName, testData.test_user.firstName);
+            if ( res.status == 200 ) {
+              assert.ok(user);
+              assert.ok(user.uuid);
+              // assert.equal(user.uuid, testData.test_user.uuid);
+              // assert.equal(user.firstName, testData.test_user.firstName);
+            }
+            else if ( res.status == 400 ) {
+              assert.ok(user);
+              assert.ok(user.error);
+              assert.equal(user.error.message, 'Username is already taken.');
+            }
+            else assert.fail( user );
             done();
         });
     },
