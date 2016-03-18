@@ -13,7 +13,10 @@ var path = require('path');
 var httpStatus = require('http-status');
 var chai = require('chai');
 var expect = chai.expect;
-var config = require('/systemapic/config/wu-config.js').clientConfig;
+var config = require(
+  process.env.WU_CONFIG_PATH ||
+  '/systemapic/config/wu-config.js'
+).clientConfig;
 var tmp = {};
 var http = require('http-request');
 var assert = require('assert');
@@ -21,6 +24,15 @@ var assert = require('assert');
 var debugMode = true;
 if (debugMode) {
     console.log('Debug mode!');
+}
+
+function base_tiles_url()
+{
+  var subdomain = config.servers.tiles.uri;
+  console.warn('XXXX subdomain: ', subdomain);
+  var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
+  console.warn('XXXX tiles_url: ', tiles_url);
+  return tiles_url;
 }
 
 describe('Raster', function () {
@@ -184,9 +196,8 @@ describe('Raster', function () {
 
                 var type = 'png';
                 var tile = [7,67,37];
-                var subdomain = config.servers.tiles.uri;
                 var layer_id = tmp.raster_layer.options.layer_id;
-                var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
+                var tiles_url = base_tiles_url();
                 tiles_url += layer_id + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
                 
                 // files (todo: cleanup)
@@ -325,9 +336,8 @@ describe('Raster', function () {
 
                 var type = 'png';
                 var tile = [7,67,37];
-                var subdomain = config.servers.tiles.uri;
                 var layer_id = tmp.vector_layer.options.layer_id;
-                var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
+                var tiles_url = base_tiles_url();
                 tiles_url += layer_id + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
                 
                 // files (todo: cleanup)
@@ -350,14 +360,14 @@ describe('Raster', function () {
         it('should get expected vector-tile from vectorized raster', function (done) {
             this.timeout(40000);
             token(function (err, access_token) {
-                https://tiles-txa.systemapic.com/v2/tiles/layer_id-93aa971e-8fb2-47f4-913c-00157555a2db/10/570/234.pbf?access_token=pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8
+                if (err) return done(err);
+                //https://tiles-txa.systemapic.com/v2/tiles/layer_id-93aa971e-8fb2-47f4-913c-00157555a2db/10/570/234.pbf?access_token=pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8
                 var type = 'pbf';
                 // var tile = [7,67,37];
                 var tile = [10,570,234];
-                var subdomain = config.servers.tiles.uri;
+                var tiles_url = base_tiles_url();
                 // var layer_id = tmp.vector_layer.options.layer_id;
                 var layer_id = 'layer_id-0de35268-a062-4e53-a384-c5157dc5feaa';
-                var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
                 tiles_url += layer_id + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
                 
                 // files (todo: cleanup)
