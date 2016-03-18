@@ -48,9 +48,11 @@
     "vector-tile": "^1.2.0",
     "winston": "^1.0.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+      "mocha": "~1.21.4"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha test/*test.js",
     "start": "node server.js"
   },
   "repository": {
