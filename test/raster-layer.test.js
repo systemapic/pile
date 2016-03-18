@@ -33,14 +33,16 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
 function base_tiles_url()
 {
   var subdomain = config.servers.tiles.uri;
-  console.warn('XXXX subdomain: ', subdomain);
   var tiles_url = subdomain.replace('{s}', config.servers.tiles.subdomains[0]);
-  console.warn('XXXX tiles_url: ', tiles_url);
   return tiles_url;
 }
 
 describe('Raster', function () {
     this.slow(400);
+
+    before(function(done) {
+      helpers.ensure_test_user_exists(done);
+    });
 
     context('GeoTIFF -> snow.raster.200.tif', function () {
         this.timeout(11000);
