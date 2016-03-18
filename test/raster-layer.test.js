@@ -222,7 +222,7 @@ describe('Raster', function () {
                     
                     if (debugMode) {
                         console.log('\n\n\n');
-                        console.log('Layer returned from', endpoints.data.vectorize, '[pile]:');
+                        console.log('Dataset returned from', endpoints.data.vectorize, '[pile]:');
                         console.log('------------------------------------------')
                         console.log(status);
                     }
