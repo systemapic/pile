@@ -565,6 +565,31 @@ module.exports = pile = {
 		var ops 		= [];
 
 
+		// raster debug
+		var defaultCartocss = '#layer {'
+		defaultCartocss += 'raster-opacity: 1; '; 
+		// defaultCartocss += 'raster-scaling: gaussian; '; 
+		defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
+		// defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
+		defaultCartocss += 'raster-colorizer-default-color: red; '; 
+		// defaultCartocss += 'raster-colorizer-epsilon: 0.0000000000000000000000001; '; 
+		defaultCartocss += 'raster-colorizer-stops: '; 
+		defaultCartocss += '  stop(0, black) '; 
+		defaultCartocss += '  stop(254, white) '; 
+		defaultCartocss += '  stop(255, red, exact); '; 
+		// defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
+		// defaultCartocss += '  stop(50, #dddddd) '; 
+	
+		// defaultCartocss += '  stop(100, #cccccc) '; 
+		// defaultCartocss += '  stop(150, #0085ff) '; 
+		// defaultCartocss += '  stop(200, #0078ff) '; 
+		// defaultCartocss += '  stop(240, yellow) '; 
+		// defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
+		// defaultCartocss += 'raster-comp-op: color-dodge;';
+		defaultCartocss += ' }';
+		
+		cartocss = defaultCartocss;
+
 		// ensure mandatory fields
 		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
 		if (!cartocss) 	return done(new Error('Please provide CartoCSS.'))
@@ -1045,17 +1070,47 @@ module.exports = pile = {
 			postgis_settings.asynchronous_request 	= true;
 			postgis_settings.max_async_connection 	= 10;
 
+			console.log('\n\n\n EXTENT________________');
+			console.log('postgis_settings.extent:', postgis_settings.extent);
+			console.log('bbox:', bbox);
+
 			if ( storedLayer.options.data_type == 'raster' ) {
-				postgis_settings.type = 'pgraster';
-        			// clip_rasters is to avoid sending unneeded data
-        			// over the wires
-				postgis_settings.clip_rasters = 'true';
-        			// prescale_rasters is needed to both reduce traffic
-        			// and align tiles,
-        			// see http://github.com/mapnik/mapnik/issues/2375
-				postgis_settings.prescale_rasters = 'true';
-				postgis_settings.geometry_field = 'rast';
-				postgis_settings.table 	= storedLayer.options.file_id;
+
+
+				// debug: attempt at implementing RasterColorizer
+				// https://github.com/systemapic/pile/issues/41
+				if (1) {
+
+					postgis_settings.type = 'pgraster';
+	        			// clip_rasters is to avoid sending unneeded data
+	        			// over the wires
+					postgis_settings.clip_rasters = 'true';
+					postgis_settings.preunion_rasters = 'true';
+	        			// prescale_rasters is needed to both reduce traffic
+	        			// and align tiles,
+	        			// see http://github.com/mapnik/mapnik/issues/2375
+					postgis_settings.prescale_rasters = 'true';
+					postgis_settings.geometry_field = 'rast';
+					postgis_settings.table 	= storedLayer.options.file_id;
+					postgis_settings.band 	= 1;
+
+
+				} else {
+
+
+					postgis_settings.type = 'pgraster';
+	        			// clip_rasters is to avoid sending unneeded data
+	        			// over the wires
+					postgis_settings.clip_rasters = 'true';
+	        			// prescale_rasters is needed to both reduce traffic
+	        			// and align tiles,
+	        			// see http://github.com/mapnik/mapnik/issues/2375
+					postgis_settings.prescale_rasters = 'true';
+					postgis_settings.geometry_field = 'rast';
+					postgis_settings.table 	= storedLayer.options.file_id;
+
+				}
+
 			 } else {
 				postgis_settings.type = 'postgis';
 				postgis_settings.geometry_field = 'the_geom_3857';
@@ -1096,6 +1151,7 @@ module.exports = pile = {
 
 		// load xml to map
 		ops.push(function (xml, callback) {
+			console.log('xml:', xml);
 			map.fromString(xml, {strict : true}, callback);
 		});
 
