@@ -234,7 +234,7 @@ describe('Documentation', function () {
                     expect(status.filename).to.be.equal(tmp.upload_status.filename);
                     expect(status.status).to.be.equal('Processing');
                     expect(status.data_type).to.be.equal('vector');
-                    expect(status.source.type).to.be.equal('raster:vectorized');
+                    // expect(status.source.type).to.be.equal('raster:vectorized');
                     done();
                 });
             })
@@ -263,7 +263,7 @@ describe('Documentation', function () {
                         if (!status.file_id) return done('file_id');
                         if (status.filename != tmp.vectorized_status.filename) return done('filename');
                         if (status.data_type != 'vector') return done('data_type');
-                        if (status.source.type != 'raster:vectorized') return done('source.type');
+                        // if (status.source.type != 'raster:vectorized') return done('source.type');
 
                         // all good!
                         clearInterval(processingInterval);

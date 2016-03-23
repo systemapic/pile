@@ -107,11 +107,10 @@ module.exports = util = {
     },
 
     ensure_test_user_exists: function (done) {
-        console.log('create_user', endpoints.users.create, testData.test_user);
+        console.log('ensure_test_user_exists', endpoints.users.create, testData.test_user);
         api.post(endpoints.users.create)
         .send(testData.test_user)
         .end(function (err, res) {
-            console.log('err, res', err, res.text);
             assert.ifError(err);
             var user = util.parse(res.text);
             if ( res.status == 200 ) {
@@ -119,13 +118,13 @@ module.exports = util = {
               assert.ok(user.uuid);
               // assert.equal(user.uuid, testData.test_user.uuid);
               // assert.equal(user.firstName, testData.test_user.firstName);
-            }
-            else if ( res.status == 400 ) {
+            } else if ( res.status == 400 ) {
               assert.ok(user);
               assert.ok(user.error);
               assert.equal(user.error.message, 'Username is already taken.');
+            } else {
+              assert.fail( user );
             }
-            else assert.fail( user );
             done();
         });
     },
