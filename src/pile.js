@@ -566,26 +566,29 @@ module.exports = pile = {
 
 
 		// raster debug
-		var defaultCartocss = '#layer {'
+		var defaultCartocss = '';
+		// defaultCartocss = 'Map { background-color: red;} '
+		defaultCartocss += '#layer {'
+		// defaultCartocss += ''; 
 		defaultCartocss += 'raster-opacity: 1; '; 
 		// defaultCartocss += 'raster-scaling: gaussian; '; 
 		defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
-		// defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
-		defaultCartocss += 'raster-colorizer-default-color: red; '; 
+		defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
+		// defaultCartocss += 'raster-colorizer-default-color: red; '; 
 		// defaultCartocss += 'raster-colorizer-epsilon: 0.0000000000000000000000001; '; 
 		defaultCartocss += 'raster-colorizer-stops: '; 
-		defaultCartocss += '  stop(0, black) '; 
-		defaultCartocss += '  stop(254, white) '; 
-		defaultCartocss += '  stop(255, red, exact); '; 
-		// defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
-		// defaultCartocss += '  stop(50, #dddddd) '; 
+		// defaultCartocss += '  stop(0, black) '; 
+		// defaultCartocss += '  stop(254, white) '; 
+		// defaultCartocss += '  stop(255, yellow); '; 
+		defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
+		defaultCartocss += '  stop(21, #dddddd) '; 
 	
 		// defaultCartocss += '  stop(100, #cccccc) '; 
 		// defaultCartocss += '  stop(150, #0085ff) '; 
-		// defaultCartocss += '  stop(200, #0078ff) '; 
+		defaultCartocss += '  stop(200, #0078ff) '; 
 		// defaultCartocss += '  stop(240, yellow) '; 
-		// defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
-		// defaultCartocss += 'raster-comp-op: color-dodge;';
+		defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
+		defaultCartocss += 'raster-comp-op: color-dodge;';
 		defaultCartocss += ' }';
 		
 		cartocss = defaultCartocss;
@@ -940,7 +943,7 @@ module.exports = pile = {
 
 			
 			// debug write xml
-			if (0) pile._debugXML(params.layerUuid, map.toXML());
+			if (1) pile._debugXML(params.layerUuid, map.toXML());
 
 			// map options
 			var map_options = {
@@ -1084,12 +1087,12 @@ module.exports = pile = {
 					postgis_settings.type = 'pgraster';
 	        			// clip_rasters is to avoid sending unneeded data
 	        			// over the wires
-					postgis_settings.clip_rasters = 'true';
-					postgis_settings.preunion_rasters = 'true';
+					// postgis_settings.clip_rasters = 'true';
+					// postgis_settings.preunion_rasters = 'true';
 	        			// prescale_rasters is needed to both reduce traffic
 	        			// and align tiles,
 	        			// see http://github.com/mapnik/mapnik/issues/2375
-					postgis_settings.prescale_rasters = 'true';
+					// postgis_settings.prescale_rasters = 'true';
 					postgis_settings.geometry_field = 'rast';
 					postgis_settings.table 	= storedLayer.options.file_id;
 					postgis_settings.band 	= 1;
@@ -1151,7 +1154,6 @@ module.exports = pile = {
 
 		// load xml to map
 		ops.push(function (xml, callback) {
-			console.log('xml:', xml);
 			map.fromString(xml, {strict : true}, callback);
 		});
 
