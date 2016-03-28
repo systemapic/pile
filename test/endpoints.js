@@ -88,11 +88,12 @@ module.exports = endpoint = {
 
 
     cube : {
-        create : '/v2/tiles/cube/create',
-        get : '/v2/tiles/cube',
-        add : '/v2/tiles/cube/add',
-        remove : '/v2/tiles/cube/remove',
-        update : '/v2/tiles/cube/update',
+        create : '/v2/cubes/create',
+        get : '/v2/cubes/cube/get', // GET
+        add : '/v2/cubes/add',
+        remove : '/v2/cubes/remove',
+        update : '/v2/cubes/update',
+        request : '/v2/cubes/' // GET
     }
 
 

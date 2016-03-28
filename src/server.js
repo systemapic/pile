@@ -28,27 +28,32 @@ module.exports = function (pile) {
 	});
 
 	// create cube layer
-	app.post('/v2/tiles/cube/create', pile.checkAccess, function (req, res) {
+	app.post('/v2/cubes/create', pile.checkAccess, function (req, res) {
 		pile.cubes.create(req, res);
 	});
 
 	// add dataset to cube
-	app.post('/v2/tiles/cube/add', pile.checkAccess, function (req, res) {
+	app.post('/v2/cubes/add', pile.checkAccess, function (req, res) {
 		pile.cubes.add(req, res);
 	});
 
 	// remove dataset from cube
-	app.post('/v2/tiles/cube/remove', pile.checkAccess, function (req, res) {
+	app.post('/v2/cubes/remove', pile.checkAccess, function (req, res) {
 		pile.cubes.remove(req, res);
 	});
 
 	// update dataset
-	app.post('/v2/tiles/cube/update', pile.checkAccess, function (req, res) {
+	app.post('/v2/cubes/update', pile.checkAccess, function (req, res) {
 		pile.cubes.update(req, res);
 	});
 
+	// request cube tiles
+	app.get('/v2/cubes/get', pile.checkAccess, function (req, res) {
+		pile.cubes.request(req, res);
+	});
+
 	// create cube layer
-	app.get('/v2/tiles/cube', pile.checkAccess, function (req, res) {
+	app.get('/v2/cubes/*', pile.checkAccess, function (req, res) {
 		pile.cubes.get(req, res);
 	});
 
