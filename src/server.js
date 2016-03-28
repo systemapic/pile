@@ -49,12 +49,12 @@ module.exports = function (pile) {
 
 	// request cube tiles
 	app.get('/v2/cubes/get', pile.checkAccess, function (req, res) {
-		pile.cubes.request(req, res);
+		pile.cubes.get(req, res);
 	});
 
 	// create cube layer
 	app.get('/v2/cubes/*', pile.checkAccess, function (req, res) {
-		pile.cubes.get(req, res);
+		pile.cubes.tile(req, res);
 	});
 
 	// vectorize layer
