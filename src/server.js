@@ -27,6 +27,31 @@ module.exports = function (pile) {
 		pile.createLayer(req, res);
 	});
 
+	// create cube layer
+	app.post('/v2/tiles/cube/create', pile.checkAccess, function (req, res) {
+		pile.cubes.create(req, res);
+	});
+
+	// add dataset to cube
+	app.post('/v2/tiles/cube/add', pile.checkAccess, function (req, res) {
+		pile.cubes.add(req, res);
+	});
+
+	// remove dataset from cube
+	app.post('/v2/tiles/cube/remove', pile.checkAccess, function (req, res) {
+		pile.cubes.remove(req, res);
+	});
+
+	// update dataset
+	app.post('/v2/tiles/cube/update', pile.checkAccess, function (req, res) {
+		pile.cubes.update(req, res);
+	});
+
+	// create cube layer
+	app.get('/v2/tiles/cube', pile.checkAccess, function (req, res) {
+		pile.cubes.get(req, res);
+	});
+
 	// vectorize layer
 	app.post('/v2/tiles/vectorize', pile.checkAccess, function (req, res) {
 		pile.vectorizeDataset(req, res);

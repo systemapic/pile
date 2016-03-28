@@ -71,10 +71,6 @@ module.exports = endpoint = {
         set             : '/v2/hashes'
     },
 
-    // upload: {
-        // get             : '/api/upload/get'
-    // },
-
     portal              : '/v2/portal',
     status              : '/v2/status',
     import : {
@@ -88,5 +84,16 @@ module.exports = endpoint = {
     },
     static: {
         screen: '/v2/static/screen'
+    },
+
+
+    cube : {
+        create : '/v2/tiles/cube/create',
+        get : '/v2/tiles/cube',
+        add : '/v2/tiles/cube/add',
+        remove : '/v2/tiles/cube/remove',
+        update : '/v2/tiles/cube/update',
     }
+
+
 };

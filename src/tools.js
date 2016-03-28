@@ -189,6 +189,11 @@ module.exports = tools = {
 			if (!response) return res.json({access : 'Unauthorized'});
 			
 			var status = tools.safeParse(body);
+			console.log('status: ', status);
+			req.user = {
+				uuid : status.user_id,
+				username : status.username
+			}
 
 			// allowed
 			if (status && status.valid && response.statusCode == 200 && !error) {
