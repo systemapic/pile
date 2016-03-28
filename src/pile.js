@@ -22,14 +22,13 @@ var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
 // modules
-var config = require(
-    process.env.PILE_CONFIG_PATH ||
-    '../../config/pile-config');
+var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
 var server = require('./server');
 var store  = require('./store');
 var proxy = require('./proxy');
 var tools = require('./tools');
 var queries = require('./queries');
+var cubes = require('./cubes');
 
 // register mapnik plugins
 mapnik.register_default_fonts();
@@ -55,6 +54,7 @@ var pgsql_options = {
 module.exports = pile = { 
 
 	config : config,
+	cubes : cubes,
 
 	// todo: move to routes, or share with wu somehow (get routes by querying wu API?)
 	routes : {
@@ -202,21 +202,25 @@ module.exports = pile = {
 	},
 
 	// pipe to queries
+	// TODO: in server.js: pile.queries.fetchDataArea
 	fetchDataArea 	: queries.fetchDataArea,
 	fetchData 	: queries.fetchData,
 	fetchHistogram 	: queries.fetchHistogram,
 
+
+
+	
 	// this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
 	createLayer : function (req, res) {
-		var options 	= req.body;
-		var file_id 	= options.file_id;
-		var sql 	= options.sql;
-		var cartocss 	= options.cartocss;
+		var options = req.body;
+		var file_id = options.file_id;
+		var sql = options.sql;
+		var cartocss = options.cartocss;
 		var cartocss_version = options.cartocss_version;
 		var geom_column = options.geom_column;
-		var geom_type 	= options.geom_type;
+		var geom_type = options.geom_type;
 		var raster_band = options.raster_band;
-		var srid 	= options.srid;
+		var srid = options.srid;
 		var affected_tables = options.affected_tables;
 		var interactivity = options.interactivity;
 		var attributes 	= options.attributes;
@@ -448,11 +452,6 @@ module.exports = pile = {
 			var temp_meta = tools.safeParse(vector_upload_status.metadata);
 			temp_meta.columns = metadata.columns;
 
-			console.log('\n\n\n\n');
-			console.log('----------------------------------');
-			console.log('temp_meta', temp_meta);
-			console.log('metadata', metadata);
-
 			var upload_status = vector_upload_status;
 			upload_status.data_type = 'vector';
 			upload_status.table_name = vectorized_raster_file_id;
@@ -508,8 +507,6 @@ module.exports = pile = {
 		// 	metadata: '{"extent":  // ... '}' 
 		// }
 
-
-
 		// -----------------------------------------------------------
 		//      requested_layer
 		// -----------------------------------------------------------
@@ -538,7 +535,6 @@ module.exports = pile = {
 			affected_tables: '',
 			interactivity: '',
 			attributes: '',
-			// access_token: 'pk.8FhhB90ax6KkQmoK0AMePd0R6IlkxM4VAGewsXw8',
 			cartocss_version: '2.0.1',
 			// cartocss: '@point_opacity: 1;\n@marker_size_factor: 2;\n[zoom<10] { marker-width: 0.2 * @marker_size_factor; }\n[zoom=10] { marker-width: 0.3 * @marker_size_factor; }\n[zoom=11] { marker-width: 0.5 * @marker_size_factor; }\n[zoom=12] { marker-width: 1   * @marker_size_factor; }\n[zoom=13] { marker-width: 1   * @marker_size_factor; }\n[zoom=14] { marker-width: 2   * @marker_size_factor; }\n[zoom=15] { marker-width: 4   * @marker_size_factor; }\n[zoom=16] { marker-width: 6   * @marker_size_factor; }\n[zoom=17] { marker-width: 8   * @marker_size_factor; }\n[zoom>=18] { marker-width: 12  * @marker_size_factor; }\n\n#layer {\n\n\tmarker-allow-overlap: true;\n\tmarker-clip: false;\n\tmarker-comp-op: screen;\n\n\tmarker-opacity: @point_opacity;\n\n\tmarker-fill: #12411d;\n\n}',
 			// sql: '(SELECT * FROM file_incluvknxcojauozeucv \nwhere coherence > 0.8\nand coherence < 1) as sub',
@@ -565,33 +561,47 @@ module.exports = pile = {
 		var ops 		= [];
 
 
-		// raster debug
-		var defaultCartocss = '';
-		// defaultCartocss = 'Map { background-color: red;} '
-		defaultCartocss += '#layer {'
-		// defaultCartocss += ''; 
-		defaultCartocss += 'raster-opacity: 1; '; 
-		// defaultCartocss += 'raster-scaling: gaussian; '; 
-		defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
-		defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
-		// defaultCartocss += 'raster-colorizer-default-color: red; '; 
-		// defaultCartocss += 'raster-colorizer-epsilon: 0.0000000000000000000000001; '; 
-		defaultCartocss += 'raster-colorizer-stops: '; 
-		// defaultCartocss += '  stop(0, black) '; 
-		// defaultCartocss += '  stop(254, white) '; 
-		// defaultCartocss += '  stop(255, yellow); '; 
-		defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
-		defaultCartocss += '  stop(21, #dddddd) '; 
+		// 
+		var data_type = requested_layer.data_type || upload_status.data_type;
+		if (data_type == 'raster') {
+
+			console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
+			console.log('default cartocss', cartocss);
+			console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
+
+			// raster debug
+			var defaultCartocss = '';
+			// defaultCartocss = 'Map { background-color: red;} '
+			defaultCartocss += '#layer {'
+			// defaultCartocss += ''; 
+			defaultCartocss += 'raster-opacity: 1; '; 
+			// defaultCartocss += 'raster-scaling: gaussian; '; 
+			defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
+			defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
+			// defaultCartocss += 'raster-colorizer-default-color: red; '; 
+			// defaultCartocss += 'raster-colorizer-epsilon: 0.0000000000000000000000001; '; 
+			defaultCartocss += 'raster-colorizer-stops: '; 
+
+			// // black and white
+			// defaultCartocss += '  stop(0, black) '; 
+			// defaultCartocss += '  stop(254, white) '; 
+			// defaultCartocss += '  stop(255, yellow); '; 
+			
+			// // white to blue
+			defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
+			defaultCartocss += '  stop(21, #dddddd) '; 
+			// defaultCartocss += '  stop(100, #cccccc) '; 
+			// defaultCartocss += '  stop(150, #0085ff) '; 
+			defaultCartocss += '  stop(200, #0078ff) '; 
+			// defaultCartocss += '  stop(240, yellow) '; 
+			defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
+			defaultCartocss += 'raster-comp-op: color-dodge;';
+			defaultCartocss += ' }';
+			
+			cartocss = cartocss || defaultCartocss;	
+		}
+
 	
-		// defaultCartocss += '  stop(100, #cccccc) '; 
-		// defaultCartocss += '  stop(150, #0085ff) '; 
-		defaultCartocss += '  stop(200, #0078ff) '; 
-		// defaultCartocss += '  stop(240, yellow) '; 
-		defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
-		defaultCartocss += 'raster-comp-op: color-dodge;';
-		defaultCartocss += ' }';
-		
-		cartocss = defaultCartocss;
 
 		// ensure mandatory fields
 		if (!sql) 	return done(new Error('Please provide a SQL statement.'))
@@ -656,7 +666,6 @@ module.exports = pile = {
 
 			// create database in postgis
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
-				console.log('exec err, stdout', err, stdout);
 				if (err) return callback(new Error(stdout));
 
 				// parse stdout
@@ -718,8 +727,7 @@ module.exports = pile = {
 		res.end();
 	},
 
-	// start render_vector_tile job
-	// will create VECTOR TILE (from postgis)
+	// create vector tile from postgis
 	createVectorTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
@@ -737,8 +745,7 @@ module.exports = pile = {
 
 	},
 
-	// start render_raster_tile job
-	// will create RASTER TILE (from postgis)
+	// create raster tile from postgis
 	createRasterTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
@@ -758,8 +765,7 @@ module.exports = pile = {
 
 	},
 
-	// start render_raster_tile job
-	// will create UTF GRID TILE (from postgis)
+	// create grid tile from postgis
 	createGridTile : function (params, storedLayer, done) {
 
 		// KUE: create raster tile
@@ -796,15 +802,12 @@ module.exports = pile = {
 
 	_renderVectorTile : function (params, done) {
 
-		// prepare tile: 
 		// parse url into layerUuid, zxy, type
 		var ops = [];
 		var map;
 		var layer;
 		var postgis;
 		var bbox;
-
-		console.log('params::', params);
 
 		// check params
 		if (!params) 	   	   return done('Invalid url: Missing params.');
@@ -825,8 +828,6 @@ module.exports = pile = {
 			if (!storedLayer) return callback('No such layerUuid.');
 
 			var storedLayer = tools.safeParse(storedLayer);
-
-			console.log('_renderVectorTile', storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -852,10 +853,6 @@ module.exports = pile = {
 			postgis_settings.simplify_geometries 	= true; // no effect :(
 			postgis_settings.simplify_clip_resolution = 3.0;
 
-			console.log('---------------- creating vector tile ---------------');
-			console.log('postgis_settings', postgis_settings);
-			console.log('mercator.proj4', mercator.proj4);
-
 			// everything in spherical mercator (3857)! ... 
 			// mercator.proj4 == 3857 == +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
 			try {  	
@@ -867,7 +864,7 @@ module.exports = pile = {
 			} catch (e) { return callback(e.message); }
 
 			// set buffer
-			// map.bufferSize = 128;
+			map.bufferSize = 128;
 
 			// set extent
 			map.extent = bbox; // must have extent!
@@ -881,16 +878,8 @@ module.exports = pile = {
 			// add layer to map
 			map.add_layer(layer);
 
-			// parse xml from cartocss
-			// pile.cartoRenderer(storedLayer, layer, callback);
-
 			callback(null, map);
 		});
-
-		// // load xml to map
-		// ops.push(function (xml, callback) {
-		// 	map.fromString(xml, {strict : true}, callback);
-		// });
 
 		// run ops
 		async.waterfall(ops, function (err, map) {
@@ -935,7 +924,6 @@ module.exports = pile = {
 	},
 
 	_renderRasterTile : function (params, done) {
-
 
 		pile._prepareTile(params, function (err, map) {
 			if (err) return done(err);
@@ -1051,7 +1039,6 @@ module.exports = pile = {
 
 			// parse layer
 			var storedLayer = tools.safeParse(storedLayerJSON);
-			console.log('pile._prepareTile(), storedLayer: ', storedLayer);
 
 			// default settings
 			var default_postgis_settings = {
@@ -1072,10 +1059,6 @@ module.exports = pile = {
 			postgis_settings.srid 			= storedLayer.options.srid;
 			postgis_settings.asynchronous_request 	= true;
 			postgis_settings.max_async_connection 	= 10;
-
-			console.log('\n\n\n EXTENT________________');
-			console.log('postgis_settings.extent:', postgis_settings.extent);
-			console.log('bbox:', bbox);
 
 			if ( storedLayer.options.data_type == 'raster' ) {
 
@@ -1120,8 +1103,6 @@ module.exports = pile = {
 				postgis_settings.table 	= storedLayer.options.sql;
 			}
 
-			// https://github.com/mapnik/node-mapnik/blob/ea012648beb476aafc747732e955027c99212c4c/src/mapnik_datasource.cpp#L72
-			
 
 			// everything in spherical mercator (3857)!
 			try {  	
@@ -1192,7 +1173,6 @@ module.exports = pile = {
 			callback(null, xml);
 
 		} catch (e) {
-			console.log('css:', css);
 			var err = { message : 'CartoCSS rendering failed: ' + e.toString() }
 			callback(err);
 		}
@@ -1258,8 +1238,6 @@ module.exports = pile = {
 
 	setUploadStatus : function (options, done) {
 		pile.POST(pile.routes.base + pile.routes.upload_status, options, function (err, json) {
-			console.log('setUploadStatus ---> done!', err, json, typeof json);
-			// var result = tools.safeParse(json);
 			done(err, json);
 		});
 	},

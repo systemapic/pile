@@ -107,7 +107,6 @@ module.exports = util = {
     },
 
     ensure_test_user_exists: function (done) {
-        console.log('ensure_test_user_exists', endpoints.users.create, testData.test_user);
         api.post(endpoints.users.create)
         .send(testData.test_user)
         .end(function (err, res) {
@@ -116,8 +115,6 @@ module.exports = util = {
             if ( res.status == 200 ) {
               assert.ok(user);
               assert.ok(user.uuid);
-              // assert.equal(user.uuid, testData.test_user.uuid);
-              // assert.equal(user.firstName, testData.test_user.firstName);
             } else if ( res.status == 400 ) {
               assert.ok(user);
               assert.ok(user.error);
