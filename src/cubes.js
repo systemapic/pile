@@ -222,6 +222,7 @@ module.exports = cubes = {
         },
 
 
+        // cube tile requests
         tile : function (req, res) {
                 var options = cubes.getBody(req);
                 var access_token = req.query.access_token;
@@ -246,7 +247,7 @@ module.exports = cubes = {
                 // run ops
                 async.parallel(ops, function (err, results) {
                         if (err) return res.status(400).end(err.message);
-                        
+
                         // create tile
                         // TODO: get from disk if already created
                         cubes.createTile({
