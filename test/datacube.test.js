@@ -23,7 +23,7 @@ var config = require(process.env.WU_CONFIG_PATH || '/systemapic/config/wu-config
 
 // logs
 var debugMode = process.env.SYSTEMAPIC_DEBUG;
-var debugMode = true; // override
+// var debugMode = true; // override
 
 var tmp = {};
 
@@ -96,6 +96,8 @@ describe('Datacube', function () {
     // TODO:
     // - add error handling/tests
     // - tiles for different styles, qualities
+    // - add cube to project [wu]
+    // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
 
     it('should create empty cube @ ' + endpoints.cube.create, function (done) {
         token(function (err, access_token) {
