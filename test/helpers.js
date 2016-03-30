@@ -28,8 +28,10 @@ module.exports = util = {
     get_access_token : function (done) {
         api.get(endpoints.users.token.token)
             .query({
-                username : testData.test_user.username,
-                password : testData.test_user.password
+                // username : testData.test_user.username,
+                // password : testData.test_user.password
+                username : 'knutole@systemapic.com',
+                password : 'o1bbxb1q'
             })
             .send()
             .end(function (err, res) {
