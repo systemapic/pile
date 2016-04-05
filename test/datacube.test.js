@@ -51,7 +51,8 @@ function get_default_cartocss() {
     // white to blue
     defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
     defaultCartocss += '  stop(21, #dddddd) '; 
-    defaultCartocss += '  stop(200, #0078ff) '; 
+    defaultCartocss += '  stop(100, #0078ff) '; 
+    defaultCartocss += '  stop(200, #000E56) '; 
     defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
     defaultCartocss += ' }';
     return defaultCartocss;
@@ -907,7 +908,7 @@ describe('Datacube', function () {
                     projectUuid : 'project-7f2a0ae6-cb30-488a-8fcc-7a2e33e1edcf', // pass to automatically attach to project
                     data : { cube : tmp.snow_raster_cube },
                     metadata : tmp[datasets[0]].metadata,
-                    title : 'Snow raster cube',
+                    title : 'Snow raster cube 2',
                     description : 'cube layer description',
                     file : 'file-' + tmp.snow_raster_cube.cube_id,
                     style : JSON.stringify(get_default_cartocss()) // save default json style
