@@ -195,6 +195,9 @@ module.exports = cubes = {
 
                 var ops = [];
 
+                // remove access token
+                delete options.access_token;
+
                 // get cube
                 ops.push(function (callback) {
                         cubes.find(cube_id, callback);
