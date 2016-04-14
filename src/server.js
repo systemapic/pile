@@ -62,10 +62,10 @@ module.exports = function (pile) {
 		pile.vectorizeDataset(req, res);
 	});
 
-	// update layer
-	app.post('/v2/tiles/update', pile.checkAccess, function (req, res) {
-		pile.updateLayer(req, res);
-	});
+	// // update layer
+	// app.post('/v2/tiles/update', pile.checkAccess, function (req, res) {
+	// 	pile.updateLayer(req, res);
+	// });
 
 	// get layer
 	app.get('/v2/tiles/layer', pile.checkAccess, function (req, res) {

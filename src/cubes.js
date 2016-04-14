@@ -1,5 +1,7 @@
 // dependencies
 var _ = require('lodash');
+var pg = require('pg');
+var gm = require('gm');
 var fs = require('fs-extra');
 var kue = require('kue');
 var path = require('path');
@@ -11,28 +13,22 @@ var carto = require('carto');
 var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
-var numCPUs = require('os').cpus().length;
 var mongoose = require('mongoose');
 var request = require('request');
+var numCPUs = require('os').cpus().length;
 var exec = require('child_process').exec;
-var pg = require('pg');
-var gm = require('gm');
 var sanitize = require("sanitize-filename");
 var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
 // modules
 var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
-// var server = require('./server');
 var store  = require('./store');
-// var proxy = require('./proxy');
 var tools = require('./tools');
-// var queries = require('./queries');
 
 // register mapnik plugins
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
-
 
 // global paths (todo: move to config)
 var VECTORPATH = '/data/vector_tiles/';
@@ -41,15 +37,12 @@ var CUBEPATH   = '/data/cube_tiles/';
 var GRIDPATH   = '/data/grid_tiles/';
 var PROXYPATH  = '/data/proxy_tiles/';
 
-
-
+// postgis conn
 var pgsql_options = {
         dbhost: 'postgis',
         dbuser: process.env.SYSTEMAPIC_PGSQL_USERNAME || 'docker',
         dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
 };
-
-
 
 module.exports = cubes = { 
 
@@ -79,7 +72,6 @@ module.exports = cubes = {
                         res.send(cube);
                 });
         },
-
 
         get : function (req, res) {
                 
@@ -137,7 +129,6 @@ module.exports = cubes = {
                         // return updated cube
                         res.send(updated_cube);
                 });
-
         },
 
         remove : function (req, res) {
@@ -179,9 +170,7 @@ module.exports = cubes = {
                         // return updated cube
                         res.send(updated_cube);
                 });
-
         },
-
 
         update : function (req, res) {
 
@@ -212,6 +201,8 @@ module.exports = cubes = {
                         // update timestamp
                         updated_cube.timestamp = new Date().getTime();
 
+                        console.log('updated_cube: ', updated_cube);
+
                         // save
                         cubes.save(updated_cube, callback);
                 });
@@ -223,9 +214,7 @@ module.exports = cubes = {
                         // return updated cube
                         res.send(updated_cube);
                 });
-
         },
-
 
         // cube tile requests
         tile : function (req, res) {
@@ -270,12 +259,9 @@ module.exports = cubes = {
                                 res.end(tile);
                         });
                 });
-
         },
 
-
         createTile : function (options, done) {
-
                 var dataset = options.dataset;
                 var cube = options.cube;
                 var coords = options.coords;
@@ -284,7 +270,6 @@ module.exports = cubes = {
                 var postgis;
                 var bbox;
                 var ops = [];
-
 
                 // define settings, xml
                 ops.push(function (callback) {
@@ -307,15 +292,14 @@ module.exports = cubes = {
                         bbox = mercator.xyz_to_envelope(parseInt(coords.x), parseInt(coords.y), parseInt(coords.z), false);
 
                         // insert layer settings 
-                        var postgis_settings                    = default_postgis_settings;
-                        postgis_settings.dbname                 = dataset.database_name;
-                        postgis_settings.asynchronous_request   = true;
-                        postgis_settings.max_async_connection   = 10;
+                        var postgis_settings = default_postgis_settings;
+                        postgis_settings.dbname = dataset.database_name;
+                        postgis_settings.asynchronous_request = true;
+                        postgis_settings.max_async_connection = 10;
                         postgis_settings.geometry_field = 'rast';
-                        postgis_settings.table  = dataset.table_name;
-                        postgis_settings.band   = 1;
+                        postgis_settings.table = dataset.table_name;
+                        postgis_settings.band = 1;
                         postgis_settings.type = 'pgraster';
-
 
                         try {   
                                 map     = new mapnik.Map(256, 256, mercator.proj4);
@@ -413,9 +397,6 @@ module.exports = cubes = {
                 });
         },
 
-
-
-
         // set to redis
         save : function (cube, done) {
                 store.layers.set(cube.cube_id, JSON.stringify(cube), function (err) {
@@ -453,20 +434,6 @@ module.exports = cubes = {
                         return false;
                 };
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 }
