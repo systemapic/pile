@@ -223,7 +223,7 @@ module.exports = cubes = {
                 var cube_request = cubes.getCubeRequest(req);
                 var ops = {};
 
-                if (!cube_request) return res.end(); // todo: error tile
+                if (!cube_request) return pile.serveErrorTile(res);
 
                 // find dataset
                 ops.dataset = function (callback) {
@@ -242,22 +242,60 @@ module.exports = cubes = {
                 async.parallel(ops, function (err, results) {
                         if (err) return res.status(400).end(err.message);
 
-                        // create tile
-                        // TODO: get from disk if already created
-                        cubes.createTile({
+                        // // create tile
+                        // // TODO: get from disk if already created
+                        // cubes.createTile({
+                        //         dataset : results.dataset,
+                        //         cube : results.cube,
+                        //         coords : {                                
+                        //                 z : cube_request.z,
+                        //                 x : cube_request.x,
+                        //                 y : cube_request.y
+                        //         }
+                        // }, function (err, tile) {
+                        //         if (err) return pile.serveErrorTile(res);
+
+                        //         // return tile to client
+                        //         res.writeHead(200, {'Content-Type': pile.headers['png']});
+                        //         res.end(tile);
+                        // });
+                        var cube = results.cube;
+                        var dataset = results.dataset;
+                        var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
+                        var tilePath = CUBEPATH + keyString;
+
+                        var options = {
                                 dataset : results.dataset,
                                 cube : results.cube,
                                 coords : {                                
                                         z : cube_request.z,
                                         x : cube_request.x,
                                         y : cube_request.y
-                                }
-                        }, function (err, tile) {
+                                }, 
+                                tilePath : tilePath
+                        };
 
-                                // return tile to client
-                                res.writeHead(200, {'Content-Type': pile.headers['png']});
-                                res.end(tile);
+                        // create tile job
+                        var jobs = pile.getJobs();
+                        var job = jobs.create('cube_tile', { 
+                                options : options,
+                        }).priority('high').attempts(5).save();
+
+                        // proxy tile job done
+                        job.on('complete', function (result) {
+
+                                // serve proxy tile
+                                cubes.serveTile(res, tilePath);
                         });
+                });
+        },
+
+        serveTile : function (res, tilePath) {
+
+                // read from disk
+                fs.readFile(tilePath, function (err, tile_buffer) {
+                        res.writeHead(200, {'Content-Type': pile.headers['png']});
+                        res.end(tile_buffer);
                 });
         },
 
@@ -265,11 +303,13 @@ module.exports = cubes = {
                 var dataset = options.dataset;
                 var cube = options.cube;
                 var coords = options.coords;
+                var tilePath = options.tilePath;
                 var map;
                 var layer;
                 var postgis;
                 var bbox;
                 var ops = [];
+
 
                 // define settings, xml
                 ops.push(function (callback) {
@@ -332,6 +372,8 @@ module.exports = cubes = {
 
                         var css = cube.style;
 
+                        console.log('css:', css);
+
                         if (!css) {
                                 console.error( 'cartoRenderer called with undefined or empty css' );
                                 css = "#layer {}";
@@ -365,7 +407,7 @@ module.exports = cubes = {
                 ops.push(function (map, callback) {
 
                         // debug write xml
-                        if (1) pile._debugXML(cube.cube_id, map.toXML());
+                        if (0) pile._debugXML(cube.cube_id, map.toXML());
 
                         // map options
                         var map_options = {
@@ -382,18 +424,20 @@ module.exports = cubes = {
                 ops.push(function (tile, callback) {
 
                         // save to disk
-                        var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + coords.z + ':' + coords.x + ':' + coords.y + '.png';
-                        var path = CUBEPATH + keyString;
+                        // var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + coords.z + ':' + coords.x + ':' + coords.y + '.png';
+                        // var path = CUBEPATH + keyString;
                         tile.encode(cube.quality || 'png8', function (err, buffer) {
-                                fs.outputFile(path, buffer, function (err) {
-                                        callback(null, buffer);
+                                fs.outputFile(tilePath, buffer, function (err) {
+                                        console.log('wrote cube tile to', tilePath);
+                                        // callback(null, buffer);
+                                        callback(null, tilePath);
                                 });
                         });
                 });
 
                 // run ops
-                async.waterfall(ops, function (err, tile_buffer) {
-                        done(err, tile_buffer);
+                async.waterfall(ops, function (err, tilePath) {
+                        done(err, tilePath);
                 });
         },
 
