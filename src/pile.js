@@ -72,6 +72,10 @@ module.exports = pile = {
 
 	proxyProviders : ['google', 'norkart'],
 
+	getJobs : function () {
+		return jobs;
+	},
+
 	// entry point for GET /v2/tiles/*
 	getTileEntryPoint : function (req, res) {
 
@@ -931,7 +935,7 @@ module.exports = pile = {
 
 			
 			// debug write xml
-			if (1) pile._debugXML(params.layerUuid, map.toXML());
+			if (0) pile._debugXML(params.layerUuid, map.toXML());
 
 			// map options
 			var map_options = {
@@ -1050,6 +1054,8 @@ module.exports = pile = {
 
 			// set bounding box
 			bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
+
+			console.log('bbox: ', bbox, params);
 
 			// insert layer settings 
 			var postgis_settings 			= default_postgis_settings;
@@ -1339,7 +1345,7 @@ if (cluster.isMaster) {
 	});
 
 	// render raster job
-	jobs.process('render_raster_tile', 3, function (job, done) {
+	jobs.process('render_raster_tile', 1, function (job, done) {
 		var params = job.data.params;
 
 		// render
@@ -1368,12 +1374,25 @@ if (cluster.isMaster) {
 
 
 	// proxy tiles
-	jobs.process('proxy_tile', 100, function (job, done) {
+	jobs.process('proxy_tile', 10, function (job, done) {
 		var options = job.data.options;
 		proxy._serveTile(options, function (err) {
 			if (err) console.error({
 				err_id : 11,
 				err_msg : 'proxy tile job',
+				error : err
+			});
+			done();
+		});
+	});
+
+	// cube tiles
+	jobs.process('cube_tile', 1, function (job, done) {
+		var options = job.data.options;
+		cubes.createTile(options, function (err) {
+			if (err) console.error({
+				err_id : 12,
+				err_msg : 'cube tile job',
 				error : err
 			});
 			done();
