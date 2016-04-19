@@ -11,7 +11,8 @@ mapnik.register_default_input_plugins();
 var dbuser = 'systemapic';
 var dbpass = 'docker'
 var dbname = 'vkztdvcqkm';
-var tablename = 'snowraster';
+// var tablename = 'snowraster';
+var tablename = 'snowo';
 
 // get tile coords
 var tile = "16/34025/19345";
@@ -35,7 +36,9 @@ var postgis_settings = {
         type            : 'pgraster',
         geometry_field  : 'rast',
         max_async_connection : 10,
-        dbname : dbname,
+        dbname          : dbname,
+        clip_rasters    : 'true',
+        prescale_rasters : 'true'
 }
 
 // create map, layer, datasource
