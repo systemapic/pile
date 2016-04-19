@@ -75,11 +75,11 @@ module.exports = cubes = {
         
         // get options
         var options = cubes.getBody(req);
-        if (!options) return res.status(400).send({error : 'Please provide a dataset uuid'})
+        if (!options) return res.status(400).send({error : 'Please provide a dataset id'})
         
         // get uuid
         var cube_id = options.cube_id;
-        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset uuid'})
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id'})
 
         // get cube
         cubes.find(cube_id, function (err, cube) {
@@ -92,15 +92,17 @@ module.exports = cubes = {
 
         // get options
         var options = cubes.getBody(req);
-        if (!options) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 1});
+        if (!options) return res.status(400).send({error : 'Please provide a dataset id', error_code : 1});
 
         // get cube_id
         var cube_id = options.cube_id;
-        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 2});
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
 
         // get datasets
         var datasets = options.datasets;
-        if (!datasets.length) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 3});
+        if (!datasets.length) return res.status(400).send({error : 'Please provide datasets', error_code : 3});
+
+        // todo: verify correct format of datasets. add test.
 
         var ops = [];
 
@@ -133,15 +135,15 @@ module.exports = cubes = {
 
         // get options
         var options = cubes.getBody(req);
-        if (!options) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 1});
+        if (!options) return res.status(400).send({error : 'Please provide a dataset id', error_code : 1});
 
         // get cube_id
         var cube_id = options.cube_id;
-        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 2});
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
 
         // get datasets
         var datasets = options.datasets;
-        if (!datasets.length) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 3});
+        if (!datasets.length) return res.status(400).send({error : 'Please provide a dataset id', error_code : 3});
 
         var ops = [];
 
@@ -154,7 +156,7 @@ module.exports = cubes = {
 
             // remove datasets from array
             datasets.forEach(function (d) {
-                _.remove(cube.datasets, {uuid : d.uuid});
+                _.remove(cube.datasets, {dataset : d.dataset});
             });
 
             // save
@@ -174,11 +176,11 @@ module.exports = cubes = {
 
         // get options
         var options = cubes.getBody(req);
-        if (!options) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 1});
+        if (!options) return res.status(400).send({error : 'Please provide a dataset id', error_code : 1});
 
         // get cube_id
         var cube_id = options.cube_id;
-        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset uuid', error_code : 2});
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
 
         var ops = [];
 
@@ -255,8 +257,7 @@ module.exports = cubes = {
             };
 
             // create tile job
-            var jobs = pile.getJobs();
-            var job = jobs.create('cube_tile', { 
+            var job = pile.jobs().create('cube_tile', { 
                 options : options,
             }).priority('high').attempts(5).save();
 
@@ -417,13 +418,13 @@ module.exports = cubes = {
         });
     },
 
-    // set to redis
+    // save cube to redis
     save : function (cube, done) {
         store.layers.set(cube.cube_id, JSON.stringify(cube), function (err) {
             done(err, cube);
         });
     },      
-    // get from redis
+    // get cube from redis
     find : function (cube_id, done) {
         store.layers.get(cube_id, function (err, cubeJSON) {
             if (err) return done(err);
