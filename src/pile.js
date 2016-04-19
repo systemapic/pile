@@ -72,7 +72,7 @@ module.exports = pile = {
 
     proxyProviders : ['google', 'norkart'],
 
-    getJobs : function () {
+    jobs : function () {
         return jobs;
     },
 
@@ -540,76 +540,58 @@ module.exports = pile = {
             interactivity: '',
             attributes: '',
             cartocss_version: '2.0.1',
-            // cartocss: '@point_opacity: 1;\n@marker_size_factor: 2;\n[zoom<10] { marker-width: 0.2 * @marker_size_factor; }\n[zoom=10] { marker-width: 0.3 * @marker_size_factor; }\n[zoom=11] { marker-width: 0.5 * @marker_size_factor; }\n[zoom=12] { marker-width: 1   * @marker_size_factor; }\n[zoom=13] { marker-width: 1   * @marker_size_factor; }\n[zoom=14] { marker-width: 2   * @marker_size_factor; }\n[zoom=15] { marker-width: 4   * @marker_size_factor; }\n[zoom=16] { marker-width: 6   * @marker_size_factor; }\n[zoom=17] { marker-width: 8   * @marker_size_factor; }\n[zoom>=18] { marker-width: 12  * @marker_size_factor; }\n\n#layer {\n\n\tmarker-allow-overlap: true;\n\tmarker-clip: false;\n\tmarker-comp-op: screen;\n\n\tmarker-opacity: @point_opacity;\n\n\tmarker-fill: #12411d;\n\n}',
-            // sql: '(SELECT * FROM file_incluvknxcojauozeucv \nwhere coherence > 0.8\nand coherence < 1) as sub',
-            // file_id: 'file_incluvknxcojauozeucv',
             return_model: true,
-            // layerUuid: 'layer-4d2ad916-a9e5-4e01-8b9c-dd8e21ae3c57' 
         }
 
 
-        var upload_status   = options.upload_status;
-        var requested_layer     = options.requested_layer; // previously opts.options
-        var file_id         = requested_layer.file_id;
-        var sql         = requested_layer.sql;
-        var cartocss        = requested_layer.cartocss;
-        var cartocss_version    = requested_layer.cartocss_version;
-        var geom_column     = requested_layer.geom_column;
-        var geom_type       = requested_layer.geom_type;
-        var raster_band     = requested_layer.raster_band;
-        var srid        = requested_layer.srid;
-        var affected_tables     = requested_layer.affected_tables;
-        var interactivity   = requested_layer.interactivity;
-        var attributes      = requested_layer.attributes;
-        var access_token    = requested_layer.access_token;
-        var ops         = [];
-
-
-        // 
+        var upload_status = options.upload_status;
+        var requested_layer = options.requested_layer; // previously opts.options
+        var file_id = requested_layer.file_id;
+        var sql = requested_layer.sql;
+        var cartocss = requested_layer.cartocss;
+        var cartocss_version = requested_layer.cartocss_version;
+        var geom_column = requested_layer.geom_column;
+        var geom_type = requested_layer.geom_type;
+        var raster_band = requested_layer.raster_band;
+        var srid = requested_layer.srid;
+        var affected_tables = requested_layer.affected_tables;
+        var interactivity = requested_layer.interactivity;
+        var attributes = requested_layer.attributes;
+        var access_token = requested_layer.access_token;
         var data_type = requested_layer.data_type || upload_status.data_type;
+        var ops = [];
+
+       
         if (data_type == 'raster') {
 
             console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
-            console.log('default cartocss', cartocss);
+            console.log('cartocss', cartocss);
             console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
 
             // raster debug
             var defaultCartocss = '';
-            // defaultCartocss = 'Map { background-color: red;} '
             defaultCartocss += '#layer {'
-            // defaultCartocss += ''; 
             defaultCartocss += 'raster-opacity: 1; '; 
             // defaultCartocss += 'raster-scaling: gaussian; '; 
             defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
             defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
-            // defaultCartocss += 'raster-colorizer-default-color: red; '; 
-            // defaultCartocss += 'raster-colorizer-epsilon: 0.0000000000000000000000001; '; 
             defaultCartocss += 'raster-colorizer-stops: '; 
-
-            // // black and white
-            // defaultCartocss += '  stop(0, black) '; 
-            // defaultCartocss += '  stop(254, white) '; 
-            // defaultCartocss += '  stop(255, yellow); '; 
             
-            // // white to blue
+            // white to blue
             defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
             defaultCartocss += '  stop(21, #dddddd) '; 
-            // defaultCartocss += '  stop(100, #cccccc) '; 
-            // defaultCartocss += '  stop(150, #0085ff) '; 
             defaultCartocss += '  stop(200, #0078ff) '; 
-            // defaultCartocss += '  stop(240, yellow) '; 
             defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
             defaultCartocss += 'raster-comp-op: color-dodge;';
             defaultCartocss += ' }';
             
+            // set cartocss
             cartocss = cartocss || defaultCartocss; 
         }
 
-    
-
         // ensure mandatory fields
-        if (!sql)   return done(new Error('Please provide a SQL statement.'))
-        if (!cartocss)  return done(new Error('Please provide CartoCSS.'))
+        if (!sql) return done(new Error('Please provide a SQL statement.'))
+        if (!cartocss) return done(new Error('Please provide CartoCSS.'))
 
         ops.push(function (callback) {
 
@@ -624,21 +606,21 @@ module.exports = pile = {
                 options : {         
                     
                     // required
-                    layer_id     : layer_id,
-                    sql          : done_sql,
-                    cartocss     : cartocss,
-                    file_id      : file_id,     
+                    layer_id         : layer_id,
+                    sql              : done_sql,
+                    cartocss         : cartocss,
+                    file_id          : file_id,     
                     database_name    : upload_status.database_name, 
-                    table_name   : requested_layer.table_name || upload_status.table_name, 
-                    metadata     : upload_status.metadata,
-                    data_type    : requested_layer.data_type || upload_status.data_type || 'vector',
+                    table_name       : requested_layer.table_name || upload_status.table_name, 
+                    metadata         : upload_status.metadata,
+                    data_type        : requested_layer.data_type || upload_status.data_type || 'vector',
 
-                    // optional             // defaults
-                    cartocss_version : cartocss_version     || '2.0.1',
+                    // optional                             // defaults
                     geom_column      : geom_column      || 'the_geom_3857',
-                    geom_type    : geom_type        || 'geometry',
+                    geom_type        : geom_type        || 'geometry',
                     raster_band      : raster_band      || 0,
-                    srid         : srid         || 3857,
+                    srid             : srid             || 3857,
+                    cartocss_version : cartocss_version || '2.0.1',
                 }
             }
 
@@ -814,12 +796,12 @@ module.exports = pile = {
         var bbox;
 
         // check params
-        if (!params)           return done('Invalid url: Missing params.');
-        if (!params.layerUuid)     return done('Invalid url: Missing layerUuid.');
-        if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
-        if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
-        if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
-        if (!params.type)      return done('Invalid url: Missing type extension.');
+        if (!params)                return done('Invalid url: Missing params.');
+        if (!params.layerUuid)      return done('Invalid url: Missing layerUuid.');
+        if (params.z == undefined)  return done('Invalid url: Missing tile coordinates. z', params.z);
+        if (params.x == undefined)  return done('Invalid url: Missing tile coordinates. x', params.x);
+        if (params.y == undefined)  return done('Invalid url: Missing tile coordinates. y', params.y);
+        if (!params.type)           return done('Invalid url: Missing type extension.');
 
 
         // look for stored layerUuid
@@ -934,7 +916,7 @@ module.exports = pile = {
             if (!map) return done(new Error('no map 7474'));
 
             // debug write xml
-            if (1) pile._debugXML(params.layerUuid, map.toXML());
+            if (0) pile._debugXML(params.layerUuid, map.toXML());
 
             // map options
             var map_options = {
@@ -1028,7 +1010,7 @@ module.exports = pile = {
         if (params.z == undefined) return done('Invalid url: Missing tile coordinates. z', params.z);
         if (params.x == undefined) return done('Invalid url: Missing tile coordinates. x', params.x);
         if (params.y == undefined) return done('Invalid url: Missing tile coordinates. y', params.y);
-        if (!params.type)      return done('Invalid url: Missing type extension.');
+        if (!params.type)          return done('Invalid url: Missing type extension.');
 
 
         // look for stored layerUuid
@@ -1065,18 +1047,11 @@ module.exports = pile = {
 
             if ( storedLayer.options.data_type == 'raster' ) {
 
-
-                // debug: attempt at implementing RasterColorizer
-                // https://github.com/systemapic/pile/issues/41
+                // attempt at implementing RasterColorizer
                 postgis_settings.type = 'pgraster';
-                // clip_rasters is to avoid sending unneeded data
-                // over the wires
                 postgis_settings.clip_rasters = 'true';
                 // postgis_settings.preunion_rasters = 'true';
                 postgis_settings.use_overviews = 'true';
-                // prescale_rasters is needed to both reduce traffic
-                // and align tiles,
-                // see http://github.com/mapnik/mapnik/issues/2375
                 postgis_settings.prescale_rasters = 'true';
                 postgis_settings.geometry_field = 'rast';
                 postgis_settings.table = storedLayer.options.file_id;
@@ -1087,7 +1062,6 @@ module.exports = pile = {
                 postgis_settings.geometry_field = 'the_geom_3857';
                 postgis_settings.table  = storedLayer.options.sql;
             }
-
 
             // everything in spherical mercator (3857)!
             try {   
@@ -1133,6 +1107,10 @@ module.exports = pile = {
 
         var css = storedLayer.options.cartocss;
 
+        // console.log('\n\n\n\n\n\n\n\n\n\n\n');
+        // console.log('================== carto renderer ======================');
+        // console.log('css: ', css);
+
         if (!css) {
             console.error( 'cartoRenderer called with undefined or empty css' );
             css = "#layer {}";
@@ -1155,6 +1133,7 @@ module.exports = pile = {
         try  {
             // carto renderer
             var xml = new carto.Renderer().render(options);
+            // console.log('xml:', xml);
             callback(null, xml);
 
         } catch (e) {
