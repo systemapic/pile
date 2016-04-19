@@ -1055,13 +1055,13 @@ module.exports = pile = {
             bbox = mercator.xyz_to_envelope(parseInt(params.x), parseInt(params.y), parseInt(params.z), false);
 
             // insert layer settings 
-            var postgis_settings            = default_postgis_settings;
-            postgis_settings.dbname         = storedLayer.options.database_name;
-            postgis_settings.extent         = storedLayer.options.extent;
-            postgis_settings.geometry_field     = storedLayer.options.geom_column;
-            postgis_settings.srid           = storedLayer.options.srid;
-            postgis_settings.asynchronous_request   = true;
-            postgis_settings.max_async_connection   = 10;
+            var postgis_settings = default_postgis_settings;
+            postgis_settings.dbname = storedLayer.options.database_name;
+            postgis_settings.extent = storedLayer.options.extent;
+            postgis_settings.geometry_field = storedLayer.options.geom_column;
+            postgis_settings.srid = storedLayer.options.srid;
+            postgis_settings.asynchronous_request = true;
+            postgis_settings.max_async_connection = 10;
 
             if ( storedLayer.options.data_type == 'raster' ) {
 
