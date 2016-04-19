@@ -156,7 +156,7 @@ module.exports = cubes = {
 
             // remove datasets from array
             datasets.forEach(function (d) {
-                _.remove(cube.datasets, {dataset : d.dataset});
+                _.remove(cube.datasets, {id : d.id});
             });
 
             // save
@@ -223,6 +223,8 @@ module.exports = cubes = {
 
         if (!cube_request) return pile.serveErrorTile(res);
 
+        console.log('cube_request -->', cube_request);
+
         // find dataset
         ops.dataset = function (callback) {
             pile.getUploadStatus({
@@ -246,8 +248,8 @@ module.exports = cubes = {
             var tilePath = CUBEPATH + keyString;
 
             var options = {
-                dataset : results.dataset,
-                cube : results.cube,
+                dataset : dataset,
+                cube : cube,
                 coords : {                                
                     z : cube_request.z,
                     x : cube_request.x,
@@ -255,6 +257,8 @@ module.exports = cubes = {
                 }, 
                 tilePath : tilePath
             };
+
+            console.log('options ---> ', options);
 
             // create tile job
             var job = pile.jobs().create('cube_tile', { 
