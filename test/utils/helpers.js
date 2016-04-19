@@ -32,7 +32,7 @@ module.exports = util = {
             .query({
                 // username : testData.test_user.username,
                 // password : testData.test_user.password
-                username : 'knutole@systemapic.com',
+                username : 'jorgen@systemapic.com',
                 password : '***REMOVED***'
             })
             .send()
