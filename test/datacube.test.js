@@ -792,6 +792,7 @@ describe('Cubes', function () {
             });
         });
 
+        
 
         it('should throw on invalid mask @ ' + endpoints.cube.mask, function (done) {
             token(function (err, access_token) {
