@@ -11,19 +11,20 @@ mapnik.register_default_input_plugins();
 var dbuser = 'systemapic';
 var dbpass = 'docker'
 var dbname = 'vkztdvcqkm';
-var tablename = 'snowraster';
+// var tablename = 'snowraster';
+var tablename = 'snowo';
 // var tablename = 'insar2';
 
 var tiles = [
     '16/34025/19345',
-    // '16/34021/19345',
-    // '16/34025/19342',
-    // '16/34021/19342',
-    // '16/34021/19344',
-    // '16/34021/19343',
-    // '16/34025/19343',
-    // '16/34025/19344',
-    // '16/34024/19345',
+    '16/34021/19345',
+    '16/34025/19342',
+    '16/34021/19342',
+    '16/34021/19344',
+    '16/34021/19343',
+    '16/34025/19343',
+    '16/34025/19344',
+    '16/34024/19345',
     // '16/34022/19345',
     // '16/34024/19342',
     // '16/34022/19342',
@@ -49,7 +50,7 @@ async.eachSeries(tiles, function (tiles, each_done) {
     }
 
     // set tile output path
-    var tilePath = 'tmp/snow-raster-error-test-' + coords.x + '-' + coords.y + '-' + coords.z + '.png';
+    var tilePath = 'tmp/' + tablename + '-raster-error-test-' + coords.x + '-' + coords.y + '-' + coords.z + '.png';
 
     var postgis_settings = {
             user            : dbuser,
@@ -60,8 +61,11 @@ async.eachSeries(tiles, function (tiles, each_done) {
             band            : 1,
             type            : 'pgraster',
             geometry_field  : 'rast',
+            dbname          : dbname,
+            clip_raster     : true,
+            prescale_raster : true,
+            use_overviews   : true,
             max_async_connection : 10,
-            dbname : dbname,
     }
 
     // create map, layer, datasource
@@ -114,12 +118,15 @@ async.eachSeries(tiles, function (tiles, each_done) {
         var im = new mapnik.Image(256, 256);
 
         // render
+        console.time('render');
         map.render(im, map_options, function (err, tile) {
+            console.timeEnd('render');
 
              // encode tile
             tile.encode('png8', function (err, buffer) {
                 if (err) console.log('tile.encode err:', err);
 
+                console.log('tilePath', tilePath);
                 // save to disk
                 fs.outputFile(tilePath, buffer, each_done);
             });

@@ -1076,12 +1076,13 @@ module.exports = pile = {
 					postgis_settings.type = 'pgraster';
 	        			// clip_rasters is to avoid sending unneeded data
 	        			// over the wires
-					// postgis_settings.clip_rasters = 'true';
+					postgis_settings.clip_rasters = 'true';
 					// postgis_settings.preunion_rasters = 'true';
+					postgis_settings.use_overviews = 'true';
 	        			// prescale_rasters is needed to both reduce traffic
 	        			// and align tiles,
 	        			// see http://github.com/mapnik/mapnik/issues/2375
-					// postgis_settings.prescale_rasters = 'true';
+					postgis_settings.prescale_rasters = 'true';
 					postgis_settings.geometry_field = 'rast';
 					postgis_settings.table 	= storedLayer.options.file_id;
 					postgis_settings.band 	= 1;
