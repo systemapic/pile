@@ -340,6 +340,9 @@ module.exports = cubes = {
                         postgis_settings.table = dataset.table_name;
                         postgis_settings.band = 1;
                         postgis_settings.type = 'pgraster';
+                        postgis_settings.use_overviews = 'true';
+                        postgis_settings.clip_rasters = 'true';
+                        postgis_settings.prescale_rasters = 'true';
 
                         try {   
                                 map     = new mapnik.Map(256, 256, mercator.proj4);
