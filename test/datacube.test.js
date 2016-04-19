@@ -184,12 +184,12 @@ describe('Cubes', function () {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
                     datasets : [{
-                        dataset : 'random-uuid-1',
+                        id : 'random-uuid-1',
                         description : 'meta text',
                         timestamp : 'date as string'
                     },
                     {
-                        dataset : 'random-uuid-2',
+                        id : 'random-uuid-2',
                         description : 'meta text',
                         timestamp : 'date as string'
                     }]
@@ -206,7 +206,7 @@ describe('Cubes', function () {
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     expect(cube.datasets).to.have.lengthOf(2);
-                    expect(cube.datasets[0].dataset).to.equal(data.datasets[0].dataset);
+                    expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
                     expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
                     expect(cube.datasets[0].timestamp).to.equal(data.datasets[0].timestamp);
                     done();
@@ -222,10 +222,10 @@ describe('Cubes', function () {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
                     datasets : [{
-                        dataset : 'random-uuid-1',
+                        id : 'random-uuid-1',
                     },
                     {
-                        dataset : 'random-uuid-2',
+                        id : 'random-uuid-2',
                     }]
                 }
 
@@ -325,7 +325,7 @@ describe('Cubes', function () {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
                     datasets : [{
-                        dataset : tmp.uploaded_raster.file_id,
+                        id : tmp.uploaded_raster.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster.filename,
                         timestamp : new Date().toString()
                     }]
@@ -342,7 +342,7 @@ describe('Cubes', function () {
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     expect(cube.datasets).to.have.lengthOf(1);
-                    expect(cube.datasets[0].dataset).to.equal(data.datasets[0].dataset);
+                    expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
                     expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
                     expect(cube.datasets[0].timestamp).to.equal(data.datasets[0].timestamp);
                     done();
@@ -358,7 +358,7 @@ describe('Cubes', function () {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
                     datasets : [{
-                        dataset : tmp.uploaded_raster_2.file_id,
+                        id : tmp.uploaded_raster_2.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster_2.filename,
                         timestamp : new Date().toString()
                     }]
@@ -375,7 +375,7 @@ describe('Cubes', function () {
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     expect(cube.datasets).to.have.lengthOf(2);
-                    expect(cube.datasets[1].dataset).to.equal(data.datasets[0].dataset);
+                    expect(cube.datasets[1].id).to.equal(data.datasets[0].id);
                     expect(cube.datasets[1].description).to.equal(data.datasets[0].description);
                     expect(cube.datasets[1].timestamp).to.equal(data.datasets[0].timestamp);
                     done();
@@ -503,8 +503,8 @@ describe('Cubes', function () {
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     expect(cube.datasets).to.have.lengthOf(2);
-                    expect(cube.datasets[0].dataset).to.equal(tmp.uploaded_raster.file_id);
-                    expect(cube.datasets[1].dataset).to.equal(tmp.uploaded_raster_2.file_id);
+                    expect(cube.datasets[0].id).to.equal(tmp.uploaded_raster.file_id);
+                    expect(cube.datasets[1].id).to.equal(tmp.uploaded_raster_2.file_id);
 
                     tmp.cube_with_datasets = cube;
                     done();
@@ -537,8 +537,8 @@ describe('Cubes', function () {
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     expect(cube.datasets).to.have.lengthOf(2);
-                    expect(cube.datasets[0].dataset).to.equal(tmp.uploaded_raster.file_id);
-                    expect(cube.datasets[1].dataset).to.equal(tmp.uploaded_raster_2.file_id);
+                    expect(cube.datasets[0].id).to.equal(tmp.uploaded_raster.file_id);
+                    expect(cube.datasets[1].id).to.equal(tmp.uploaded_raster_2.file_id);
                     done();
                 });
             });
