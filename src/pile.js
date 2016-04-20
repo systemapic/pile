@@ -1269,7 +1269,7 @@ if (cluster.isMaster) {
     server(pile);
 
     console.log('Clusters: ' + numCPUs);
-    for (var i = 0; i < numCPUs - 2; i++) {  // 6 cpus
+    for (var i = 0; i < numCPUs - 1; i++) {  // 7 or 11 cpus
         // fork workers
         cluster.fork(); 
     } 
