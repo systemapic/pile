@@ -10,6 +10,7 @@ var uuid = require('uuid');
 var async = require('async');
 var redis = require('redis');
 var carto = require('carto');
+var crypto = require('crypto');
 var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
@@ -216,14 +217,15 @@ module.exports = cubes = {
 
     // cube tile requests
     tile : function (req, res) {
+
+        // get options
         var options = cubes.getBody(req);
         var access_token = req.query.access_token;
         var cube_request = cubes.getCubeRequest(req);
         var ops = {};
 
+        // return if erroneus request
         if (!cube_request) return pile.serveErrorTile(res);
-
-        console.log('cube_request -->', cube_request);
 
         // find dataset
         ops.dataset = function (callback) {
@@ -242,40 +244,81 @@ module.exports = cubes = {
         async.parallel(ops, function (err, results) {
             if (err) return res.status(400).end(err.message);
 
+            // get cube, dataset
             var cube = results.cube;
             var dataset = results.dataset;
-            var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
-            var tilePath = CUBEPATH + keyString;
 
-            var options = {
-                dataset : dataset,
+            // serve tile
+            cubes._serveTile({
                 cube : cube,
-                coords : {                                
-                    z : cube_request.z,
-                    x : cube_request.x,
-                    y : cube_request.y
-                }, 
-                tilePath : tilePath
-            };
+                dataset : dataset,
+                cube_request : cube_request
+            }, res);
+        
+        });
+    },
 
-            console.log('options ---> ', options);
 
-            // create tile job
-            var job = pile.jobs().create('cube_tile', { 
-                options : options,
-            }).priority('high').attempts(5).save();
+    _serveTile : function (options, res) {
 
-            // proxy tile job done
-            job.on('complete', function (result) {
+        // get options
+        var cube = options.cube;
+        var dataset = options.dataset;
+        var cube_request = options.cube_request;
 
-                // serve proxy tile
-                cubes.serveTile(res, tilePath);
-            });
+        // create unique hash for style
+        var style_hash = crypto.createHash('md5').update(cube.style).digest("hex");
+        
+        // define path
+        var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + style_hash + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
+        var tilePath = CUBEPATH + keyString;
+
+        // check for cached tile
+        fs.readFile(tilePath, function (err, tile_buffer) {
+            if (!err && tile_buffer) {
+
+                // return cached tile
+                console.log('tile was cached!');
+                res.writeHead(200, {'Content-Type': pile.headers['png']});
+                res.end(tile_buffer);
+
+            } else {
+
+                console.log('createing new tile');
+
+                // create new tile
+                cubes._createTileRenderJob({
+                    tilePath : tilePath,
+                    dataset : dataset,
+                    cube : cube,
+                    coords : {                                
+                        z : cube_request.z,
+                        x : cube_request.x,
+                        y : cube_request.y
+                    }, 
+                }, res);
+            }
+        });
+
+    },
+
+
+    _createTileRenderJob : function (options, res) {
+
+        // create tile job
+        var job = pile.jobs().create('cube_tile', { 
+            options : options,
+        }).priority('high').attempts(5).save();
+
+        // cubes tile job done
+        job.on('complete', function (result) {
+
+            // serve cube tile
+            cubes.serveTile(res, options.tilePath);
         });
     },
 
     serveTile : function (res, tilePath) {
-
         // read from disk
         fs.readFile(tilePath, function (err, tile_buffer) {
             res.writeHead(200, {'Content-Type': pile.headers['png']});
@@ -357,7 +400,7 @@ module.exports = cubes = {
 
             var css = cube.style;
 
-            console.log('css:', css);
+            // console.log('css:', css);
 
             if (!css) {
                 console.error( 'cartoRenderer called with undefined or empty css' );
@@ -392,7 +435,7 @@ module.exports = cubes = {
         ops.push(function (map, callback) {
 
             // debug write xml
-            if (1) pile._debugXML(cube.cube_id, map.toXML());
+            if (0) pile._debugXML(cube.cube_id, map.toXML());
 
             // map options
             var map_options = {
