@@ -248,6 +248,9 @@ module.exports = cubes = {
             var cube = results.cube;
             var dataset = results.dataset;
 
+            // return on error
+            if (!cube || !dataset || dataset.error) return pile.serveErrorTile(res);
+
             // serve tile
             cubes._serveTile({
                 cube : cube,
@@ -278,13 +281,11 @@ module.exports = cubes = {
             if (!err && tile_buffer) {
 
                 // return cached tile
-                console.log('tile was cached!');
+                console.log('Serving cached tile');
                 res.writeHead(200, {'Content-Type': pile.headers['png']});
                 res.end(tile_buffer);
 
             } else {
-
-                console.log('createing new tile');
 
                 // create new tile
                 cubes._createTileRenderJob({
@@ -304,6 +305,7 @@ module.exports = cubes = {
 
 
     _createTileRenderJob : function (options, res) {
+
 
         // create tile job
         var job = pile.jobs().create('cube_tile', { 
@@ -460,7 +462,9 @@ module.exports = cubes = {
         });
 
         // run ops
+        console.time('create cube tile');
         async.waterfall(ops, function (err, tilePath) {
+            console.timeEnd('create cube tile');
             done(err, tilePath);
         });
     },
