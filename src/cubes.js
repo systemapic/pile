@@ -306,7 +306,6 @@ module.exports = cubes = {
 
     _createTileRenderJob : function (options, res) {
 
-
         // create tile job
         var job = pile.jobs().create('cube_tile', { 
             options : options,
