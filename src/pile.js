@@ -780,7 +780,7 @@ module.exports = pile = {
     },
 
     serveEmptyTile : function (res) {
-        fs.readFile('public/emptyTile.png', function (err, tile) {
+        fs.readFile('public/nullTile.png', function (err, tile) {
             res.writeHead(200, {'Content-Type': 'image/png'});
             res.end(tile);
         });
