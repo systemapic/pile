@@ -101,7 +101,7 @@ describe('Cubes', function () {
     // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
 
 
-    context("ain't nuttin to fuck with", function () {
+    context.skip("ain't nuttin to fuck with", function () {
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
@@ -470,6 +470,8 @@ describe('Cubes', function () {
                 var expected = __dirname + '/open-data/expected-cube-tile-2.png';
                 var actual = __dirname + '/tmp/cube-tile-2.png'  
 
+                console.log('tiles_url: ', tiles_url);
+
                 http.get({
                     url : tiles_url,
                     noSslVerifier : true
@@ -543,6 +545,262 @@ describe('Cubes', function () {
                 });
             });
         });
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    context("with masks", function () {
+
+        it('should create empty cube @ ' + endpoints.cube.create, function (done) {
+            token(function (err, access_token) {
+                
+                // test data, no default options required
+                var data = {access_token : access_token};
+
+                api.post(endpoints.cube.create)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.exist;
+                    tmp.created_empty = cube;
+                    done();
+                });
+            });
+        });
+
+        it('should add geojson mask @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        type : 'geojson',
+                        mask : '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]}',
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    done();
+                });
+            });
+        });
+
+        it('should add topojson mask @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        type : 'topojson',
+                        mask : '{"type":"Topology","objects":{"collection":{"type":"GeometryCollection","geometries":[{"type":"Polygon","arcs":[[0]]}]}},"arcs":[[[0,0],[0,9999],[9999,0],[0,-9999],[-9999,0]]],"transform":{"scale":[0.00013954032121962193,0.00007602713378509362],"translate":[9.2230224609375,58.91031927906605]},"bbox":[9.2230224609375,58.91031927906605,10.6182861328125,59.6705145897832]}'
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.mask).to.exist;
+                    expect(cube.mask).to.equal(data.mask.mask);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    done();
+                });
+            });
+        });
+
+
+        it('should upload cube-mask.zip', function (done) {
+            token(function (err, access_token) {
+                api.post(endpoints.import.post)
+                .type('form')
+                .field('access_token', access_token)
+                .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-mask.zip')))
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    assert.ifError(err);
+                    var result = helpers.parse(res.text);
+                    assert.ok(result.file_id);
+                    assert.ok(result.user_id);
+                    assert.ok(result.upload_success);
+                    assert.equal(result.filename, 'cube-mask.zip');
+                    assert.equal(result.status, 'Processing');
+                    assert.ifError(result.error_code);
+                    assert.ifError(result.error_text);
+
+                    tmp.cube_mask_file_id = result.file_id;
+                    done();
+                });
+            });
+        });
+
+        it('should process', function (done) {       
+            this.timeout(11000);     
+            this.slow(5000);
+            token(function (err, access_token) {
+                var processingInterval = setInterval(function () {
+                process.stdout.write('.');
+                    api.get(endpoints.import.status)
+                    .query({ file_id : tmp.cube_mask_file_id, access_token : access_token})
+                    .end(function (err, res) {
+                        assert.ifError(err);
+                        var status = helpers.parse(res.text);
+                        if (status.processing_success) {
+                            clearInterval(processingInterval);
+                            done();
+                        }
+                    });
+                }, 500);
+            });
+        });
+
+        it('should add mask from existing dataset @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        type : 'dataset',
+                        mask : tmp.cube_mask_file_id,
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    done();
+                });
+            });
+        });
+
+
+        it('should throw on invalid mask @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        type : 'geojson',
+                        mask : 'invalid topojson'
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(400)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var error = res.body;
+                    debugMode && console.log(error);
+                    expect(error).to.exist;
+                    expect(error.error_code).to.exist;
+                    expect(error.error).to.exist;
+                    done();
+                });
+            });
+        });
+
+        it('should throw on invalid topology type @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        type : 'handdrawn',
+                        mask : ''
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(400)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var error = res.body;
+                    debugMode && console.log(error);
+                    expect(error).to.exist;
+                    expect(error.error_code).to.exist;
+                    expect(error.error).to.exist;
+                    done();
+                });
+            });
+        });
+
+
+        
+        it('should remove mask @ ' + endpoints.cube.unmask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                }
+
+                api.post(endpoints.cube.unmask)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.mask).to.not.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    done();
+                });
+            });
+        });
+
+
 
     });
 

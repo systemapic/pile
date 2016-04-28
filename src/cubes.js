@@ -22,6 +22,8 @@ var sanitize = require("sanitize-filename");
 var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 var geojsonExtent = require('geojson-extent');
+var topojson = require('topojson');
+
 
 // modules
 var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
@@ -216,6 +218,164 @@ module.exports = cubes = {
         });
     },
 
+    mask : function (req, res) {
+
+        // get options
+        var options = cubes.getBody(req);
+        if (!options) return res.status(400).send({error : 'Please provide an options object', error_code : 2});
+
+        // get mask
+        var mask = options.mask;
+        if (!mask) return res.status(400).send({error : 'Please provide a mask', error_code : 2});
+
+        // get cube_id
+        var cube_id = options.cube_id;
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
+
+        // get access token
+        var access_token = options.access_token;
+
+        var ops = {};
+
+        // get cube
+        ops.cube = function (callback) {
+            cubes.find(cube_id, callback);
+        };
+
+
+        // geojson string
+        if (mask.type == 'geojson') {
+
+            // convert geojson to topojson
+            ops.topo = function (callback) {
+
+                // parse geojson string
+                var collection = tools.safeParse(mask.mask);
+
+                // throw on failed parsing
+                if (!collection) return callback({error : 'Invalid GeoJSON', error_code : 3});
+
+                // convert
+                var topology = topojson.topology({collection: collection});
+
+                // return topojson
+                callback(null, topology);
+            };
+           
+
+        // topojson string
+        } else if (mask.type == 'topojson') {
+
+            // convert geojson to topojson
+            ops.topo = function (callback) {
+
+                // return topojson
+                var topology = mask.mask;
+
+                // throw on failed parsing
+                if (!topology) return callback({error : 'Invalid GeoJSON', error_code : 3});
+
+                // return topology
+                callback(null, topology);
+            };
+
+
+        // mask from existing dataset
+        } else if (mask.type == 'dataset') {
+
+            // convert geojson to topojson
+            ops.topo = function (callback) {
+
+                // get dataset id
+                var dataset_id = mask.mask;
+
+                // sanity check dataset_id
+                if (!_.isString(dataset_id) || _.size(dataset_id) < 20 || _.size(dataset_id) > 30) {
+                    return callback({error : 'Invalid dataset_id', error_code : 3});
+                }
+
+                // get dataset as geojson from API
+                var url = 'http://wu:3001/v2/data/geojson?dataset_id=' + dataset_id + '&access_token=' + access_token;
+                request(url, function (error, response, body) {
+                    if (!response || error) return callback({error : 'Unauthorized', error_code : 3});
+
+                    // parse
+                    var collection = tools.safeParse(body);
+
+                    // verify
+                    if (!collection) return callback({errir : 'Invalid GeoJSON', error_code : 5});
+
+                    // convert to topojson
+                    var topology = topojson.topology({collection: collection});
+
+                    // return topojson
+                    callback(null, topology);
+
+                });
+            };
+
+        
+        // throw on non-supported mask types
+        } else {
+            ops.topo = function (callback) {
+                callback({error : 'Mask type ' + mask.type + ' is not supported!', error_code : 3})
+            };
+        }
+
+
+        async.series(ops, function (err, result) {
+            if (err) return res.status(400).send(err);
+
+            // get mask, cube
+            var topology = result.topo;
+            var cube = result.cube;
+
+            // add mask to cube
+            var updated_cube = _.extend(cube, {
+                mask : topology,
+                timestamp : new Date().getTime()
+            });
+
+            // save
+            cubes.save(updated_cube, function (err, updated_cube) {
+                if (err) return res.status(400).send({error : 'Failed to save Cube. Error: ' + err.message, error_code : 5});
+
+                // return updated cube
+                res.send(updated_cube);
+            });
+
+        });
+
+    },
+
+    unmask : function (req, res) {
+        
+        // get options
+        var options = cubes.getBody(req);
+        if (!options) return res.status(400).send({error : 'Please provide an options object', error_code : 2});
+
+        // get cube_id
+        var cube_id = options.cube_id;
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
+
+        var ops = {};
+
+        cubes.find(cube_id, function (err, cube) {
+
+            // delete mask
+            delete cube.mask;
+ 
+            // save
+            cubes.save(cube, function (err, updated_cube) {
+                if (err) return res.status(400).send({error : 'Failed to save Cube. Error: ' + err.message, error_code : 5});
+
+                // return updated cube
+                res.send(updated_cube);
+            });
+        });
+
+    },
+
     // cube tile requests
     tile : function (req, res) {
 
@@ -270,7 +430,6 @@ module.exports = cubes = {
         var dataset = options.dataset;
         var cube_request = options.cube_request;
 
-
         // check if tile is outside bounds if dataset
         var out_of_bounds = cubes._isOutsideExtent(options);
 
@@ -312,7 +471,6 @@ module.exports = cubes = {
         });
 
     },
-
 
     _createTileRenderJob : function (options, res) {
 
@@ -458,8 +616,6 @@ module.exports = cubes = {
 
             var css = cube.style;
 
-            // console.log('css:', css);
-
             if (!css) {
                 console.error( 'cartoRenderer called with undefined or empty css' );
                 css = "#layer {}";
@@ -505,6 +661,7 @@ module.exports = cubes = {
 
             // render
             map.render(im, map_options, callback);
+
         });
 
         ops.push(function (tile, callback) {
@@ -558,45 +715,34 @@ module.exports = cubes = {
                 y : params[4].split('.')[0]
             }
             return cube_request;
-        } catch (e) {
-            return false;
-        };
+        } catch (e) { return false; };
     }
-
 
 }
 
 var Conv=({
-    r_major:6378137.0,//Equatorial Radius, WGS84
-    r_minor:6356752.314245179,//defined as constant
-    f:298.257223563,//1/f=(a-b)/a , a=r_major, b=r_minor
-    deg2rad:function(d)
-    {
+    r_major : 6378137.0,//Equatorial Radius, WGS84
+    r_minor : 6356752.314245179,//defined as constant
+    f : 298.257223563,//1/f=(a-b)/a , a=r_major, b=r_minor
+    deg2rad : function(d) {
         var r=d*(Math.PI/180.0);
         return r;
     },
-    rad2deg:function(r)
-    {
+    rad2deg : function(r) {
         var d=r/(Math.PI/180.0);
         return d;
     },
-    ll2m:function(lon,lat) //lat lon to mercator
-    {
+    ll2m : function(lon,lat) { //lat lon to mercator
+    
         //lat, lon in rad
         var x=this.r_major * this.deg2rad(lon);
-        
         if (lat > 89.5) lat = 89.5;
         if (lat < -89.5) lat = -89.5;
-        
-        
         var temp = this.r_minor / this.r_major;
         var es = 1.0 - (temp * temp);
         var eccent = Math.sqrt(es);
-        
         var phi = this.deg2rad(lat);
-        
         var sinphi = Math.sin(phi);
-        
         var con = eccent * sinphi;
         var com = .5 * eccent;
         var con2 = Math.pow((1.0-con)/(1.0+con), com);
@@ -605,23 +751,17 @@ var Conv=({
         var ret={'x':x,'y':y};
         return ret;
     },
-    m2ll:function(x,y) //mercator to lat lon
-    {
+    m2ll : function(x,y) {//mercator to lat lon
         var lon=this.rad2deg((x/this.r_major));
-                            
         var temp = this.r_minor / this.r_major;
         var e = Math.sqrt(1.0 - (temp * temp));
         var lat=this.rad2deg(this.pj_phi2( Math.exp( 0-(y/this.r_major)), e));
-        
         var ret={'lon':lon,'lat':lat};
         return ret;
     },
-    pj_phi2:function(ts, e) 
-    {
+    pj_phi2 : function(ts, e) {
         var N_ITER=15;
         var HALFPI=Math.PI/2;
-        
-        
         var TOL=0.0000000001;
         var eccnth, Phi, con, dphi;
         var i;
@@ -633,7 +773,6 @@ var Conv=({
             con = e * Math.sin (Phi);
             dphi = HALFPI - 2. * Math.atan (ts * Math.pow((1. - con) / (1. + con), eccnth)) - Phi;
             Phi += dphi;
-            
         } 
         while ( Math.abs(dphi)>TOL && --i);
         return Phi;

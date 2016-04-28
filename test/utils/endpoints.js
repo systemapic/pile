@@ -86,12 +86,14 @@ module.exports = endpoint = {
     },
 
     cube : {
-        create : '/v2/cubes/create',
-        get : '/v2/cubes/get', // GET
-        add : '/v2/cubes/add',
-        remove : '/v2/cubes/remove',
-        update : '/v2/cubes/update',
-        request : '/v2/cubes/' // GET
+        create  : '/v2/cubes/create',
+        get     : '/v2/cubes/get', // GET
+        add     : '/v2/cubes/add',
+        remove  : '/v2/cubes/remove',
+        update  : '/v2/cubes/update',
+        request : '/v2/cubes/', // GET
+        mask    : '/v2/cubes/mask',
+        unmask  : '/v2/cubes/unmask',
     }
 
 

@@ -44,6 +44,7 @@
     "spark": "^0.5.9",
     "sphericalmercator": "^1.0.3",
     "supertest": "^1.2.0",
+    "topojson": "^1.6.24",
     "usage": "^0.7.0",
     "uuid": "^2.0.1",
     "vector-tile": "^1.2.0",

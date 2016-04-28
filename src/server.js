@@ -47,6 +47,16 @@ module.exports = function (pile) {
 		pile.cubes.update(req, res);
 	});
 
+	// add mask
+	app.post('/v2/cubes/mask', pile.checkAccess, function (req, res) {
+		pile.cubes.mask(req, res);
+	});
+
+	// remove mask
+	app.post('/v2/cubes/unmask', pile.checkAccess, function (req, res) {
+		pile.cubes.unmask(req, res);
+	});
+
 	// request cube tiles
 	app.get('/v2/cubes/get', pile.checkAccess, function (req, res) {
 		pile.cubes.get(req, res);
