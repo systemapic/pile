@@ -1158,7 +1158,7 @@ module.exports = pile = {
         store._readRasterTile(params, function (err, data) {
 
             // return data
-            // if (data) return done(null, data); // debug, turned off to create every time
+            if (data) return done(null, data); // debug, turned off to create every time
             
             // create
             pile.createRasterTile(params, storedLayer, done);
@@ -1172,7 +1172,7 @@ module.exports = pile = {
         store._readVectorTile(params, function (err, data) {
 
             // return data
-            // if (data) return done(null, data);   // debug, turned off to create every time
+            if (data) return done(null, data);   // debug, turned off to create every time
 
             // create
             pile.createVectorTile(params, storedLayer, done);
@@ -1269,7 +1269,7 @@ if (cluster.isMaster) {
     server(pile);
 
     console.log('Clusters: ' + numCPUs);
-    for (var i = 0; i < numCPUs - 1; i++) {  // 7 or 11 cpus
+    for (var i = 0; i < numCPUs - 1; i++) {  
         // fork workers
         cluster.fork(); 
     } 
