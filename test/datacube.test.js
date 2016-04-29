@@ -101,7 +101,7 @@ describe('Cubes', function () {
     // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
 
 
-    context.skip("ain't nuttin to fuck with", function () {
+    context("ain't nuttin to fuck with", function () {
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
@@ -385,7 +385,7 @@ describe('Cubes', function () {
 
         it('should process raster', function (done) {
             this.timeout(10000);
-            this.slow(2000);
+            this.slow(5000);
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
                     process.stdout.write('.');
@@ -411,7 +411,7 @@ describe('Cubes', function () {
 
         it('should process second raster', function (done) {
             this.timeout(10000);
-            this.slow(2000);
+            this.slow(5000);
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
                     process.stdout.write('.');
@@ -435,7 +435,8 @@ describe('Cubes', function () {
             });
         });
 
-        it('should get expected raster-tile from cube @ ' + base_cubes_url(), function (done) {
+        it('should get expected raster-tile from cube', function (done) {
+            this.slow(5000);
             token(function (err, access_token) {
                 var type = 'png';
                 var tile = [7,67,37]; // oslo
@@ -459,7 +460,8 @@ describe('Cubes', function () {
             });
         });
 
-        it('should get expected second raster-tile from cube @ ' + base_cubes_url(), function (done) {
+        it('should get expected second raster-tile from cube', function (done) {
+            this.slow(5000);
             token(function (err, access_token) {
                 var type = 'png';
                 var tile = [7,67,37]; // oslo
@@ -469,8 +471,6 @@ describe('Cubes', function () {
                 tiles_url += cube_id + '/' + dataset_uuid + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
                 var expected = __dirname + '/open-data/expected-cube-tile-2.png';
                 var actual = __dirname + '/tmp/cube-tile-2.png'  
-
-                console.log('tiles_url: ', tiles_url);
 
                 http.get({
                     url : tiles_url,
