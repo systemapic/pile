@@ -237,6 +237,8 @@ module.exports = cubes = {
 
         var ops = {};
 
+        console.log('mask', options);
+
         // get cube
         ops.cube = function (callback) {
             cubes.find(cube_id, callback);
@@ -496,6 +498,10 @@ module.exports = cubes = {
     },
 
     _isOutsideExtent : function (options) {
+        
+        try {
+
+        // get options
         var dataset = options.dataset;
         var coords = options.cube_request;
         var metadata = dataset.metadata;
@@ -538,6 +544,10 @@ module.exports = cubes = {
         if (tile_bounds.east < raster_bounds.west)      outside = true;
         if (tile_bounds.south > raster_bounds.north)    outside = true;
         if (tile_bounds.west > raster_bounds.east)      outside = true;
+
+        } catch (e) {
+            var outside = false;    
+        }
 
         return outside;
     },
@@ -681,6 +691,225 @@ module.exports = cubes = {
             done(err, tilePath);
         });
     },
+
+
+
+    query : function (req, res) {
+        var options = req.body;
+        var access_token = options.access_token;
+        var cube_id = options.cube_id;
+        var geometry = options.geometry;
+        var query_type = options.query_type;
+        var ops = [];
+
+        console.log('req.body', req.body);
+
+        // create geojson from geometry
+        var geojson = cubes.geojsonFromGeometry(geometry);
+
+        // console.log('cube_id, geom', cube_id, geometry, query_type);
+
+        ops.push(function (callback) {
+            console.log('looking@!');
+            cubes.find(cube_id, function (err, cube) {
+                console.log('looking for cube: ', err);
+                callback(err, cube);
+            });
+        });
+
+        ops.push(function (cube, callback) {
+
+            // get datasets
+            var datasets = cube.datasets;
+
+            // post options
+            var options = {
+                datasets : datasets,
+                access_token : access_token
+            }
+
+            // wu route
+            var route = pile.routes.base + pile.routes.get_datasets;
+
+            console.log('calling wu', route);
+
+            // get details on all datasets
+            pile.POST(route, options, callback);
+
+        });
+
+        ops.push(function (dataset_details, callback) {
+
+
+            // console.log('got dataset details!');
+            // console.log('dataset_details:', dataset_details);
+            // console.log('got dataset details!');
+
+
+            var test_dataset = _.sample(dataset_details, 1)[0];
+
+            console.log('test_dataset', test_dataset);
+
+            // do sql query on postgis
+            var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
+
+            var sql = "'(SELECT * from " + test_dataset.table_name + " as sub) as sub'";
+            // var sql = test_dataset.table_name;
+
+            // st_extent script 
+            var command = [
+                GET_DATA_AREA_SCRIPT_PATH,  // script
+                test_dataset.database_name,    // database name
+                sql,
+                // JSON.stringify(geojson)
+                geojson
+            ].join(' ');
+
+            console.log('command: ', command);
+
+            // do postgis script
+            var exec = require('child_process').exec;
+            exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+                console.log('exec ->', err, stdout, stdin);
+                if (err) return callback(err);
+
+                var arr = stdout.split('\n');
+                var result = [];
+                var points = [];
+
+                console.log('arr', arr);
+
+                // arr.forEach(function (arrr) {
+                //     var item = tools.safeParse(arrr);
+                //     item && result.push(item);
+                // });
+
+
+                callback(null, dataset_details);
+
+            });
+
+        });
+        
+        async.waterfall(ops, function (err, dataset_details) {
+            if (err) return res.status(400).send(err);
+
+            res.send(dataset_details);
+        });
+
+    },
+
+    geojsonFromGeometry : function (geometry) {
+        var geojson = {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "properties": {},
+              "geometry": geometry
+            }
+          ]
+        }
+        return geojson;
+    },
+
+
+    // fetchDataArea : function (options, done) {
+    //     var options = req.body;
+    //     var geojson = options.geojson;
+    //     var access_token = options.access_token;
+    //     var cube_id = options.cube_id;
+
+    //     var ops = [];
+
+    //     // // error handling
+    //     // if (!geojson) return pile.error.missingInformation(res, 'Please provide an area.')
+
+    //     // ops.push(function (callback) {
+    //     //     // retrieve layer and return it to client
+    //     //     store.layers.get(layer_id, function (err, layer) {
+    //     //         if (err || !layer) return callback(err || 'no layer');
+    //     //         callback(null, tools.safeParse(layer));
+    //     //     });
+    //     // });
+
+    //     ops.push(function (layer, callback) {
+    //         var table = layer.options.table_name;
+    //         var database = layer.options.database_name;
+    //         var polygon = "'" + JSON.stringify(geojson.geometry) + "'";
+    //         var sql = '"' + layer.options.sql + '"';
+
+    //         // do sql query on postgis
+    //         var GET_DATA_AREA_SCRIPT_PATH = 'src/get_data_by_area.sh';
+
+    //         // st_extent script 
+    //         var command = [
+    //             GET_DATA_AREA_SCRIPT_PATH,  // script
+    //             layer.options.database_name,    // database name
+    //             sql,
+    //             polygon
+    //         ].join(' ');
+
+    //         // do postgis script
+    //         var exec = require('child_process').exec;
+    //         exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
+    //             console.log('exec ->', err, stdout, stdin);
+    //             if (err) return callback(err);
+
+    //             var arr = stdout.split('\n');
+    //             var result = [];
+    //             var points = [];
+
+    //             arr.forEach(function (arrr) {
+    //                 var item = tools.safeParse(arrr);
+    //                 item && result.push(item);
+    //             });
+
+    //             result.forEach(function (point) {
+
+    //                 // delete geoms
+    //                 delete point.geom;
+    //                 delete point.the_geom_3857;
+    //                 delete point.the_geom_4326;
+                    
+    //                 // push
+    //                 points.push(point);
+    //             });
+
+    //             // calculate averages, totals
+    //             var average = tools._calculateAverages(points);
+    //             var total_points = points.length;
+
+    //             // only return 100 points
+    //             if (points.length > 100) {
+    //                 points = points.slice(0, 100);
+    //             }
+
+    //             // return results
+    //             var resultObject = {
+    //                 all : points,
+    //                 average : average,
+    //                 total_points : total_points,
+    //                 area : geojsonArea.geometry(geojson.geometry),
+    //                 layer_id : layer_id
+    //             }
+
+    //             // callback
+    //             callback(null, resultObject);
+    //         });
+    //     });
+
+    //     async.waterfall(ops, function (err, data) {
+    //         if (err) console.error({
+    //             err_id : 52,
+    //             err_msg : 'fetch data area script',
+    //             error : err
+    //         });
+    //         res.json(data);
+    //     });
+    // },
+
+
 
     // save cube to redis
     save : function (cube, done) {

@@ -61,6 +61,7 @@ module.exports = pile = {
         base : 'http://wu:3001',
         upload_status : '/v2/data/import/status',
         create_dataset : '/v2/data/create',
+        get_datasets : '/v2/data/several',
     },
 
     headers : {
