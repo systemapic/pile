@@ -97,6 +97,11 @@ module.exports = function (pile) {
 		pile.fetchDataArea(req, res);
 	});
 
+	// get data from area for cube
+	app.post('/v2/cubes/query', pile.checkAccess, function (req, res) {
+		pile.cubes.query(req, res);
+	});
+
 	// get histogram from column
 	app.post('/v2/query/histogram', pile.checkAccess, function (req, res) {
 		pile.fetchHistogram(req, res);
