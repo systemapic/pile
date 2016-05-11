@@ -29,6 +29,7 @@
     "mapnik-omnivore": "^6.1.4",
     "mmmagic": "^0.4.1",
     "mocha": "^2.4.5",
+    "moment": "^2.13.0",
     "mongoose": "^4.0.8",
     "mongoose-times": "^0.1.0",
     "monitr": "0.0.15",
