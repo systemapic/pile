@@ -1358,6 +1358,19 @@ if (cluster.isMaster) {
         });
     });
 
+    // // cube tiles
+    // jobs.process('query_scf', 50, function (job, done) {
+    //     var options = job.data.options;
+    //     cubes.queries.snowCoverFractionJob(options, function (err) {
+    //         if (err) console.error({
+    //             err_id : 12,
+    //             err_msg : 'snow cover fraction job',
+    //             error : err
+    //         });
+    //         done();
+    //     });
+    // });
+
     // remove stale jobs
     jobs.on('job complete', function (id) {
         kue.Job.get(id, function (err, job) {
