@@ -690,7 +690,6 @@ module.exports = cubes = {
             query.forEach(function (q) {
                 var startOfYear = moment().year(year).dayOfYear(1);
                 var endOfPeriod = moment().year(year).dayOfYear(day);
-                console.log('q.date', q.date);
                 var isBetween = moment(q.date).isBetween(startOfYear, endOfPeriod); 
                 // todo: Thu Jan 01 2015 23:00:00 GMT+0000 is NOT a reliable format. 
                 // see https://github.com/moment/moment/issues/1407
@@ -707,14 +706,12 @@ module.exports = cubes = {
         scf : function (req, res) {
             var options = req.body;
             var query_type = options.query_type;
-            var access_token = options.access_token;
             var cube_id = options.cube_id;
-            var geometry = options.geometry;
-            var mask_id = options.mask_id;
-            var query_type = options.query_type;
+            var mask_id = options.mask ? options.mask.mask_id : false;
             var year = options.year;
             var day = options.day;
-            var force_query = options.force_query;
+            var force_query = options.options ? options.options.force_query : false;
+            var filter_query = options.options ? options.options.filter_query : false;
             var ops = [];
 
             console.log('Querying...');
@@ -732,15 +729,23 @@ module.exports = cubes = {
                     // must create
                     cubes.queries.create_scf_query(options, function (err, query) {
 
-                        // filter only until day requested
-                        var filtered_query = cubes.queries.filter_scf_query({
-                            query : query, 
-                            day : day,
-                            year : year
-                        });
+                        if (filter_query) {
+
+                            // filter only until day requested
+                            var finished_query = cubes.queries.filter_scf_query({
+                                query : query, 
+                                day : day,
+                                year : year
+                            });
+
+                        } else {
+                             
+                            // return whole query
+                            var finished_query = query;
+                        }
 
                         // return to client
-                        res.send(filtered_query);                      
+                        res.send(finished_query);                      
 
                     });
 
@@ -748,15 +753,24 @@ module.exports = cubes = {
 
                     console.log('Using cached query...', mask_id);
 
-                    // filter only until day requested
-                    var filtered_query = cubes.queries.filter_scf_query({
-                        query : stored_query, 
-                        day : day,
-                        year : year
-                    });
+                    if (filter_query) {
 
+                        // filter only until day requested
+                        var finished_query = cubes.queries.filter_scf_query({
+                            query : stored_query, 
+                            day : day,
+                            year : year
+                        });
+
+                    } else {
+
+                        // return whole query
+                        var finished_query = stored_query;
+                    }
+
+                    
                     // return to client
-                    res.send(filtered_query);
+                    res.send(finished_query);
                 }
 
             });
@@ -767,15 +781,13 @@ module.exports = cubes = {
             var query_type = options.query_type;
             var access_token = options.access_token;
             var cube_id = options.cube_id;
-            var geometry = options.geometry;
-            var mask_id = options.mask_id;
+            var geometry = options.mask ? options.mask.geometry : false;
+            var mask_id = options.mask ? options.mask.mask_id : false;
             var query_type = options.query_type;
             var year = options.year;
             var day = options.day;
             var ops = [];
 
-            // create geojson from geometry
-            var mask = cubes.geojsonFromGeometry(geometry);
 
             // find cube
             ops.push(function (callback) {
@@ -802,6 +814,8 @@ module.exports = cubes = {
                     access_token : access_token,
                 }
 
+                // console.log('POST options', options);
+
                 // wu route
                 var route = pile.routes.base + pile.routes.get_datasets;
 
@@ -812,14 +826,49 @@ module.exports = cubes = {
 
             });
 
+
+            // fix mask
             ops.push(function (dataset_details, cube, callback) {
 
-                // query multiple datasets
-                cubes.queries.queue_snow_cover_fraction({
+                var options = {
                     datasets : dataset_details,
-                    mask : mask,
+                    // mask : mask,
                     cube : cube
-                }, callback);
+                }
+
+                if (geometry == 'all') {
+
+                    // get mask from topojson
+                    var topo_mask = cube.mask;
+
+                    callback(null, options);
+
+                } else {
+                    
+                    // create geojson from geometry
+                    options.mask = cubes.geojsonFromGeometry(geometry);
+
+                    // continue
+                    callback(null, options);
+                }
+               
+
+               
+            });
+
+            ops.push(function (options, callback) {
+
+               
+
+                // query multiple datasets
+                cubes.queries.query_snow_cover_fraction(options, callback);
+
+                // query multiple datasets
+                // cubes.queries.query_snow_cover_fraction({
+                //     datasets : dataset_details,
+                //     mask : mask,
+                //     cube : cube
+                // }, callback);
 
             });
             
@@ -841,7 +890,7 @@ module.exports = cubes = {
 
         },
 
-        queue_snow_cover_fraction : function (options, done) {
+        query_snow_cover_fraction : function (options, done) {
 
             var datasets = options.datasets;
             var cube = options.cube;
@@ -851,6 +900,12 @@ module.exports = cubes = {
 
             // set query id
             var query_id = 'query-' + tools.getRandomChars(10);
+
+            // console.log('query_snow_cover_fraction', query_id);
+
+            // console.log('datasets', datasets);
+
+            // console.log('cube:', cube);
             
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
@@ -924,10 +979,24 @@ module.exports = cubes = {
                 if (err) return console.error('error fetching client from pool', err);
 
                 // create query with geojson mask (works!)
-                var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+
+                if (pg_geojson) {
+
+                    // with mask
+                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+                } else {
+                    // without mask
+                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc ) as t;"
+                }
+
+                // console.log('query: ', query);
+
 
                 // query postgis
+                console.log('q');
+                console.time('querying...');
                 client.query(query, function(err, pg_result) {
+                console.timeEnd('querying...');
                    
                     // call `pg_done()` to release the client back to the pool
                     pg_done();
@@ -979,6 +1048,7 @@ module.exports = cubes = {
 
     // get PostGIS compatible GeoJSON
     _retriveGeoJSON : function (geojson) {
+        if (!geojson) return false;
         try {
             return JSON.stringify(geojson.features[0].geometry);
         } catch (e) {
@@ -1025,6 +1095,8 @@ module.exports = cubes = {
     },
 
     geojsonFromGeometry : function (geometry) {
+        if (!geometry) return false;
+
         var geojson = {
           "type": "FeatureCollection",
           "features": [
