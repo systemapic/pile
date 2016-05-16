@@ -127,9 +127,13 @@ module.exports = queries = {
 				polygon
 			].join(' ');
 
+			console.log('cmod', command);
+
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 				if (err) return callback(err);
+
+				console.log('stdout: ', stdout);
 
 				var arr = stdout.split('\n');
 				var result = [];
