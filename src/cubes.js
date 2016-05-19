@@ -714,6 +714,7 @@ module.exports = cubes = {
             var filter_query = options.options ? options.options.filter_query : false;
             var ops = [];
 
+
             console.log('Querying...');
             console.time('querying snow cover fraction');
 
@@ -1068,8 +1069,8 @@ module.exports = cubes = {
             var value = data.value;
             var count = data.count;
 
-            // only include values between 100-200
-            if (value >= 100 && value <= 200) {
+            // only include values between 101-200
+            if (value >= 101 && value <= 200) {
                 if (pixelValues[value]) {
                     pixelValues[value] += count;
                 } else {
