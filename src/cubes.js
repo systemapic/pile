@@ -468,7 +468,7 @@ module.exports = cubes = {
             if (!err && tile_buffer) {
 
                 // return cached tile
-                console.log('Serving cached tile');
+                console.log('Serving cached tile', cube_request.z + ':' + cube_request.x + ':' + cube_request.y);
                 res.writeHead(200, {'Content-Type': pile.headers['png']});
                 res.end(tile_buffer);
 
@@ -842,12 +842,16 @@ module.exports = cubes = {
                     // get mask from topojson
                     var topo_mask = cube.mask;
 
+                    // todo: add to options??
+                    
                     callback(null, options);
 
                 } else {
                     
                     // create geojson from geometry
                     options.mask = cubes.geojsonFromGeometry(geometry);
+
+                    console.log('mask', options.mask);
 
                     // continue
                     callback(null, options);
@@ -922,7 +926,7 @@ module.exports = cubes = {
                     mask : mask,
                 }
 
-                // debug: kue is 50% slower (!), plus job gets stuck
+                // debug: kue is 50% slower (!), plus jobs gets stuck
                 if (0) {
 
                     // // create tile job
@@ -982,7 +986,6 @@ module.exports = cubes = {
                 // create query with geojson mask (works!)
 
                 if (pg_geojson) {
-
                     // with mask
                     var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                 } else {
@@ -994,10 +997,7 @@ module.exports = cubes = {
 
 
                 // query postgis
-                console.log('q');
-                console.time('querying...');
                 client.query(query, function(err, pg_result) {
-                console.timeEnd('querying...');
                    
                     // call `pg_done()` to release the client back to the pool
                     pg_done();
@@ -1070,7 +1070,7 @@ module.exports = cubes = {
             var count = data.count;
 
             // only include values between 101-200
-            if (value >= 101 && value <= 200) {
+            if (value >= 100 && value <= 200) {
                 if (pixelValues[value]) {
                     pixelValues[value] += count;
                 } else {
