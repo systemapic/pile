@@ -519,7 +519,8 @@ describe('Cubes', function () {
 
                 var layer = {
                     access_token : access_token,
-                    projectUuid : 'project-7f2a0ae6-cb30-488a-8fcc-7a2e33e1edcf', // pass to automatically attach to project
+                    // todo: create project for test, and clean up after
+                    projectUuid : 'project-35532fe5-ccdb-4d39-b98a-1dbf4548c443', // pass to automatically attach to project
                     data : { cube : tmp.cube_with_datasets },
                     metadata : tmp.uploaded_raster.metadata,
                     title : 'Snow raster cube',
