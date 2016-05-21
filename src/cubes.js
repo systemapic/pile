@@ -10,7 +10,7 @@ var uuid = require('uuid');
 var async = require('async');
 var redis = require('redis');
 var carto = require('carto');
-var crypto = require('crypto');
+var forge = require('node-forge');
 var mapnik = require('mapnik');
 var colors = require('colors');
 var cluster = require('cluster');
@@ -207,6 +207,75 @@ module.exports = cubes = {
 
             // save
             cubes.save(updated_cube, callback);
+        });
+           
+        // run ops
+        async.waterfall(ops, function (err, updated_cube) {
+            if (err) return res.status(400).send({error : err.message}) 
+
+            // return updated cube
+            res.send(updated_cube);
+        });
+    },
+
+    // replace datasets @ same date
+    replace : function (req, res) {
+
+        // get options
+        var options = cubes.getBody(req);
+        if (!options) return res.status(400).send({error : 'Please provide a dataset id', error_code : 1});
+
+        // get cube_id
+        var cube_id = options.cube_id;
+        if (!cube_id) return res.status(400).send({error : 'Please provide a dataset id', error_code : 2});
+
+        // get datasets
+        var datasets = options.datasets;
+        if (!datasets.length) return res.status(400).send({error : 'Please provide datasets', error_code : 3});
+
+        // todo: verify correct format of datasets. add test.
+        // todo: security: only be able to replace own cubes
+
+        var ops = [];
+
+        // get cube
+        ops.push(function (callback) {
+            cubes.find(cube_id, callback);
+        });
+
+        ops.push(function (cube, callback) {
+            if (!cube) return callback({message : 'No such cube.'});
+
+            // add datasets to array
+            datasets.forEach(function (d) {
+
+                // { 
+                //     id: 'file_ckvuatwfkqpyzjxjpygj',
+                //     description: 'Filename: snow.raster.2.200.tif',
+                //     timestamp: 'Fri May 20 2016 11:33:20 GMT+0000 (UTC)',
+                //     time_resolution: 'day' 
+                // }
+
+                // get moment() datestamp of dataset to add
+                var datestamp = moment(d.timestamp);
+
+                // time resolution
+                var granularity = d.granularity || 'day';
+
+                // check if dataset exists at same time, by resolution
+                var i = _.findIndex(cube.datasets, function (cd) {
+                    return moment(cd.timestamp).isSame(datestamp, granularity);
+                });
+
+                // already exists a dataset on this day, replace!
+                if (i > -1) {
+                    console.log('replacing!', d);
+                    cube.datasets[i] = d;
+                }
+            });
+
+            // save
+            cubes.save(cube, callback);
         });
            
         // run ops
@@ -457,8 +526,8 @@ module.exports = cubes = {
         }
 
         // create unique hash for style
-        var style_hash = crypto.createHash('md5').update(cube.style).digest("hex");
-        
+        var style_hash = forge.md.md5.create().update(cube.style).digest().toHex();
+
         // define path
         var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + style_hash + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
         var tilePath = CUBEPATH + keyString;
@@ -662,9 +731,7 @@ module.exports = cubes = {
         var query_type = options.query_type;
         
         // snow cover fraction
-        if (query_type == 'scf') {
-            return cubes.queries.scf(req, res);
-        }
+        if (query_type == 'scf') return cubes.queries.scf(req, res);
 
         // return unsupported
         res.status(400).send({error : 'Query type not supported:' + query_type});
@@ -673,135 +740,103 @@ module.exports = cubes = {
 
     queries : {
 
-        // filter out only relevant days from query
-        filter_scf_query : function (options) {
-            var query = _.isString(options.query) ? tools.safeParse(options.query) : options.query;
-            var day = options.day;
-            var year = options.year;
-            var filtered_query = [];
-
-            // catch 
-            if (!_.isArray(query)) {
-                console.log('ERROR - query not array!');
-                return query;
-            }
-
-            // iterate, add
-            query.forEach(function (q) {
-                var startOfYear = moment().year(year).dayOfYear(1);
-                var endOfPeriod = moment().year(year).dayOfYear(day);
-                var isBetween = moment(q.date).isBetween(startOfYear, endOfPeriod); 
-                // todo: Thu Jan 01 2015 23:00:00 GMT+0000 is NOT a reliable format. 
-                // see https://github.com/moment/moment/issues/1407
-                
-                // include if between dates
-                isBetween && filtered_query.push(q);
-            });
-
-            // debug retun
-            return filtered_query;
-        },
-
         // snow cover fraction query (red line in client)
+        // either get query from cache, or do new query
         scf : function (req, res) {
             var options = req.body;
-            var query_type = options.query_type;
-            var cube_id = options.cube_id;
-            var mask_id = options.mask ? options.mask.mask_id : false;
-            var year = options.year;
-            var day = options.day;
+            var multi_mask = options.mask ? options.mask.multi_mask : false;
+
+            if (multi_mask) {
+                
+                // multi mask query
+                cubes.queries.scf_multi_mask(req, res);
+            
+            } else {
+
+                // single mask query
+                cubes.queries.scf_single_mask(req, res);
+            }
+
+        },
+
+        scf_single_mask : function (req, res) {
+            var options     = req.body;
+            var query_type  = options.query_type;
+            var cube_id     = options.cube_id;
+            var mask_id     = options.mask ? options.mask.mask_id : false;
+            var year        = options.year;
             var force_query = options.options ? options.options.force_query : false;
-            var filter_query = options.options ? options.options.filter_query : false;
-            var ops = [];
-
-
-            console.log('Querying...');
-            console.time('querying snow cover fraction');
+            var ops         = [];
 
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
             store.layers.get(query_key, function (err, stored_query) {
 
-                // create query if error, not cached, or forced
-                if (err || !stored_query || force_query) {
-                    
-                    console.log('Creating query...', mask_id);
+                // return stored query if any
+                if (!err && stored_query && !force_query) return res.end(stored_query);
 
-                    // must create
-                    cubes.queries.create_scf_query(options, function (err, query) {
+                // create and run new query
+                cubes.queries.create_scf_single_mask_query(options, function (err, query) {
 
-                        if (filter_query) {
-
-                            // filter only until day requested
-                            var finished_query = cubes.queries.filter_scf_query({
-                                query : query, 
-                                day : day,
-                                year : year
-                            });
-
-                        } else {
-                             
-                            // return whole query
-                            var finished_query = query;
-                        }
-
-                        // return to client
-                        res.send(finished_query);                      
-
-                    });
-
-                } else {
-
-                    console.log('Using cached query...', mask_id);
-
-                    if (filter_query) {
-
-                        // filter only until day requested
-                        var finished_query = cubes.queries.filter_scf_query({
-                            query : stored_query, 
-                            day : day,
-                            year : year
-                        });
-
-                    } else {
-
-                        // return whole query
-                        var finished_query = stored_query;
-                    }
-
-                    
                     // return to client
-                    res.send(finished_query);
-                }
+                    res.send(query);                      
 
+                });
             });
-
         },
 
-        create_scf_query : function (options, done) {
+        scf_multi_mask : function (req, res) {
+            var options     = req.body;
+            var query_type  = options.query_type;
+            var cube_id     = options.cube_id;
+            var mask_id     = options.mask ? options.mask.mask_id : false;
+            var year        = options.year;
+            var force_query = options.options ? options.options.force_query : false;
+            var ops         = [];
+
+            // check for already stored query
+            var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
+            store.layers.get(query_key, function (err, stored_query) {
+
+                // return stored query if any
+                if (!err && stored_query && !force_query) return res.end(stored_query);
+
+                // create and run new query
+                cubes.queries.create_scf_multi_mask_query(options, function (err, query) {
+
+                    // return to client
+                    res.send(query);                      
+
+                });
+            });
+        },
+
+
+        create_scf_multi_mask_query : function (options, done) {
             var query_type = options.query_type;
             var access_token = options.access_token;
             var cube_id = options.cube_id;
-            var geometry = options.mask ? options.mask.geometry : false;
+            var geometries = options.mask ? options.mask.geometries : false;
             var mask_id = options.mask ? options.mask.mask_id : false;
+            // var multi_mask = options.mask ? options.mask.multi : false;
             var query_type = options.query_type;
             var year = options.year;
             var day = options.day;
             var ops = [];
 
 
-            // find cube
+            // get cube
             ops.push(function (callback) {
                 cubes.find(cube_id, callback);
             });
 
-            // get datasets from [wu]
+            // get relevant datasets to query, from [wu]
             ops.push(function (cube, callback) {
 
-                // get datasets
+                // get cube datasets
                 var datasets = cube.datasets;
 
-                // filter datasets for this year only
+                // filter cube's datasets for this year only
                 var withinRange = _.filter(datasets, function (d) {
                     var current = moment(d.timestamp);
                     var before = moment().year(year).dayOfYear(1);
@@ -809,24 +844,246 @@ module.exports = cubes = {
                     return (current.isSameOrAfter(before) && current.isSameOrBefore(after));
                 });
 
-                // post options
-                var options = {
+                // get details on all datasets
+                pile.POST(pile.routes.base + pile.routes.get_datasets, {
                     datasets : withinRange,
                     access_token : access_token,
-                }
-
-                // console.log('POST options', options);
-
-                // wu route
-                var route = pile.routes.base + pile.routes.get_datasets;
-
-                // get details on all datasets
-                pile.POST(route, options, function (err, dataset_details){
+                }, function (err, dataset_details){
                     callback(err, dataset_details, cube);
                 });
 
             });
 
+            // fix mask
+            ops.push(function (dataset_details, cube, callback) {
+
+                var options = {
+                    datasets : dataset_details,
+                    // mask : mask,
+                    cube : cube
+                }
+
+                var geometry_results = [];
+
+                async.each(geometries, function (geom, each_callback) {
+                    
+                    // create geojson from geometry
+                    options.mask = cubes.geojsonFromGeometry(geom);
+
+                    // query multiple datasets
+                    cubes.queries.query_snow_cover_fraction_multi_mask(options, function (err, each_result) {
+
+                        geometry_results.push(each_result);
+
+                        each_callback(err);
+
+                    });
+                
+                }, function (err) {
+
+
+                    // results for ALL datasets for EACH geometry
+
+                    // console.log('ALL RESULTS', results);
+
+                    var dates = {};
+
+                    var values = {};
+
+                    // iterate results per mask
+                    geometry_results.forEach(function (r) {
+
+                        // iterate
+                        r.forEach(function (rr) {
+
+                            // get date
+                            var date = rr.date;
+
+                            // sum results
+                            rr.rows.forEach(function (row) {
+
+                                // get values/count
+                                var value = row.row_to_json.pvc.value;
+                                var count = row.row_to_json.pvc.count;
+
+                                // create key
+                                dates[date] = dates[date] || {}; // will happen 9 times
+
+                                // add 
+                                dates[date][value] = _.isUndefined(dates[date][value]) ? count : dates[date][value] + count;
+
+                            });
+
+                        });
+                    });
+
+                    // console.log('dates:', dates);
+
+
+                    // var parsed_results = dates;
+
+                    var snow_cover_fractions = cubes.queries._calculateSnowCoverFraction(dates);
+
+                    // 
+                    callback(err, snow_cover_fractions);
+
+                });
+               
+            });
+
+            
+            async.waterfall(ops, function (err, scfs) {
+
+                console.log('ASYNC DONE', err);
+
+                // catch errors
+                if (err) return res.status(400).send(err);
+
+                // save query to redis cache
+                var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
+                store.layers.set(query_key, JSON.stringify(scfs), function (err) {
+
+                    // done
+                    done(null, scfs);
+
+                });
+            });
+
+        },
+
+
+
+        _calculateSnowCoverFraction : function (all_dates) {
+
+            // console.log('_calculateSnowCoverFraction', all_dates);
+
+            // '2016-02-23T23:00:00+00:00': { 
+            //     '20': 90425,
+            //     '100': 13814,
+            //     '101': 380,
+            //     '102': 545,
+            //     '103': 648,
+            //     '104': 611,
+
+            var dates = [];
+
+            _.forEach(all_dates, function (values, date) {
+
+                var avg_sum = 0;
+                var count_sum = 0;
+
+                _.forEach(values, function (count, pixel_value) {
+
+                    var moved_value = pixel_value - 100;
+                    
+                    // only include pixels with values between 100-200
+                    // if (pixel_value >= 100 && pixel_value <= 200) {
+                    if (moved_value >= 0 && moved_value <= 100) {
+                        // avg_sum += count * pixel_value;
+                        avg_sum += count * moved_value;
+                        count_sum += count;
+                    }
+                });
+
+                // var scf = (avg_sum / count_sum) - 100;
+                var scf = (avg_sum / count_sum);
+
+                dates.push({
+                    date : date,
+                    SCF : scf
+                });
+
+            });
+
+            console.log('dates --<', dates);
+
+            return dates;
+
+        },
+
+    // _getSnowCoverFraction : function (rows) {
+
+    //     // clean up 
+    //     var pixelValues = {};
+
+    //     // get values, count
+    //     rows.forEach(function (r) {
+
+    //         var data = r.row_to_json.pvc; // {"value":156,"count":3}
+    //         var value = data.value;
+    //         var count = data.count;
+
+    //         // only include values between 101-200
+    //         if (value >= 100 && value <= 200) {
+    //             if (pixelValues[value]) {
+    //                 pixelValues[value] += count;
+    //             } else {
+    //                 pixelValues[value] = count;
+    //             }
+    //         }
+    //     });
+
+    //     // sum averages
+    //     var avg_sum = 0;
+    //     var tot_count = 0;
+    //     _.forEach(pixelValues, function (p, v) {
+    //         avg_sum += p * v;
+    //         tot_count += p;
+    //     });
+
+    //     // calculate average
+    //     var average = avg_sum / tot_count;
+    //     var scf = average - 100; // to get %
+
+    //     return scf;
+
+    // },
+
+
+
+
+       
+        create_scf_single_mask_query : function (options, done) {
+            var query_type = options.query_type;
+            var access_token = options.access_token;
+            var cube_id = options.cube_id;
+            var geometry = options.mask ? options.mask.geometry : false;
+            var mask_id = options.mask ? options.mask.mask_id : false;
+            var multi_mask = options.mask ? options.mask.multi : false;
+            var query_type = options.query_type;
+            var year = options.year;
+            var day = options.day;
+            var ops = [];
+
+
+            // get cube
+            ops.push(function (callback) {
+                cubes.find(cube_id, callback);
+            });
+
+            // get relevant datasets to query, from [wu]
+            ops.push(function (cube, callback) {
+
+                // get cube datasets
+                var datasets = cube.datasets;
+
+                // filter cube's datasets for this year only
+                var withinRange = _.filter(datasets, function (d) {
+                    var current = moment(d.timestamp);
+                    var before = moment().year(year).dayOfYear(1);
+                    var after = moment().year(year).dayOfYear(365);
+                    return (current.isSameOrAfter(before) && current.isSameOrBefore(after));
+                });
+
+                // get details on all datasets
+                pile.POST(pile.routes.base + pile.routes.get_datasets, {
+                    datasets : withinRange,
+                    access_token : access_token,
+                }, function (err, dataset_details){
+                    callback(err, dataset_details, cube);
+                });
+
+            });
 
             // fix mask
             ops.push(function (dataset_details, cube, callback) {
@@ -851,51 +1108,39 @@ module.exports = cubes = {
                     // create geojson from geometry
                     options.mask = cubes.geojsonFromGeometry(geometry);
 
-                    console.log('mask', options.mask);
-
                     // continue
                     callback(null, options);
                 }
-               
-
                
             });
 
             ops.push(function (options, callback) {
 
-               
-
                 // query multiple datasets
-                cubes.queries.query_snow_cover_fraction(options, callback);
-
-                // query multiple datasets
-                // cubes.queries.query_snow_cover_fraction({
-                //     datasets : dataset_details,
-                //     mask : mask,
-                //     cube : cube
-                // }, callback);
-
+                cubes.queries.query_snow_cover_fraction_single_mask(options, callback);
+              
             });
             
+            
             async.waterfall(ops, function (err, scfs) {
-                console.timeEnd('querying snow cover fraction');
 
                 // catch errors
                 if (err) return res.status(400).send(err);
 
                 // save query to redis cache
-                // var query_key = 'query:' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
                 store.layers.set(query_key, JSON.stringify(scfs), function (err) {
 
                     // done
                     done(null, scfs);
+
                 });
             });
 
         },
 
-        query_snow_cover_fraction : function (options, done) {
+
+        query_snow_cover_fraction_multi_mask : function (options, done) {
 
             var datasets = options.datasets;
             var cube = options.cube;
@@ -906,12 +1151,7 @@ module.exports = cubes = {
             // set query id
             var query_id = 'query-' + tools.getRandomChars(10);
 
-            // console.log('query_snow_cover_fraction', query_id);
 
-            // console.log('datasets', datasets);
-
-            // console.log('cube:', cube);
-            
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
 
@@ -926,22 +1166,30 @@ module.exports = cubes = {
                     mask : mask,
                 }
 
-                // debug: kue is 50% slower (!), plus jobs gets stuck
-                if (0) {
+                // create query
+                cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
+                    
+                    // get rows
+                    var rows = pg_result.rows;
 
-                    // // create tile job
-                    // var job = pile.jobs().create('query_scf', { 
-                    //     options : queryOptions,
-                    // }).priority('high').attempts(5).save();
+                    // calculate snow cover fraction
+                    // var averagePixelValue = cubes._getSnowCoverFraction(rows);
 
-                    // // cubes tile job done
-                    // job.on('complete', callback);
+                    // get date from cube dataset (not from dataset internal timestamp)
+                    var cubeDatasetTimestamp = queryOptions.dataset_date;
 
-                } else {
+                    // results
+                    var scf_results = {
+                        date : moment(cubeDatasetTimestamp).format(),
+                        // SCF : averagePixelValue,
+                        rows : rows
+                    };
 
-                    // non-kue job
-                    cubes.queries.snowCoverFractionJob(queryOptions, callback)
-                }
+                    // write results to redis
+                    var key = query_id + '-' + queryOptions.query_num;
+                    store.temp.set(key, JSON.stringify(scf_results), callback);
+
+                });
 
             }, function (err) {
 
@@ -959,7 +1207,74 @@ module.exports = cubes = {
         },
 
 
-        snowCoverFractionJob : function (options, done) {
+        query_snow_cover_fraction_single_mask : function (options, done) {
+
+            var datasets = options.datasets;
+            var cube = options.cube;
+            var mask = options.mask;
+            var queryOptions;
+            var n = 0;
+
+            // set query id
+            var query_id = 'query-' + tools.getRandomChars(10);
+
+
+            // query each dataset
+            async.eachSeries(datasets, function (dataset, callback) {
+
+                // set query options
+                queryOptions = {
+                    dataset : dataset,
+                    query_num : n++,
+                    query_id : query_id,
+                    dataset_date : _.find(cube.datasets, function (d) {
+                        return d.id == dataset.table_name;
+                    }).timestamp, // get date of dataset in cube, not timestamp of dataset
+                    mask : mask,
+                }
+
+                // create query
+                cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
+                    
+                    // get rows
+                    var rows = pg_result.rows;
+
+                    // calculate snow cover fraction
+                    var averagePixelValue = cubes._getSnowCoverFraction(rows);
+
+                    // get date from cube dataset (not from dataset internal timestamp)
+                    var cubeDatasetTimestamp = queryOptions.dataset_date;
+
+                    // results
+                    var scf_results = {
+                        date : moment(cubeDatasetTimestamp).format(),
+                        SCF : averagePixelValue,
+                        rows : rows
+                    };
+
+                    // write results to redis
+                    var key = query_id + '-' + queryOptions.query_num;
+                    store.temp.set(key, JSON.stringify(scf_results), callback);
+
+                });
+
+            }, function (err) {
+
+                // get query result from redis
+                async.times(n, function (i, next) {
+                    var key = queryOptions.query_id + '-' + i;
+                    store.temp.get(key, function (err, part) {
+
+                        // parse parts
+                        next(err, tools.safeParse(part));
+                    });
+                }, done);
+            });
+
+        },
+
+
+        postgis_snowcover : function (options, done) {
 
             // options
             var dataset = options.dataset;
@@ -987,13 +1302,14 @@ module.exports = cubes = {
 
                 if (pg_geojson) {
                     // with mask
+                    // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                     var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                 } else {
                     // without mask
                     var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc ) as t;"
                 }
 
-                // console.log('query: ', query);
+                console.log('query: ', query_id);
 
 
                 // query postgis
@@ -1003,37 +1319,34 @@ module.exports = cubes = {
                     pg_done();
 
                     // return on err
-                    if (err) return done(err);
+                    // if (err) return done(err);
 
-                    // get rows
-                    var rows = pg_result.rows;
+                    done(err, pg_result);
 
-                    // calculate snow cover fraction
-                    var averagePixelValue = cubes._getSnowCoverFraction(rows);
+                    // // get rows
+                    // var rows = pg_result.rows;
 
-                    // get date from cube dataset (not from dataset internal timestamp)
-                    var cubeDatasetTimestamp = options.dataset_date;
+                    // // calculate snow cover fraction
+                    // var averagePixelValue = cubes._getSnowCoverFraction(rows);
 
-                    // results
-                    var scf_results = {
-                        date : moment(cubeDatasetTimestamp).toString(),
-                        SCF : averagePixelValue
-                    };
+                    // // get date from cube dataset (not from dataset internal timestamp)
+                    // var cubeDatasetTimestamp = options.dataset_date;
 
-                    // write results to redis
-                    var key = query_id + '-' + query_num;
-                    store.temp.set(key, JSON.stringify(scf_results), done);
+                    // // results
+                    // var scf_results = {
+                    //     date : moment(cubeDatasetTimestamp).toString(),
+                    //     SCF : averagePixelValue,
+                    //     // rows : rows
+                    // };
+
+                    // // write results to redis
+                    // var key = query_id + '-' + query_num;
+                    // store.temp.set(key, JSON.stringify(scf_results), done);
 
                 });
             });
         },
     },
-
-
-
-
-
-
 
 
 

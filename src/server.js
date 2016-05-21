@@ -42,6 +42,11 @@ module.exports = function (pile) {
 		pile.cubes.remove(req, res);
 	});
 
+	// replace dataset
+	app.post('/v2/cubes/replace', pile.checkAccess, function (req, res) {
+		pile.cubes.replace(req, res);
+	});
+
 	// update dataset
 	app.post('/v2/cubes/update', pile.checkAccess, function (req, res) {
 		pile.cubes.update(req, res);
