@@ -94,6 +94,7 @@ module.exports = endpoint = {
         request : '/v2/cubes/', // GET
         mask    : '/v2/cubes/mask',
         unmask  : '/v2/cubes/unmask',
+        replace : '/v2/cubes/replace',
     }
 
 

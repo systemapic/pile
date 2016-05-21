@@ -12,6 +12,7 @@ var chai = require('chai');
 var expect = chai.expect;
 var http = require('http-request');
 var assert = require('assert');
+var moment = require('moment');
 
 // helpers
 var endpoints = require(__dirname + '/utils/endpoints');
@@ -39,16 +40,14 @@ function base_cubes_url() {
 }
 
 function get_default_cartocss() {
-    // raster debug
+    // raster style
     var defaultCartocss = '';
     defaultCartocss += '#layer {'
     defaultCartocss += 'raster-opacity: 1; '; 
-    // defaultCartocss += 'raster-scaling: gaussian; '; 
     defaultCartocss += 'raster-colorizer-default-mode: linear; '; 
     defaultCartocss += 'raster-colorizer-default-color: transparent; '; 
     defaultCartocss += 'raster-comp-op: color-dodge;';
     defaultCartocss += 'raster-colorizer-stops: '; 
-    // white to blue
     defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
     defaultCartocss += '  stop(21, #dddddd) '; 
     defaultCartocss += '  stop(100, #0078ff) '; 
@@ -193,7 +192,7 @@ describe('Cubes', function () {
                         description : 'meta text',
                         timestamp : 'date as string'
                     }]
-                }
+                };
 
                 api.post(endpoints.cube.add)
                 .send(data)
@@ -327,7 +326,7 @@ describe('Cubes', function () {
                     datasets : [{
                         id : tmp.uploaded_raster.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster.filename,
-                        timestamp : new Date().toString()
+                        timestamp : moment().format()
                     }]
                 }
 
@@ -360,7 +359,7 @@ describe('Cubes', function () {
                     datasets : [{
                         id : tmp.uploaded_raster_2.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster_2.filename,
-                        timestamp : new Date().toString()
+                        timestamp : moment().format()
                     }]
                 }
 
@@ -547,15 +546,6 @@ describe('Cubes', function () {
             });
         });
     });
-
-
-
-
-
-
-
-
-
 
 
 
@@ -806,5 +796,105 @@ describe('Cubes', function () {
     });
 
 
+    
+
+    context("replacing datasets", function () {
+
+        var date_stamp = moment().format();
+
+        it('should create empty cube @ ' + endpoints.cube.create, function (done) {
+            token(function (err, access_token) {
+                
+                // test data, no default options required
+                var data = {access_token : access_token};
+
+                api.post(endpoints.cube.create)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.exist;
+                    tmp.created_empty = cube;
+                    done();
+                });
+            });
+        });
+
+        it('add dataset to cube @ ' + endpoints.cube.add, function (done) {
+            token(function (err, access_token) {
+
+                console.log('date_stamp', date_stamp);
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    datasets : [{
+                        id : tmp.uploaded_raster.file_id,
+                        description : 'Filename: ' + tmp.uploaded_raster.filename,
+                        timestamp : date_stamp
+                    }]
+                }
+
+                api.post(endpoints.cube.add)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    expect(cube.datasets).to.have.lengthOf(1);
+                    expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
+                    expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
+                    expect(cube.datasets[0].timestamp).to.equal(data.datasets[0].timestamp);
+                    done();
+                });
+            });
+        });
+
+        it('replace dataset in cube @ ' + endpoints.cube.replace, function (done) {
+            token(function (err, access_token) {
+
+                console.log('date_stamp', date_stamp);
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    datasets : [{
+                        id : tmp.uploaded_raster_2.file_id,
+                        description : 'Filename: ' + tmp.uploaded_raster_2.filename,
+                        timestamp : date_stamp,
+                        granularity : 'day'
+                    }]
+                }
+
+                api.post(endpoints.cube.replace)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    expect(cube.datasets).to.have.lengthOf(1);
+                    expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
+                    expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
+                    expect(cube.datasets[0].timestamp).to.equal(data.datasets[0].timestamp);
+                    done();
+                });
+            });
+        });
+
+    });
 
 });
