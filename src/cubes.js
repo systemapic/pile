@@ -818,7 +818,6 @@ module.exports = cubes = {
             var cube_id = options.cube_id;
             var geometries = options.mask ? options.mask.geometries : false;
             var mask_id = options.mask ? options.mask.mask_id : false;
-            // var multi_mask = options.mask ? options.mask.multi : false;
             var query_type = options.query_type;
             var year = options.year;
             var day = options.day;
@@ -859,7 +858,6 @@ module.exports = cubes = {
 
                 var options = {
                     datasets : dataset_details,
-                    // mask : mask,
                     cube : cube
                 }
 
@@ -873,8 +871,10 @@ module.exports = cubes = {
                     // query multiple datasets
                     cubes.queries.query_snow_cover_fraction_multi_mask(options, function (err, each_result) {
 
+                        // remember
                         geometry_results.push(each_result);
 
+                        // return
                         each_callback(err);
 
                     });
@@ -882,13 +882,8 @@ module.exports = cubes = {
                 }, function (err) {
 
 
-                    // results for ALL datasets for EACH geometry
-
-                    // console.log('ALL RESULTS', results);
 
                     var dates = {};
-
-                    var values = {};
 
                     // iterate results per mask
                     geometry_results.forEach(function (r) {
@@ -917,14 +912,10 @@ module.exports = cubes = {
                         });
                     });
 
-                    // console.log('dates:', dates);
-
-
-                    // var parsed_results = dates;
-
+                    // calculate snow cover fraction
                     var snow_cover_fractions = cubes.queries._calculateSnowCoverFraction(dates);
 
-                    // 
+                    // return scf
                     callback(err, snow_cover_fractions);
 
                 });
@@ -933,8 +924,6 @@ module.exports = cubes = {
 
             
             async.waterfall(ops, function (err, scfs) {
-
-                console.log('ASYNC DONE', err);
 
                 // catch errors
                 if (err) return res.status(400).send(err);
@@ -1000,47 +989,6 @@ module.exports = cubes = {
             return dates;
 
         },
-
-    // _getSnowCoverFraction : function (rows) {
-
-    //     // clean up 
-    //     var pixelValues = {};
-
-    //     // get values, count
-    //     rows.forEach(function (r) {
-
-    //         var data = r.row_to_json.pvc; // {"value":156,"count":3}
-    //         var value = data.value;
-    //         var count = data.count;
-
-    //         // only include values between 101-200
-    //         if (value >= 100 && value <= 200) {
-    //             if (pixelValues[value]) {
-    //                 pixelValues[value] += count;
-    //             } else {
-    //                 pixelValues[value] = count;
-    //             }
-    //         }
-    //     });
-
-    //     // sum averages
-    //     var avg_sum = 0;
-    //     var tot_count = 0;
-    //     _.forEach(pixelValues, function (p, v) {
-    //         avg_sum += p * v;
-    //         tot_count += p;
-    //     });
-
-    //     // calculate average
-    //     var average = avg_sum / tot_count;
-    //     var scf = average - 100; // to get %
-
-    //     return scf;
-
-    // },
-
-
-
 
        
         create_scf_single_mask_query : function (options, done) {
@@ -1151,7 +1099,6 @@ module.exports = cubes = {
             // set query id
             var query_id = 'query-' + tools.getRandomChars(10);
 
-
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
 
@@ -1172,16 +1119,12 @@ module.exports = cubes = {
                     // get rows
                     var rows = pg_result.rows;
 
-                    // calculate snow cover fraction
-                    // var averagePixelValue = cubes._getSnowCoverFraction(rows);
-
                     // get date from cube dataset (not from dataset internal timestamp)
                     var cubeDatasetTimestamp = queryOptions.dataset_date;
 
                     // results
                     var scf_results = {
                         date : moment(cubeDatasetTimestamp).format(),
-                        // SCF : averagePixelValue,
                         rows : rows
                     };
 
@@ -1290,6 +1233,9 @@ module.exports = cubes = {
             var pg_username = process.env.SYSTEMAPIC_PGSQL_USERNAME;
             var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
             var pg_database = dataset.database_name;
+
+            // console.log('database', dataset.database_name);
+            // console.log('table', dataset.table_name);
             
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
@@ -1303,46 +1249,22 @@ module.exports = cubes = {
                 if (pg_geojson) {
                     // with mask
                     // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+                    // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                     var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                 } else {
                     // without mask
                     var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc ) as t;"
                 }
 
-                console.log('query: ', query_id);
-
-
                 // query postgis
+                console.time('querying');
                 client.query(query, function(err, pg_result) {
+                console.timeEnd('querying');
                    
                     // call `pg_done()` to release the client back to the pool
                     pg_done();
 
-                    // return on err
-                    // if (err) return done(err);
-
                     done(err, pg_result);
-
-                    // // get rows
-                    // var rows = pg_result.rows;
-
-                    // // calculate snow cover fraction
-                    // var averagePixelValue = cubes._getSnowCoverFraction(rows);
-
-                    // // get date from cube dataset (not from dataset internal timestamp)
-                    // var cubeDatasetTimestamp = options.dataset_date;
-
-                    // // results
-                    // var scf_results = {
-                    //     date : moment(cubeDatasetTimestamp).toString(),
-                    //     SCF : averagePixelValue,
-                    //     // rows : rows
-                    // };
-
-                    // // write results to redis
-                    // var key = query_id + '-' + query_num;
-                    // store.temp.set(key, JSON.stringify(scf_results), done);
-
                 });
             });
         },
