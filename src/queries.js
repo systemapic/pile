@@ -127,13 +127,9 @@ module.exports = queries = {
 				polygon
 			].join(' ');
 
-			console.log('cmod', command);
-
 			// do postgis script
 			exec(command, {maxBuffer: 1024 * 50000}, function (err, stdout, stdin) {
 				if (err) return callback(err);
-
-				console.log('stdout: ', stdout);
 
 				var arr = stdout.split('\n');
 				var result = [];
@@ -284,23 +280,6 @@ module.exports = queries = {
 				callback(null, geometry_type);
 			});
 		});
-
-		// // create geometry 4326
-		// ops.push(function (geometry_type, callback) {
-		// 	var column = ' the_geom_4326';
-		// 	var geometry = ' geometry(' + geometry_type + ', 4326)';
-		// 	var query = 'ALTER TABLE ' + file_id + ' ADD COLUMN' + column + geometry;
-
-		// 	queries.postgis({
-		// 		postgis_db : postgis_db,
-		// 		query : query
-		// 	}, function (err, results) {
-		// 		if (err) return callback(err);
-		// 		callback(err, geometry_type);
-		// 	});
-		// });
-
-
 		// populate geometry
 		ops.push(function (geometry_type, callback) {
 			var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_3857 TYPE Geometry(' + geometry_type + ', 3857) USING ST_Transform(geom, 3857)'
@@ -314,33 +293,6 @@ module.exports = queries = {
 				callback(err);
 			});
 		});
-
-		// // populate geometry
-		// ops.push(function (geometry_type, callback) {
-		// 	var query = 'ALTER TABLE ' + file_id + ' ALTER COLUMN the_geom_4326 TYPE Geometry(' + geometry_type + ', 4326) USING ST_Transform(geom, 4326)'
-
-  //  			queries.postgis({
-		// 		postgis_db : postgis_db,
-		// 		query : query
-		// 	}, function (err, results) {
-		// 		if (err) return callback(err);
-		// 		callback(err);
-		// 	});
-		// });
-
-		// // create index for 4326
-		// ops.push(function (callback) {
-		// 	var idx = file_id + '_the_geom_4326_idx';
-		// 	var query = 'CREATE INDEX ' + idx + ' ON ' + file_id + ' USING GIST(the_geom_4326)'
-
-		// 	queries.postgis({
-		// 		postgis_db : postgis_db,
-		// 		query : query
-		// 	}, function (err, results) {
-		// 		if (err) return callback(err);
-		// 		callback(null);
-		// 	});
-		// });
 
 		// create index for 3857
 		ops.push(function (callback) {
@@ -373,7 +325,6 @@ module.exports = queries = {
 		var dbuser = pgsql_options.dbuser;
 		var dbpass = pgsql_options.dbpass;
 		var conString = 'postgres://'+dbuser+':'+dbpass+'@'+dbhost+'/' + postgis_db;
-
 
 		console.log('pgquery:', options);
 

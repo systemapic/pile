@@ -2,9 +2,9 @@ var assert = require('assert');
 var mongoose = require('mongoose');
 var async = require('async');
 var fs = require('fs-extra');
-var crypto = require('crypto');
 var request = require('request');
 var _ = require('lodash');
+var forge = require('node-forge');
 var supertest = require('supertest');
 var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
 var endpoints = require('./endpoints.js');
@@ -18,6 +18,8 @@ module.exports = util = {
     test_layer: testData.test_layer,
 
     test_user: testData.test_user,
+
+    test_project : {},
 
     createExpectedError : function (errorMessage) {
         return {
@@ -130,9 +132,13 @@ module.exports = util = {
 
     create_project : function (done) {
         util.token(function (err, access_token) {
+
+            // random project name
+            var project_name = 'mocha-test-' + forge.util.bytesToHex(forge.random.getBytesSync(5));
+
             api.post(endpoints.projects.create)
             .send({
-                name : 'mocha-test-project', 
+                name : project_name, 
                 access_token : access_token
             })
             .end(function (err, res) {
@@ -141,8 +147,8 @@ module.exports = util = {
                 var project = util.parse(res.text).project;
                 assert.ok(project);
                 assert.ok(project.uuid);
-                assert.equal(project.name, 'mocha-test-project');
-                util.test_user.pid = project.uuid;
+                assert.equal(project.name, project_name);
+                util.test_project.uuid = project.uuid;
                 done();
             });
         });
@@ -152,7 +158,7 @@ module.exports = util = {
         util.token(function (err, access_token) {
             api.post(endpoints.projects.delete)
             .send({
-                projectUuid : util.test_user.pid, 
+                projectUuid : util.test_project.uuid, 
                 access_token : access_token
             })
             .end(function (err, res) {
