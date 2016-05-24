@@ -50,8 +50,8 @@ function get_default_cartocss() {
     defaultCartocss += 'raster-colorizer-stops: '; 
     defaultCartocss += '  stop(20, rgba(0,0,0,0)) '; 
     defaultCartocss += '  stop(21, #dddddd) '; 
-    defaultCartocss += '  stop(100, #0078ff) '; 
-    defaultCartocss += '  stop(200, #000E56) '; 
+    defaultCartocss += '  stop(100, rgba(6, 255, 63, 0.1)) '; 
+    defaultCartocss += '  stop(200, rgba(6, 255, 63, 1.0)) '; 
     defaultCartocss += '  stop(255, rgba(0,0,0,0), exact); '; 
     defaultCartocss += ' }';
     return defaultCartocss;
@@ -62,7 +62,16 @@ describe('Cubes', function () {
     this.slow(400);
 
     before(function(done) {
-        helpers.ensure_test_user_exists(done);
+
+        async.series([
+            helpers.ensure_test_user_exists,
+            helpers.create_project
+        ], done);
+
+    });
+
+    after(function (done) {
+        helpers.delete_project(done);
     });
 
 
@@ -244,7 +253,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('update dataset @ ' + endpoints.cube.update, function (done) {
+        it('update cube @ ' + endpoints.cube.update, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -277,7 +286,8 @@ describe('Cubes', function () {
                 api.post(endpoints.import.post)
                 .type('form')
                 .field('access_token', access_token)
-                .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.200.tif')))
+                // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.200.tif')))
+                .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow_scandinavia_jan.tif')))
                 .expect(httpStatus.OK)
                 .end(function (err, res) {
                     if (err) return done(err);
@@ -286,7 +296,7 @@ describe('Cubes', function () {
                     expect(status.file_id).to.exist;
                     expect(status.user_id).to.exist;
                     expect(status.upload_success).to.exist;
-                    expect(status.filename).to.be.equal('snow.raster.200.tif');
+                    expect(status.filename).to.be.equal('snow_scandinavia_jan.tif');
                     expect(status.status).to.be.equal('Processing');
                     tmp.uploaded_raster = status;
                     done();
@@ -299,7 +309,8 @@ describe('Cubes', function () {
                 api.post(endpoints.import.post)
                 .type('form')
                 .field('access_token', access_token)
-                .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.2.200.tif')))
+                // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.2.200.tif')))
+                .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow_scandinavia_july.tif')))
                 .expect(httpStatus.OK)
                 .end(function (err, res) {
                     if (err) return done(err);
@@ -308,7 +319,7 @@ describe('Cubes', function () {
                     expect(status.file_id).to.exist;
                     expect(status.user_id).to.exist;
                     expect(status.upload_success).to.exist;
-                    expect(status.filename).to.be.equal('snow.raster.2.200.tif');
+                    expect(status.filename).to.be.equal('snow_scandinavia_july.tif');
                     expect(status.status).to.be.equal('Processing');
                     tmp.uploaded_raster_2 = status;
                     done();
@@ -398,7 +409,7 @@ describe('Cubes', function () {
                             debugMode && console.log(status);
                             expect(status.upload_success).to.exist;
                             expect(status.status).to.be.equal('Done');
-                            expect(status.filename).to.be.equal('snow.raster.200.tif');
+                            expect(status.filename).to.be.equal('snow_scandinavia_jan.tif');
                             expect(status.error_code).to.be.null;
                             expect(status.error_text).to.be.null;
                             done();
@@ -424,7 +435,7 @@ describe('Cubes', function () {
                             debugMode && console.log(status);
                             expect(status.upload_success).to.exist;
                             expect(status.status).to.be.equal('Done');
-                            expect(status.filename).to.be.equal('snow.raster.2.200.tif');
+                            expect(status.filename).to.be.equal('snow_scandinavia_july.tif');
                             expect(status.error_code).to.be.null;
                             expect(status.error_text).to.be.null;
                             done();
@@ -518,8 +529,7 @@ describe('Cubes', function () {
 
                 var layer = {
                     access_token : access_token,
-                    // todo: create project for test, and clean up after
-                    projectUuid : 'project-35532fe5-ccdb-4d39-b98a-1dbf4548c443', // pass to automatically attach to project
+                    projectUuid : util.test_project_uuid,
                     data : { cube : tmp.cube_with_datasets },
                     metadata : tmp.uploaded_raster.metadata,
                     title : 'Snow raster cube',
@@ -545,14 +555,7 @@ describe('Cubes', function () {
                 });
             });
         });
-    });
-
-
-
-
-
-
-    context("with masks", function () {
+  
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
@@ -793,13 +796,10 @@ describe('Cubes', function () {
 
 
 
-    });
 
 
-    
 
-    context("replacing datasets", function () {
-
+        // date stamp for replacing dataset
         var date_stamp = moment().format();
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
@@ -818,7 +818,35 @@ describe('Cubes', function () {
                     expect(cube.timestamp).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.exist;
-                    tmp.created_empty = cube;
+                    tmp.replacing_cube = cube;
+                    done();
+                });
+            });
+        });
+
+        it('update cube @ ' + endpoints.cube.update, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.replacing_cube.cube_id,
+                    style : get_default_cartocss(),
+                    quality : 'png8'
+                }
+
+                api.post(endpoints.cube.update)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.replacing_cube.cube_id);
+                    expect(cube.style).to.equal(data.style);
+                    expect(cube.quality).to.equal(data.quality);
                     done();
                 });
             });
@@ -827,12 +855,10 @@ describe('Cubes', function () {
         it('add dataset to cube @ ' + endpoints.cube.add, function (done) {
             token(function (err, access_token) {
 
-                console.log('date_stamp', date_stamp);
-
                 // test data
                 var data = {
                     access_token : access_token,
-                    cube_id : tmp.created_empty.cube_id,
+                    cube_id : tmp.replacing_cube.cube_id,
                     datasets : [{
                         id : tmp.uploaded_raster.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster.filename,
@@ -849,7 +875,7 @@ describe('Cubes', function () {
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
                     expect(cube.createdBy).to.exist;
-                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    expect(cube.cube_id).to.equal(tmp.replacing_cube.cube_id);
                     expect(cube.datasets).to.have.lengthOf(1);
                     expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
                     expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
@@ -859,15 +885,39 @@ describe('Cubes', function () {
             });
         });
 
+
+        it('should get expected raster-tile from cube', function (done) {
+            this.slow(5000);
+            token(function (err, access_token) {
+                var type = 'png';
+                var tile = [7,67,37]; // oslo
+                var cube_id = tmp.replacing_cube.cube_id;
+                var tiles_url = base_cubes_url();
+                var dataset_uuid = tmp.uploaded_raster.file_id;
+                tiles_url += cube_id + '/' + dataset_uuid + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
+                var expected = __dirname + '/open-data/expected-cube-tile-1.png';
+                var actual = __dirname + '/tmp/cube-tile-1.png'
+
+                http.get({
+                    url : tiles_url,
+                    noSslVerifier : true
+                }, actual, function (err, result) {
+                    if (err) return done(err);
+                    var e = fs.readFileSync(actual);
+                    var a = fs.readFileSync(expected);
+                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    done();
+                });
+            });
+        });
+
         it('replace dataset in cube @ ' + endpoints.cube.replace, function (done) {
             token(function (err, access_token) {
-
-                console.log('date_stamp', date_stamp);
 
                 // test data
                 var data = {
                     access_token : access_token,
-                    cube_id : tmp.created_empty.cube_id,
+                    cube_id : tmp.replacing_cube.cube_id,
                     datasets : [{
                         id : tmp.uploaded_raster_2.file_id,
                         description : 'Filename: ' + tmp.uploaded_raster_2.filename,
@@ -885,7 +935,7 @@ describe('Cubes', function () {
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
                     expect(cube.createdBy).to.exist;
-                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    expect(cube.cube_id).to.equal(tmp.replacing_cube.cube_id);
                     expect(cube.datasets).to.have.lengthOf(1);
                     expect(cube.datasets[0].id).to.equal(data.datasets[0].id);
                     expect(cube.datasets[0].description).to.equal(data.datasets[0].description);
@@ -894,6 +944,34 @@ describe('Cubes', function () {
                 });
             });
         });
+
+
+
+        it('should get expected second raster-tile from cube', function (done) {
+            this.slow(5000);
+            token(function (err, access_token) {
+                var type = 'png';
+                var tile = [7,67,37]; // oslo
+                var cube_id = tmp.replacing_cube.cube_id;
+                var tiles_url = base_cubes_url();
+                var dataset_uuid = tmp.uploaded_raster_2.file_id;
+                tiles_url += cube_id + '/' + dataset_uuid + '/' + tile[0] + '/' + tile[1] + '/' + tile[2] + '.' + type + '?access_token=' + access_token;
+                var expected = __dirname + '/open-data/expected-cube-tile-2.png';
+                var actual = __dirname + '/tmp/cube-tile-2.png'  
+
+                http.get({
+                    url : tiles_url,
+                    noSslVerifier : true
+                }, actual, function (err, result) {
+                    if (err) return done(err);
+                    var e = fs.readFileSync(actual);
+                    var a = fs.readFileSync(expected);
+                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    done();
+                });
+            });
+        });
+
 
     });
 

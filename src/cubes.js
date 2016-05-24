@@ -56,7 +56,7 @@ module.exports = cubes = {
         // default cube options
         var defaultOptions = {
             cube_id : 'cube-' + uuid.v4(),
-            timestamp : new Date().getTime(),
+            timestamp : moment().valueOf(),
             createdBy : req.user.uuid,
             style : options.style || '#layer { raster-opacity: 1; }',
             quality : options.quality || 'png32',
@@ -122,6 +122,9 @@ module.exports = cubes = {
                 cube.datasets.push(d);
             });
 
+            // mark changed
+            cube.timestamp = moment().valueOf();
+
             // save
             cubes.save(cube, callback);
         });
@@ -163,6 +166,9 @@ module.exports = cubes = {
                 _.remove(cube.datasets, {id : d.id});
             });
 
+            // mark changed
+            cube.timestamp = moment().valueOf();
+
             // save
             cubes.save(cube, callback);
         });
@@ -202,8 +208,8 @@ module.exports = cubes = {
             // add options to existing cube
             var updated_cube = _.extend(cube, options);
 
-            // update timestamp
-            updated_cube.timestamp = new Date().getTime();
+            // mark changed
+            updated_cube.timestamp = moment().valueOf();;
 
             // save
             cubes.save(updated_cube, callback);
@@ -253,7 +259,7 @@ module.exports = cubes = {
                 //     id: 'file_ckvuatwfkqpyzjxjpygj',
                 //     description: 'Filename: snow.raster.2.200.tif',
                 //     timestamp: 'Fri May 20 2016 11:33:20 GMT+0000 (UTC)',
-                //     time_resolution: 'day' 
+                //     granularity: 'day' 
                 // }
 
                 // get moment() datestamp of dataset to add
@@ -269,9 +275,18 @@ module.exports = cubes = {
 
                 // already exists a dataset on this day, replace!
                 if (i > -1) {
-                    console.log('replacing!', d);
+
+                    // replace dataset
                     cube.datasets[i] = d;
+
+                    // mark changed
+                    cube.timestamp = moment().valueOf();
+
+                    // log
+                    console.log('Replacing dataset', cube.timestamp);
+
                 }
+
             });
 
             // save
@@ -420,7 +435,7 @@ module.exports = cubes = {
             // add mask to cube
             var updated_cube = _.extend(cube, {
                 mask : topology,
-                timestamp : new Date().getTime()
+                timestamp : moment().valueOf()
             });
 
             // save
@@ -451,6 +466,9 @@ module.exports = cubes = {
 
             // delete mask
             delete cube.mask;
+
+            // mark changed
+            cube.timestamp = moment().valueOf();
  
             // save
             cubes.save(cube, function (err, updated_cube) {
@@ -518,15 +536,15 @@ module.exports = cubes = {
         var cube_request = options.cube_request;
 
         // check if tile is outside bounds if dataset
-        var out_of_bounds = cubes._isOutsideExtent(options);
+        var outside_extent = cubes._isOutsideExtent(options);
 
-        if (out_of_bounds) {
+        if (outside_extent) {
             console.log('Serving empty tile (outside extent)')
             return pile.serveEmptyTile(res);
         }
 
         // create unique hash for style
-        var style_hash = forge.md.md5.create().update(cube.style).digest().toHex();
+        var style_hash = forge.md.md5.create().update(cube.style + cube.timestamp).digest().toHex();
 
         // define path
         var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + style_hash + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
@@ -714,6 +732,7 @@ module.exports = cubes = {
                     callback(null, tilePath);
                 });
             });
+
         });
 
         // run ops
@@ -723,7 +742,6 @@ module.exports = cubes = {
             done(err, tilePath);
         });
     },
-
 
 
     query : function (req, res) {
@@ -755,36 +773,12 @@ module.exports = cubes = {
 
                 // single mask query
                 cubes.queries.scf_single_mask(req, res);
+
             }
 
         },
 
-        scf_single_mask : function (req, res) {
-            var options     = req.body;
-            var query_type  = options.query_type;
-            var cube_id     = options.cube_id;
-            var mask_id     = options.mask ? options.mask.mask_id : false;
-            var year        = options.year;
-            var force_query = options.options ? options.options.force_query : false;
-            var ops         = [];
-
-            // check for already stored query
-            var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
-            store.layers.get(query_key, function (err, stored_query) {
-
-                // return stored query if any
-                if (!err && stored_query && !force_query) return res.end(stored_query);
-
-                // create and run new query
-                cubes.queries.create_scf_single_mask_query(options, function (err, query) {
-
-                    // return to client
-                    res.send(query);                      
-
-                });
-            });
-        },
-
+       
         scf_multi_mask : function (req, res) {
             var options     = req.body;
             var query_type  = options.query_type;
@@ -797,9 +791,9 @@ module.exports = cubes = {
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
             store.layers.get(query_key, function (err, stored_query) {
-
+                
                 // return stored query if any
-                if (!err && stored_query && !force_query) return res.end(stored_query);
+                if (!err && _.size(stored_query) && !force_query) return res.end(stored_query);
 
                 // create and run new query
                 cubes.queries.create_scf_multi_mask_query(options, function (err, query) {
@@ -823,7 +817,6 @@ module.exports = cubes = {
             var day = options.day;
             var ops = [];
 
-
             // get cube
             ops.push(function (callback) {
                 cubes.find(cube_id, callback);
@@ -836,7 +829,7 @@ module.exports = cubes = {
                 var datasets = cube.datasets;
 
                 // filter cube's datasets for this year only
-                var withinRange = _.filter(datasets, function (d) {
+                var datasets_in_range = _.filter(datasets, function (d) {
                     var current = moment(d.timestamp);
                     var before = moment().year(year).dayOfYear(1);
                     var after = moment().year(year).dayOfYear(365);
@@ -845,7 +838,7 @@ module.exports = cubes = {
 
                 // get details on all datasets
                 pile.POST(pile.routes.base + pile.routes.get_datasets, {
-                    datasets : withinRange,
+                    datasets : datasets_in_range,
                     access_token : access_token,
                 }, function (err, dataset_details){
                     callback(err, dataset_details, cube);
@@ -863,8 +856,9 @@ module.exports = cubes = {
 
                 var geometry_results = [];
 
-                async.each(geometries, function (geom, each_callback) {
-                    
+                // query each geometry
+                async.eachSeries(geometries, function (geom, each_callback) {
+
                     // create geojson from geometry
                     options.mask = cubes.geojsonFromGeometry(geom);
 
@@ -880,8 +874,6 @@ module.exports = cubes = {
                     });
                 
                 }, function (err) {
-
-
 
                     var dates = {};
 
@@ -926,7 +918,7 @@ module.exports = cubes = {
             async.waterfall(ops, function (err, scfs) {
 
                 // catch errors
-                if (err) return res.status(400).send(err);
+                if (err) return done(err);
 
                 // save query to redis cache
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
@@ -938,6 +930,117 @@ module.exports = cubes = {
                 });
             });
 
+        },
+
+
+        query_snow_cover_fraction_multi_mask : function (options, done) {
+
+            var datasets = options.datasets;
+            var cube = options.cube;
+            var mask = options.mask;
+            var queryOptions;
+            var n = 0;
+            var query_results = [];
+
+            // set query id
+            var query_id = 'query-' + tools.getRandomChars(10);
+
+            // query each dataset
+            async.eachSeries(datasets, function (dataset, callback) {
+
+                // get dataset date
+                var timestamp_dataset = _.find(cube.datasets, function (d) {
+                    return d.id == dataset.table_name;
+                })
+                if(!timestamp_dataset) return callback(null);
+                var dataset_date = timestamp_dataset.timestamp;
+
+                // set query options
+                queryOptions = {
+                    dataset : dataset,
+                    query_num : n++,
+                    query_id : query_id,
+                    dataset_date : dataset_date, // get date of dataset in cube, not timestamp of dataset
+                    mask : mask,
+                }
+
+                // create query
+                cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
+                    
+                    // get rows
+                    var rows = pg_result.rows;
+
+                    // get date from cube dataset (not from dataset internal timestamp)
+                    var cubeDatasetTimestamp = queryOptions.dataset_date;
+
+                    // results
+                    var scf_results = {
+                        date : moment(cubeDatasetTimestamp).format(),
+                        rows : rows
+                    };
+
+                    // write results to redis
+                    query_results.push(scf_results);
+
+                    callback();
+
+                });
+
+            }, function (err) {
+
+                done(err, query_results);
+
+            });
+
+        },
+
+
+        postgis_snowcover : function (options, done) {
+
+            // options
+            var dataset = options.dataset;
+            var geojson = options.mask;
+            var cube = options.cube;
+            var query_id = options.query_id;
+            var query_num = options.query_num;
+
+            // get postgis compatible geojson
+            var pg_geojson = cubes._retriveGeoJSON(geojson);
+
+            // set postgis options
+            var pg_username = process.env.SYSTEMAPIC_PGSQL_USERNAME;
+            var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
+            var pg_database = dataset.database_name;
+
+            // set connection string
+            var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
+
+            // initialize a connection pool
+            pg.connect(conString, function(err, client, pg_done) {
+                if (err) return console.error('error fetching client from pool', err);
+
+                // create query with geojson mask
+                if (pg_geojson) {
+                 
+                    // with mask
+                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+               
+                } else {
+                 
+                    // without mask
+                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc ) as t;"
+               
+                }
+
+                // query postgis
+                client.query(query, function(err, pg_result) {
+                   
+                    // call `pg_done()` to release the client back to the pool
+                    pg_done();
+
+                    done(err, pg_result);
+                });
+            });
         },
 
 
@@ -984,13 +1087,38 @@ module.exports = cubes = {
 
             });
 
-            console.log('dates --<', dates);
-
             return dates;
 
         },
 
        
+        scf_single_mask : function (req, res) {
+            var options     = req.body;
+            var query_type  = options.query_type;
+            var cube_id     = options.cube_id;
+            var mask_id     = options.mask ? options.mask.mask_id : false;
+            var year        = options.year;
+            var force_query = options.options ? options.options.force_query : false;
+            var ops         = [];
+
+            // check for already stored query
+            var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
+            store.layers.get(query_key, function (err, stored_query) {
+
+                // return stored query if any
+                if (!err && stored_query && !force_query) return res.end(stored_query);
+
+                // create and run new query
+                cubes.queries.create_scf_single_mask_query(options, function (err, query) {
+
+                    // return to client
+                    res.send(query);                      
+
+                });
+            });
+        },
+
+
         create_scf_single_mask_query : function (options, done) {
             var query_type = options.query_type;
             var access_token = options.access_token;
@@ -1073,7 +1201,7 @@ module.exports = cubes = {
             async.waterfall(ops, function (err, scfs) {
 
                 // catch errors
-                if (err) return res.status(400).send(err);
+                if (err) return done(err);
 
                 // save query to redis cache
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
@@ -1088,67 +1216,7 @@ module.exports = cubes = {
         },
 
 
-        query_snow_cover_fraction_multi_mask : function (options, done) {
-
-            var datasets = options.datasets;
-            var cube = options.cube;
-            var mask = options.mask;
-            var queryOptions;
-            var n = 0;
-
-            // set query id
-            var query_id = 'query-' + tools.getRandomChars(10);
-
-            // query each dataset
-            async.eachSeries(datasets, function (dataset, callback) {
-
-                // set query options
-                queryOptions = {
-                    dataset : dataset,
-                    query_num : n++,
-                    query_id : query_id,
-                    dataset_date : _.find(cube.datasets, function (d) {
-                        return d.id == dataset.table_name;
-                    }).timestamp, // get date of dataset in cube, not timestamp of dataset
-                    mask : mask,
-                }
-
-                // create query
-                cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
-                    
-                    // get rows
-                    var rows = pg_result.rows;
-
-                    // get date from cube dataset (not from dataset internal timestamp)
-                    var cubeDatasetTimestamp = queryOptions.dataset_date;
-
-                    // results
-                    var scf_results = {
-                        date : moment(cubeDatasetTimestamp).format(),
-                        rows : rows
-                    };
-
-                    // write results to redis
-                    var key = query_id + '-' + queryOptions.query_num;
-                    store.temp.set(key, JSON.stringify(scf_results), callback);
-
-                });
-
-            }, function (err) {
-
-                // get query result from redis
-                async.times(n, function (i, next) {
-                    var key = queryOptions.query_id + '-' + i;
-                    store.temp.get(key, function (err, part) {
-
-                        // parse parts
-                        next(err, tools.safeParse(part));
-                    });
-                }, done);
-            });
-
-        },
-
+        
 
         query_snow_cover_fraction_single_mask : function (options, done) {
 
@@ -1157,6 +1225,7 @@ module.exports = cubes = {
             var mask = options.mask;
             var queryOptions;
             var n = 0;
+            var query_results = [];
 
             // set query id
             var query_id = 'query-' + tools.getRandomChars(10);
@@ -1165,14 +1234,18 @@ module.exports = cubes = {
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
 
+                var timestamp_dataset = _.find(cube.datasets, function (d) {
+                    return d.id == dataset.table_name;
+                })
+                if(!timestamp_dataset) return callback(null);
+                var dataset_date = timestamp_dataset.timestamp;
+
                 // set query options
                 queryOptions = {
                     dataset : dataset,
                     query_num : n++,
                     query_id : query_id,
-                    dataset_date : _.find(cube.datasets, function (d) {
-                        return d.id == dataset.table_name;
-                    }).timestamp, // get date of dataset in cube, not timestamp of dataset
+                    dataset_date : dataset_date, // get date of dataset in cube, not timestamp of dataset
                     mask : mask,
                 }
 
@@ -1195,79 +1268,32 @@ module.exports = cubes = {
                         rows : rows
                     };
 
-                    // write results to redis
-                    var key = query_id + '-' + queryOptions.query_num;
-                    store.temp.set(key, JSON.stringify(scf_results), callback);
+                    // // write results to redis
+                    // var key = query_id + '-' + queryOptions.query_num;
+                    // store.temp.set(key, JSON.stringify(scf_results), callback);
 
+                    query_results.push(scf_results);
                 });
 
             }, function (err) {
 
-                // get query result from redis
-                async.times(n, function (i, next) {
-                    var key = queryOptions.query_id + '-' + i;
-                    store.temp.get(key, function (err, part) {
+                done(err, query_results);
 
-                        // parse parts
-                        next(err, tools.safeParse(part));
-                    });
-                }, done);
+                // // get query result from redis
+                // async.times(n, function (i, next) {
+                //     var key = queryOptions.query_id + '-' + i;
+                //     store.temp.get(key, function (err, part) {
+
+                //         // parse parts
+                //         next(err, tools.safeParse(part));
+                //     });
+                // }, done);
             });
 
         },
 
 
-        postgis_snowcover : function (options, done) {
 
-            // options
-            var dataset = options.dataset;
-            var geojson = options.mask;
-            var cube = options.cube;
-            var query_id = options.query_id;
-            var query_num = options.query_num;
-
-            // get postgis compatible geojson
-            var pg_geojson = cubes._retriveGeoJSON(geojson);
-
-            // set postgis options
-            var pg_username = process.env.SYSTEMAPIC_PGSQL_USERNAME;
-            var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
-            var pg_database = dataset.database_name;
-
-            // console.log('database', dataset.database_name);
-            // console.log('table', dataset.table_name);
-            
-            // set connection string
-            var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
-
-            // initialize a connection pool
-            pg.connect(conString, function(err, client, pg_done) {
-                if (err) return console.error('error fetching client from pool', err);
-
-                // create query with geojson mask (works!)
-
-                if (pg_geojson) {
-                    // with mask
-                    // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
-                    // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
-                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
-                } else {
-                    // without mask
-                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc ) as t;"
-                }
-
-                // query postgis
-                console.time('querying');
-                client.query(query, function(err, pg_result) {
-                console.timeEnd('querying');
-                   
-                    // call `pg_done()` to release the client back to the pool
-                    pg_done();
-
-                    done(err, pg_result);
-                });
-            });
-        },
     },
 
 
