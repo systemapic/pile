@@ -464,7 +464,7 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var e = fs.readFileSync(actual);
                     var a = fs.readFileSync(expected);
-                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    assert.ok(Math.abs(e.length - a.length) < 250);
                     done();
                 });
             });
@@ -905,7 +905,7 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var e = fs.readFileSync(actual);
                     var a = fs.readFileSync(expected);
-                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    assert.ok(Math.abs(e.length - a.length) < 250);
                     done();
                 });
             });
@@ -966,7 +966,7 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var e = fs.readFileSync(actual);
                     var a = fs.readFileSync(expected);
-                    assert.ok(Math.abs(e.length - a.length) < 100);
+                    assert.ok(Math.abs(e.length - a.length) < 250);
                     done();
                 });
             });
