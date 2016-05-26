@@ -964,6 +964,9 @@ module.exports = cubes = {
                     mask : mask,
                 }
 
+                console.log('dataset_date', dataset_date);
+                console.log('dataset:', dataset);
+
                 // create query
                 cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
                     
@@ -1011,6 +1014,8 @@ module.exports = cubes = {
             var pg_username = process.env.SYSTEMAPIC_PGSQL_USERNAME;
             var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
             var pg_database = dataset.database_name;
+
+           
 
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
