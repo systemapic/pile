@@ -539,7 +539,7 @@ module.exports = cubes = {
         var outside_extent = cubes._isOutsideExtent(options);
 
         if (outside_extent) {
-            console.log('Serving empty tile (outside extent)')
+            // console.log('Serving empty tile (outside extent)')
             return pile.serveEmptyTile(res);
         }
 
@@ -555,7 +555,7 @@ module.exports = cubes = {
             if (!err && tile_buffer) {
 
                 // return cached tile
-                console.log('Serving cached tile', cube_request.z + ':' + cube_request.x + ':' + cube_request.y);
+                // console.log('Serving cached tile', cube_request.z + ':' + cube_request.x + ':' + cube_request.y);
                 res.writeHead(200, {'Content-Type': pile.headers['png']});
                 res.end(tile_buffer);
 
@@ -747,6 +747,8 @@ module.exports = cubes = {
     query : function (req, res) {
         var options = req.body;
         var query_type = options.query_type;
+
+        console.log('query');
         
         // snow cover fraction
         if (query_type == 'scf') return cubes.queries.scf(req, res);
@@ -788,6 +790,8 @@ module.exports = cubes = {
             var force_query = options.options ? options.options.force_query : false;
             var ops         = [];
 
+            console.log('scf_multi_mask', options);
+
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
             store.layers.get(query_key, function (err, stored_query) {
@@ -819,11 +823,13 @@ module.exports = cubes = {
 
             // get cube
             ops.push(function (callback) {
+                console.log('find cube');
                 cubes.find(cube_id, callback);
             });
 
             // get relevant datasets to query, from [wu]
             ops.push(function (cube, callback) {
+                console.log('get relevant datasets');
 
                 // get cube datasets
                 var datasets = cube.datasets;
@@ -848,6 +854,7 @@ module.exports = cubes = {
 
             // fix mask
             ops.push(function (dataset_details, cube, callback) {
+                console.log('fix mask', _.size(dataset_details));
 
                 var options = {
                     datasets : dataset_details,
@@ -1106,9 +1113,14 @@ module.exports = cubes = {
             var force_query = options.options ? options.options.force_query : false;
             var ops         = [];
 
+            console.log('scf_single_mask', options);
+
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
+            console.log('query_key:', query_key);
             store.layers.get(query_key, function (err, stored_query) {
+
+                console.log('query_key', query_key, err, _.size(stored_query));
 
                 // return stored query if any
                 if (!err && stored_query && !force_query) return res.end(stored_query);
@@ -1136,6 +1148,7 @@ module.exports = cubes = {
             var day = options.day;
             var ops = [];
 
+            console.log('create single');
 
             // get cube
             ops.push(function (callback) {
@@ -1147,6 +1160,8 @@ module.exports = cubes = {
 
                 // get cube datasets
                 var datasets = cube.datasets;
+
+                console.log('cube datasets', _.size(datasets));
 
                 // filter cube's datasets for this year only
                 var withinRange = _.filter(datasets, function (d) {
@@ -1181,6 +1196,7 @@ module.exports = cubes = {
                     var topo_mask = cube.mask;
 
                     // todo: add to options??
+                    console.log('geom all');
                     
                     callback(null, options);
 
@@ -1188,6 +1204,8 @@ module.exports = cubes = {
                     
                     // create geojson from geometry
                     options.mask = cubes.geojsonFromGeometry(geometry);
+
+                    console.log('mask ', options.mask);
 
                     // continue
                     callback(null, options);
@@ -1204,6 +1222,7 @@ module.exports = cubes = {
             
             
             async.waterfall(ops, function (err, scfs) {
+                console.log('all done 2', err, _.size(scfs));
 
                 // catch errors
                 if (err) return done(err);
@@ -1211,6 +1230,7 @@ module.exports = cubes = {
                 // save query to redis cache
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
                 store.layers.set(query_key, JSON.stringify(scfs), function (err) {
+                    console.log('saved: ', query_key, err);
 
                     // done
                     done(null, scfs);
@@ -1224,7 +1244,6 @@ module.exports = cubes = {
         
 
         query_snow_cover_fraction_single_mask : function (options, done) {
-
             var datasets = options.datasets;
             var cube = options.cube;
             var mask = options.mask;
@@ -1235,9 +1254,10 @@ module.exports = cubes = {
             // set query id
             var query_id = 'query-' + tools.getRandomChars(10);
 
-
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
+
+                console.log('querying each');
 
                 var timestamp_dataset = _.find(cube.datasets, function (d) {
                     return d.id == dataset.table_name;
@@ -1256,6 +1276,7 @@ module.exports = cubes = {
 
                 // create query
                 cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
+                    if (err) return callback(err);
                     
                     // get rows
                     var rows = pg_result.rows;
@@ -1278,9 +1299,15 @@ module.exports = cubes = {
                     // store.temp.set(key, JSON.stringify(scf_results), callback);
 
                     query_results.push(scf_results);
+
+                    // callback
+                    callback(null);
+
                 });
 
             }, function (err) {
+
+                console.log('all done -->', err, _.size(query_results));
 
                 done(err, query_results);
 
