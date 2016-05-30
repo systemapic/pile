@@ -588,7 +588,8 @@ describe('Cubes', function () {
                     cube_id : tmp.created_empty.cube_id,
                     mask : {
                         type : 'geojson',
-                        mask : '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]}',
+                        // mask : '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]}',
+                        geometry : '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]}',
                     }
                 }
 
@@ -599,7 +600,9 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var cube = res.body;
                     debugMode && console.log(cube);
+                    expect(cube.mask.type).to.equal('topojson');
                     expect(cube.timestamp).to.exist;
+                    expect(cube.mask.geometry).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
@@ -616,7 +619,8 @@ describe('Cubes', function () {
                     cube_id : tmp.created_empty.cube_id,
                     mask : {
                         type : 'topojson',
-                        mask : '{"type":"Topology","objects":{"collection":{"type":"GeometryCollection","geometries":[{"type":"Polygon","arcs":[[0]]}]}},"arcs":[[[0,0],[0,9999],[9999,0],[0,-9999],[-9999,0]]],"transform":{"scale":[0.00013954032121962193,0.00007602713378509362],"translate":[9.2230224609375,58.91031927906605]},"bbox":[9.2230224609375,58.91031927906605,10.6182861328125,59.6705145897832]}'
+                        // mask : '{"type":"Topology","objects":{"collection":{"type":"GeometryCollection","geometries":[{"type":"Polygon","arcs":[[0]]}]}},"arcs":[[[0,0],[0,9999],[9999,0],[0,-9999],[-9999,0]]],"transform":{"scale":[0.00013954032121962193,0.00007602713378509362],"translate":[9.2230224609375,58.91031927906605]},"bbox":[9.2230224609375,58.91031927906605,10.6182861328125,59.6705145897832]}'
+                        geometry : '{"type":"Topology","objects":{"collection":{"type":"GeometryCollection","geometries":[{"type":"Polygon","arcs":[[0]]}]}},"arcs":[[[0,0],[0,9999],[9999,0],[0,-9999],[-9999,0]]],"transform":{"scale":[0.00013954032121962193,0.00007602713378509362],"translate":[9.2230224609375,58.91031927906605]},"bbox":[9.2230224609375,58.91031927906605,10.6182861328125,59.6705145897832]}'
                     }
                 }
 
@@ -628,7 +632,8 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.mask).to.exist;
-                    expect(cube.mask).to.equal(data.mask.mask);
+                    expect(cube.mask.geometry).to.equal(data.mask.geometry);
+                    expect(cube.mask.type).to.equal('topojson');
                     expect(cube.timestamp).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
@@ -638,12 +643,12 @@ describe('Cubes', function () {
         });
 
 
-        it('should upload cube-mask.zip', function (done) {
+        it('should upload cube-vector-mask.zip', function (done) {
             token(function (err, access_token) {
                 api.post(endpoints.import.post)
                 .type('form')
                 .field('access_token', access_token)
-                .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-mask.zip')))
+                .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-vector-mask.zip')))
                 .expect(httpStatus.OK)
                 .end(function (err, res) {
                     assert.ifError(err);
@@ -651,12 +656,12 @@ describe('Cubes', function () {
                     assert.ok(result.file_id);
                     assert.ok(result.user_id);
                     assert.ok(result.upload_success);
-                    assert.equal(result.filename, 'cube-mask.zip');
+                    assert.equal(result.filename, 'cube-vector-mask.zip');
                     assert.equal(result.status, 'Processing');
                     assert.ifError(result.error_code);
                     assert.ifError(result.error_text);
 
-                    tmp.cube_mask_file_id = result.file_id;
+                    tmp.cube_postgis_vector_mask_file_id = result.file_id;
                     done();
                 });
             });
@@ -669,7 +674,7 @@ describe('Cubes', function () {
                 var processingInterval = setInterval(function () {
                 process.stdout.write('.');
                     api.get(endpoints.import.status)
-                    .query({ file_id : tmp.cube_mask_file_id, access_token : access_token})
+                    .query({ file_id : tmp.cube_postgis_vector_mask_file_id, access_token : access_token})
                     .end(function (err, res) {
                         assert.ifError(err);
                         var status = helpers.parse(res.text);
@@ -682,7 +687,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('should add mask from existing dataset @ ' + endpoints.cube.mask, function (done) {
+        it('should add vector mask from postgis @ ' + endpoints.cube.mask, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -690,8 +695,85 @@ describe('Cubes', function () {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
                     mask : {
-                        type : 'dataset',
-                        mask : tmp.cube_mask_file_id,
+                        // type : 'dataset',
+                        type : 'postgis-vector',
+                        // mask : tmp.cube_mask_file_id,
+                        dataset_id : tmp.cube_postgis_vector_mask_file_id,
+                    }
+                }
+
+                api.post(endpoints.cube.mask)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
+                    done();
+                });
+            });
+        });
+
+
+        it('should upload cube-raster-mask.tif', function (done) {
+            token(function (err, access_token) {
+                api.post(endpoints.import.post)
+                .type('form')
+                .field('access_token', access_token)
+                .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-raster-mask.tif')))
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    assert.ifError(err);
+                    var result = helpers.parse(res.text);
+                    assert.ok(result.file_id);
+                    assert.ok(result.user_id);
+                    assert.ok(result.upload_success);
+                    assert.equal(result.filename, 'cube-raster-mask.tif');
+                    assert.equal(result.status, 'Processing');
+                    assert.ifError(result.error_code);
+                    assert.ifError(result.error_text);
+
+                    tmp.cube_postgis_raster_mask_file_id = result.file_id;
+                    done();
+                });
+            });
+        });
+
+        it('should process', function (done) {       
+            this.timeout(11000);     
+            this.slow(5000);
+            token(function (err, access_token) {
+                var processingInterval = setInterval(function () {
+                process.stdout.write('.');
+                    api.get(endpoints.import.status)
+                    .query({ file_id : tmp.cube_postgis_raster_mask_file_id, access_token : access_token})
+                    .end(function (err, res) {
+                        assert.ifError(err);
+                        var status = helpers.parse(res.text);
+                        if (status.processing_success) {
+                            clearInterval(processingInterval);
+                            done();
+                        }
+                    });
+                }, 500);
+            });
+        });
+
+        it('should add raster mask from postgis @ ' + endpoints.cube.mask, function (done) {
+            token(function (err, access_token) {
+
+                // test data
+                var data = {
+                    access_token : access_token,
+                    cube_id : tmp.created_empty.cube_id,
+                    mask : {
+                        // type : 'dataset',
+                        type : 'postgis-raster',
+                        // mask : tmp.cube_mask_file_id,
+                        dataset_id : tmp.cube_postgis_raster_mask_file_id,
                     }
                 }
 
@@ -720,7 +802,7 @@ describe('Cubes', function () {
                     cube_id : tmp.created_empty.cube_id,
                     mask : {
                         type : 'geojson',
-                        mask : 'invalid topojson'
+                        geometry : 'invalid topojson'
                     }
                 }
 
@@ -748,7 +830,7 @@ describe('Cubes', function () {
                     cube_id : tmp.created_empty.cube_id,
                     mask : {
                         type : 'handdrawn',
-                        mask : ''
+                        geometry : ''
                     }
                 }
 
