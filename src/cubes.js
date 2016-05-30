@@ -416,6 +416,10 @@ module.exports = cubes = {
                 });
             };
 
+        // mask from raster
+        } else if (mask.type == 'geotiff') {
+
+            
         
         // throw on non-supported mask types
         } else {
@@ -750,8 +754,6 @@ module.exports = cubes = {
         var options = req.body;
         var query_type = options.query_type;
 
-        console.log('query');
-        
         // snow cover fraction
         if (query_type == 'scf') return cubes.queries.scf(req, res);
 
