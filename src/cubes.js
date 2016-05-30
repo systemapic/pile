@@ -971,8 +971,8 @@ module.exports = cubes = {
                     mask : mask,
                 }
 
-                console.log('dataset_date', dataset_date);
-                console.log('dataset:', dataset);
+                // console.log('dataset_date', dataset_date);
+                // console.log('dataset:', dataset);
 
                 // create query
                 cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
@@ -1113,7 +1113,9 @@ module.exports = cubes = {
             var force_query = options.options ? options.options.force_query : false;
             var ops         = [];
 
-            console.log('scf_single_mask', options);
+            if (!mask_id) return res.status(502).send({
+                error : 'Need a mask to query.'
+            });
 
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
@@ -1240,8 +1242,6 @@ module.exports = cubes = {
 
         },
 
-
-        
 
         query_snow_cover_fraction_single_mask : function (options, done) {
             var datasets = options.datasets;
