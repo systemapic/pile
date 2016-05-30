@@ -321,7 +321,7 @@ module.exports = cubes = {
 
         var ops = {};
 
-        // console.log('mask', options);
+        console.log('mask', options);
 
         // get cube
         ops.cube = function (callback) {
@@ -333,10 +333,10 @@ module.exports = cubes = {
         if (mask.type == 'geojson') {
 
             // convert geojson to topojson
-            ops.topo = function (callback) {
+            ops.mask = function (callback) {
 
                 // parse geojson string
-                var collection = tools.safeParse(mask.mask);
+                var collection = tools.safeParse(mask.geometry);
 
                 // throw on failed parsing
                 if (!collection) return callback({error : 'Invalid GeoJSON', error_code : 3});
@@ -352,8 +352,14 @@ module.exports = cubes = {
                     }
                 });
 
+                // mask to save
+                var prepared_mask = {
+                    type : 'topojson',
+                    geometry : topology
+                }
+
                 // return topojson
-                callback(null, topology);
+                callback(null, prepared_mask);
             };
            
 
@@ -361,27 +367,33 @@ module.exports = cubes = {
         } else if (mask.type == 'topojson') {
 
             // convert geojson to topojson
-            ops.topo = function (callback) {
+            ops.mask = function (callback) {
 
                 // return topojson
-                var topology = mask.mask;
+                var topology = mask.geometry;
 
                 // throw on failed parsing
                 if (!topology) return callback({error : 'Invalid GeoJSON', error_code : 3});
 
+                // mask to save
+                var prepared_mask = {
+                    type : 'topojson',
+                    geometry : topology
+                }
+
                 // return topology
-                callback(null, topology);
+                callback(null, prepared_mask);
             };
 
 
         // mask from existing dataset
-        } else if (mask.type == 'dataset') {
+        } else if (mask.type == 'postgis-vector') {
 
             // convert geojson to topojson
-            ops.topo = function (callback) {
+            ops.mask = function (callback) {
 
                 // get dataset id
-                var dataset_id = mask.mask;
+                var dataset_id = mask.dataset_id;
 
                 // sanity check dataset_id
                 if (!_.isString(dataset_id) || _.size(dataset_id) < 20 || _.size(dataset_id) > 30) {
@@ -410,20 +422,43 @@ module.exports = cubes = {
                         }
                     });
 
+                    // mask to save
+                    var prepared_mask = {
+                        type : 'topojson',
+                        geometry : topology
+                    }
+
                     // return topojson
-                    callback(null, topology);
+                    callback(null, prepared_mask);
 
                 });
             };
 
         // mask from raster
-        } else if (mask.type == 'geotiff') {
+        } else if (mask.type == 'postgis-raster') {
 
+            ops.mask = function (callback) {
+
+                // get dataset id
+                var dataset_id = mask.dataset_id;
+
+                // mask to save
+                var prepared_mask = {
+                    type : 'postgis-raster',
+                    dataset_id : dataset_id,
+                    layer_id : mask.layer_id,
+                    title : mask.title,
+                }
+
+                // return mask
+                callback(null, prepared_mask);
+
+            };
             
         
         // throw on non-supported mask types
         } else {
-            ops.topo = function (callback) {
+            ops.mask = function (callback) {
                 callback({error : 'Mask type ' + mask.type + ' is not supported!', error_code : 3})
             };
         }
@@ -432,13 +467,14 @@ module.exports = cubes = {
         async.series(ops, function (err, result) {
             if (err) return res.status(400).send(err);
 
-            // get mask, cube
-            var topology = result.topo;
+            // get cube
             var cube = result.cube;
+            var finished_mask = result.mask;
 
             // add mask to cube
             var updated_cube = _.extend(cube, {
-                mask : topology,
+                // mask : topology,
+                mask : finished_mask,
                 timestamp : moment().valueOf()
             });
 
