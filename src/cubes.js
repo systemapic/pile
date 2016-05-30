@@ -540,6 +540,7 @@ module.exports = cubes = {
 
         if (outside_extent) {
             // console.log('Serving empty tile (outside extent)')
+            console.log('Serving empty tile')
             return pile.serveEmptyTile(res);
         }
 
@@ -556,6 +557,7 @@ module.exports = cubes = {
 
                 // return cached tile
                 // console.log('Serving cached tile', cube_request.z + ':' + cube_request.x + ':' + cube_request.y);
+                console.log('Serving cached tile');
                 res.writeHead(200, {'Content-Type': pile.headers['png']});
                 res.end(tile_buffer);
 
