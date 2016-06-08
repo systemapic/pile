@@ -976,8 +976,6 @@ module.exports = cubes = {
                     // get dataset date
                     var dataset_date = timestamp_dataset ? timestamp_dataset.timestamp : null;
                     
-                    console.log('dataset_date', dataset_date);
-
                     // calculate avg pixel value
                     var SCF = cubes.calcSCF(q.query_result.rows);
 
@@ -1000,8 +998,6 @@ module.exports = cubes = {
                 var mask_id = data.cube.mask.dataset_id;
                 var query_key = 'query_type:' + query_type + '::cube_id:' + cube_id + '::year:' + year + '::mask_id:' + mask_id;
                 store.layers.set(query_key, JSON.stringify(data.query_store), function (err) {
-                    console.log('saved query:', err);
-                    console.log('finsihed query:', data.query_store);
                     done(null, data.query_store);
                 });
             });
@@ -1024,6 +1020,7 @@ module.exports = cubes = {
 
             console.log('pg_database', pg_database);
             console.log('dataset.table_name', dataset.table_name);
+            console.log('dataset;', dataset);
 
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
@@ -1032,11 +1029,23 @@ module.exports = cubes = {
             pg.connect(conString, function(err, client, pg_done) {
                 if (err) return done(err);
 
-                // set query
-                var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
+                // set query // currently working query:
+                // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(ST_Intersection(A.rast, B.rast, 0),1) AS pvc) as t;'
 
                 // var query = 'select row_to_json(t) from (SELECT A.rid, B.rid, pvc, mask FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id + ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc, ST_ValueCount(B.rast,1) AS mask) as t;'
+                
+                // vector query
+                // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+                
+                // debug 
+                // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
+                // var query = "select row_to_json(t) from (SELECT A.rid, A.pvc FROM " + dataset.table_name + " AS A, " + mask_dataset_id + " AS B, ST_ValueCount(A.rast,1) AS pvc WHERE st_intersects(A.rast, B.rast) as t;"
+                // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A, ' + mask_dataset_id + ' AS B, ST_ValueCount(A.rast,1) AS pvc WHERE st_intersects(A.rast, 1, B.rast, 1)) as t;'
+                
+
+                var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A INNER JOIN ' + mask_dataset_id + ' AS B ON ST_Intersects(A.rast, B.rast), LATERAL ST_ValueCount(ST_Clip(A.rast,ST_Polygon(B.rast)), 1) AS pvc) as t;'
+
                 console.log('query: ', query);
 
                 // query postgis
@@ -1620,46 +1629,30 @@ module.exports = cubes = {
         // console.log('#############');
         // console.log('#############');
 
-        var dump_values = 0;
-        var dump_count = 0;
+        var dump_values = 0.0;
+        var dump_count = 0.0;
 
         // get values, count
         rows.forEach(function (r) {
 
-            // console.log('row_to_json', r.row_to_json);
-
             var rid = r.row_to_json.rid;
-            // console.log('rid:', rid);
             var data = r.row_to_json.pvc; // {"value":156,"count":3}
-            var value = data.value;
-            var count = data.count;
+            var value = parseFloat(data.value);
+            var count = parseFloat(data.count);
 
-            // console.log('pvc:', data);
-            
-            // var mask = r.row_to_json.mask;
-            // if (mask.value == 0) {
-            //     console.log('mask is 0, skipping');
-            //     return;
-            // }
-
-            // dump_count += count;
 
             // only include values between 101-200
             if (value >= 100 && value <= 200) {
-                dump_count += count;
-                dump_values += count * value;
-                // console.log('count:', count);
-                // console.log('value:', value);
-            } else {
-                // console.log('value, count', value, count);
-                if (value == 30) {
-                    // dump_values += count * value;
-                }
-            }
+                dump_count += parseFloat(count);
+                dump_values += parseFloat(count) * parseFloat(value);
+            } 
         });
 
+        console.log('dump_values', dump_values);
+        console.log('dump_count', dump_count);
+
         // calculate average
-        var average = dump_values / dump_count;
+        var average = parseFloat(dump_values) / parseFloat(dump_count);
         var scf = average - 100; // to get %
 
         console.log('SFC: ', scf);
