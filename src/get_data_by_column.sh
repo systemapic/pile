@@ -28,5 +28,6 @@ fi
 # get config
 source /systemapic/config/env.sh
 
-# PGPASSWORD=docker psql -U docker -d $1 -h postgis -c "SELECT ST_EXTENT(the_geom_3857) FROM $2;"
-PGPASSWORD=$SYSTEMAPIC_PGSQL_PASSWORD psql -U $SYSTEMAPIC_PGSQL_USERNAME -d $1 -h postgis -c "select row_to_json(t) from (select * from $2 where $3 = $4) t;"
+# run query
+# PGPASSWORD=$SYSTEMAPIC_PGSQL_PASSWORD psql -U $SYSTEMAPIC_PGSQL_USERNAME -d $1 -h postgis -c "select row_to_json(t) from (select * from $2 where $3 = $4) t;"
+PGPASSWORD=$SYSTEMAPIC_PGSQL_PASSWORD psql -U $SYSTEMAPIC_PGSQL_USERNAME -d $1 -h postgis -c "select row_to_json(t) from (SELECT * FROM $2 AS q, ST_X(geom) as lng, ST_Y(geom) as lat where $3 = $4) t;"
