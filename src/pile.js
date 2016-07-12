@@ -208,10 +208,10 @@ module.exports = pile = {
 
     // pipe to queries
     // TODO: in server.js: pile.queries.fetchDataArea
-    fetchDataArea   : queries.fetchDataArea,
-    fetchData   : queries.fetchData,
-    fetchHistogram  : queries.fetchHistogram,
-
+    fetchDataArea : queries.fetchDataArea,
+    fetchData : queries.fetchData,
+    fetchHistogram : queries.fetchHistogram,
+    getVectorPoints : queries.getVectorPoints,
 
 
     

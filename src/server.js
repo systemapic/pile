@@ -112,6 +112,11 @@ module.exports = function (pile) {
 		pile.fetchHistogram(req, res);
 	});
 
+	// get histogram from column
+	app.post('/v2/query/getVectorPoints', pile.checkAccess, function (req, res) {
+		pile.getVectorPoints(req, res);
+	});
+
 	// start server
 	app.listen(pile.config.port);
 

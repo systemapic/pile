@@ -316,6 +316,59 @@ module.exports = queries = {
     },
 
 
+    getVectorPoints : function (req, res) {
+        var options = req.body;
+        var layer_id = options.layer_id;
+        var ops = [];
+
+        ops.push(function (callback) {
+            store.layers.get(layer_id, function (err, layer) {
+                if (err || !layer) return callback(err || 'no layer');
+                callback(null, tools.safeParse(layer));
+            });
+        });
+
+        ops.push(function (layer, callback) {
+
+            var sql = layer.options.sql;
+            var postgis_db = layer.options.database_name;
+            var table_name = layer.options.table_name;
+
+            // todo: will query whole table, no filter
+            var query = 'select row_to_json(t) from (SELECT * FROM ' + table_name + ' AS q, ST_X(geom) as lng, ST_Y(geom) as lat) t;'
+
+            // query
+            queries.postgis({
+                postgis_db : postgis_db,
+                query : query
+            }, function (err, query_result) {
+                if (err) return callback(err);
+                callback(err, query_result);
+            });
+        });
+
+
+        async.waterfall(ops, function (err, query_result) {
+
+            var rows = query_result.rows;
+            var points = [];
+
+            _.forEach(rows, function (r) {
+                points.push(r.row_to_json);
+            });
+
+            res.send({
+                error : false,
+                points : points,
+            });
+
+        });
+
+      
+    },
+
+
+
     // run postgis queries
     postgis : function (options, callback) {
         var postgis_db = options.postgis_db;
