@@ -350,6 +350,8 @@ module.exports = queries = {
 
 
         async.waterfall(ops, function (err, query_result) {
+            if (err) return res.send({error : err.message});
+            if (!query_result) return res.send({error : 'no results'});
 
             var rows = query_result.rows;
             var points = [];
