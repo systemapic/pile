@@ -135,6 +135,7 @@ module.exports = queries = {
                 var result = [];
                 var points = [];
 
+
                 arr.forEach(function (arrr) {
                     var item = tools.safeParse(arrr);
                     item && result.push(item);

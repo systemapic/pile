@@ -373,7 +373,7 @@ module.exports = cubes = {
                 var topology = mask.geometry;
 
                 // throw on failed parsing
-                if (!topology) return callback({error : 'Invalid GeoJSON', error_code : 3});
+                if (!topology) return callback({error : 'Invalid TopoJSON', error_code : 3});
 
                 // mask to save
                 var prepared_mask = {
@@ -409,7 +409,7 @@ module.exports = cubes = {
                     var collection = tools.safeParse(body);
 
                     // verify
-                    if (!collection) return callback({errir : 'Invalid GeoJSON', error_code : 5});
+                    if (!collection) return callback({error : 'Invalid GeoJSON', error_code : 5});
 
                     // convert to topojson
                     var topology = topojson.topology({collection: collection}, {
@@ -471,12 +471,22 @@ module.exports = cubes = {
             var cube = result.cube;
             var finished_mask = result.mask;
 
+            // add mask id
+            finished_mask.id = 'mask-' + tools.getRandomChars(5);
+
             // add mask to cube
             var updated_cube = _.extend(cube, {
-                // mask : topology,
-                mask : finished_mask,
+                // mask : finished_mask,
                 timestamp : moment().valueOf()
             });
+
+            // ensure array (backwards compatibility)
+            if (!_.isArray(updated_cube.mask)) {
+                updated_cube.mask = (updated_cube.mask) ? [updated_cube.mask] : [];
+            }
+
+            // add mask to cube mask array
+            updated_cube.mask.push(finished_mask);
 
             // save
             cubes.save(updated_cube, function (err, updated_cube) {
@@ -505,7 +515,10 @@ module.exports = cubes = {
         cubes.find(cube_id, function (err, cube) {
 
             // delete mask
-            delete cube.mask;
+            // delete cube.mask;
+            _.remove(cube.mask, {
+                cube_id : cube_id
+            });
 
             // mark changed
             cube.timestamp = moment().valueOf();
