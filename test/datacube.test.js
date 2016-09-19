@@ -599,10 +599,13 @@ describe('Cubes', function () {
                 .end(function (err, res) {
                     if (err) return done(err);
                     var cube = res.body;
+                    console.log('cube.mask -->', cube.mask);
                     debugMode && console.log(cube);
-                    expect(cube.mask.type).to.equal('topojson');
+                    var mask = cube.mask[0]; // get first
+                    expect(mask.type).to.equal('topojson');
                     expect(cube.timestamp).to.exist;
-                    expect(cube.mask.geometry).to.exist;
+                    expect(mask.geometry).to.exist;
+                    expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
@@ -632,9 +635,11 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.mask).to.exist;
-                    expect(cube.mask.geometry).to.equal(data.mask.geometry);
-                    expect(cube.mask.type).to.equal('topojson');
+                    var mask = cube.mask[1]; 
+                    expect(mask.geometry).to.equal(data.mask.geometry);
+                    expect(mask.type).to.equal('topojson');
                     expect(cube.timestamp).to.exist;
+                    expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
@@ -710,6 +715,8 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
+                    var mask = cube.mask[2];
+                    expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
@@ -785,6 +792,8 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
+                    var mask = cube.mask[3];
+                    expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
@@ -813,6 +822,7 @@ describe('Cubes', function () {
                 .end(function (err, res) {
                     if (err) return done(err);
                     var error = res.body;
+                    console.log('thru err', error);
                     debugMode && console.log(error);
                     expect(error).to.exist;
                     expect(error.error_code).to.exist;
@@ -859,6 +869,7 @@ describe('Cubes', function () {
                 var data = {
                     access_token : access_token,
                     cube_id : tmp.created_empty.cube_id,
+                    mask_id : '', // todo: remove all masks
                 }
 
                 api.post(endpoints.cube.unmask)
@@ -870,7 +881,8 @@ describe('Cubes', function () {
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
                     expect(cube.createdBy).to.exist;
-                    expect(cube.mask).to.not.exist;
+                    // expect(cube.mask).to.not.exist;
+                    console.log('REMOVED !!! cube.mask', cube.mask);
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
                     done();
                 });
