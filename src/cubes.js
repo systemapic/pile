@@ -505,12 +505,12 @@ module.exports = cubes = {
             });
 
             // ensure array (backwards compatibility)
-            if (!_.isArray(updated_cube.mask)) {
-                updated_cube.mask = (updated_cube.mask) ? [updated_cube.mask] : [];
+            if (!_.isArray(updated_cube.masks)) {
+                updated_cube.masks = (updated_cube.masks) ? [updated_cube.masks] : [];
             }
 
             // add mask to cube mask array
-            updated_cube.mask.push(finished_mask);
+            updated_cube.masks.push(finished_mask);
 
             // save
             cubes.save(updated_cube, function (err, updated_cube) {
