@@ -107,7 +107,7 @@ describe('Cubes', function () {
     // - tiles for different styles, qualities
     // - add cube to project [wu]
     // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
-
+    // - clean up: delete cubes, datasets that were created during test
 
     context("ain't nuttin to fuck with", function () {
 
@@ -132,6 +132,38 @@ describe('Cubes', function () {
                 });
             });
         });
+
+        it('should create cube with options @ ' + endpoints.cube.create, function (done) {
+            token(function (err, access_token) {
+                
+                // test data, no default options required
+                var data = {
+                    access_token : access_token,
+                    options : {
+                        type : 'scf',
+                        dateformat : 'YYYYMMDD'
+                    }
+                };
+
+                api.post(endpoints.cube.create)
+                .send(data)
+                .expect(httpStatus.OK)
+                .end(function (err, res) {
+                    if (err) return done(err);
+                    var cube = res.body;
+                    debugMode && console.log(cube);
+                    expect(cube.timestamp).to.exist;
+                    expect(cube.createdBy).to.exist;
+                    expect(cube.cube_id).to.exist;
+                    expect(cube.options).to.exist;
+                    expect(cube.options.type).to.equal('scf');
+                    expect(cube.options.dateformat).to.equal('YYYYMMDD');
+                    tmp.created_with_options = cube;
+                    done();
+                });
+            });
+        });
+
 
         it('create cube with a dataset @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
@@ -647,7 +679,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('should add data with geojson mask @ ' + endpoints.cube.mask, function (done) {
+        it('should add data and options with geojson mask @ ' + endpoints.cube.mask, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -662,6 +694,7 @@ describe('Cubes', function () {
                     data : {
                         test : 'test'
                     }
+                
                 }
 
                 api.post(endpoints.cube.mask)
