@@ -600,7 +600,7 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var cube = res.body;
                     debugMode && console.log(cube);
-                    var mask = cube.mask[0]; // get first
+                    var mask = cube.masks[0]; // get first
                     // expect(mask.type).to.equal('topojson');
                     expect(mask.type).to.equal('geojson');
                     expect(cube.timestamp).to.exist;
@@ -634,8 +634,8 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var cube = res.body;
                     debugMode && console.log(cube);
-                    expect(cube.mask).to.exist;
-                    var mask = cube.mask[1]; 
+                    expect(cube.masks).to.exist;
+                    var mask = cube.masks[1]; 
                     expect(mask.geometry).to.equal(data.mask.geometry);
                     expect(mask.type).to.equal('topojson');
                     expect(cube.timestamp).to.exist;
@@ -671,7 +671,7 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var cube = res.body;
                     debugMode && console.log(cube);
-                    var mask = cube.mask[2]; // get first
+                    var mask = cube.masks[2]; // get first
                     // expect(mask.type).to.equal('topojson');
                     expect(mask.data).to.exist;
                     expect(mask.title).to.exist;
@@ -756,7 +756,7 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
-                    var mask = cube.mask[2];
+                    var mask = cube.masks[2];
                     expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
@@ -833,7 +833,7 @@ describe('Cubes', function () {
                     var cube = res.body;
                     debugMode && console.log(cube);
                     expect(cube.timestamp).to.exist;
-                    var mask = cube.mask[3];
+                    var mask = cube.masks[3];
                     expect(mask.id).to.exist;
                     expect(cube.createdBy).to.exist;
                     expect(cube.cube_id).to.equal(tmp.created_empty.cube_id);
