@@ -66,6 +66,8 @@ module.exports = cubes = {
         // combine options (latter overrides former)
         var cube = _.extend(options, defaultOptions);
 
+        console.log('\n\n\n\n\n cube -->', cube.title);
+
         // save cube
         cubes.save(cube, function (err) {
             if (err) return res.status(400).send(err);
@@ -321,7 +323,10 @@ module.exports = cubes = {
 
         var ops = {};
 
-        console.log('mask', options);
+        // console.log('mask', options);
+        // console.log('################\n\n\n\n\n\n\n');
+        // console.log('mask!');
+        // console.log('################\n\n\n\n\n\n\n');
 
         // get cube
         ops.cube = function (callback) {
@@ -332,35 +337,50 @@ module.exports = cubes = {
         // geojson string
         if (mask.type == 'geojson') {
 
-            // convert geojson to topojson
+
+            // debug: keep as geojson
             ops.mask = function (callback) {
-
-                // parse geojson string
-                var collection = tools.safeParse(mask.geometry);
-
-                // throw on failed parsing
-                if (!collection) return callback({error : 'Invalid GeoJSON', error_code : 3});
-
-                // convert
-                var topology = topojson.topology({collection: collection}, {
-                    verbose : true,
-                    id : function (d) {
-                        return d.properties.ID; // hardcoded for snow! todo: add to options
-                    },
-                    'property-transform': function (feature) {
-                        return feature.properties;
-                    }
-                });
-
-                // mask to save
                 var prepared_mask = {
-                    type : 'topojson',
-                    geometry : topology
+                    type : 'geojson',
+                    geometry : mask.geometry,
+                    title : mask.title
                 }
-
-                // return topojson
                 callback(null, prepared_mask);
-            };
+            }
+
+            // console.log('debug geojson!');
+            // return;
+
+
+            // // convert geojson to topojson
+            // ops.mask = function (callback) {
+
+            //     // parse geojson string
+            //     var collection = tools.safeParse(mask.geometry);
+
+            //     // throw on failed parsing
+            //     if (!collection) return callback({error : 'Invalid GeoJSON', error_code : 3});
+
+            //     // convert
+            //     var topology = topojson.topology({collection: collection}, {
+            //         verbose : true,
+            //         id : function (d) {
+            //             return d.properties.ID; // hardcoded for snow! todo: add to options
+            //         },
+            //         'property-transform': function (feature) {
+            //             return feature.properties;
+            //         }
+            //     });
+
+            //     // mask to save
+            //     var prepared_mask = {
+            //         type : 'topojson',
+            //         geometry : topology
+            //     }
+
+            //     // return topojson
+            //     callback(null, prepared_mask);
+            // };
            
 
         // topojson string
@@ -378,7 +398,8 @@ module.exports = cubes = {
                 // mask to save
                 var prepared_mask = {
                     type : 'topojson',
-                    geometry : topology
+                    geometry : topology,
+                    title : mask.title
                 }
 
                 // return topology
@@ -464,6 +485,7 @@ module.exports = cubes = {
         }
 
 
+
         async.series(ops, function (err, result) {
             if (err) return res.status(400).send(err);
 
@@ -471,12 +493,14 @@ module.exports = cubes = {
             var cube = result.cube;
             var finished_mask = result.mask;
 
-            // add mask id
-            finished_mask.id = 'mask-' + tools.getRandomChars(5);
+            // add data if available
+            if (options.data) finished_mask.data = options.data;
 
-            // add mask to cube
+            // add mask id
+            finished_mask.id = 'mask-' + tools.getRandomChars(8);
+
+            // add timestamp to cube
             var updated_cube = _.extend(cube, {
-                // mask : finished_mask,
                 timestamp : moment().valueOf()
             });
 
