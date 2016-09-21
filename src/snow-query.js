@@ -127,10 +127,7 @@ module.exports = snow_query = {
             var query_type = options.query_type;
             var access_token = options.access_token;
             var cube_id = options.cube_id;
-            // var geometry = options.mask ? options.mask.geometry : false;
-            // var mask_id = options.mask ? options.mask.mask_id : false;
             var mask_id = options.mask_id;
-            var multi_mask = options.mask ? options.mask.multi : false;
             var query_type = options.query_type;
             var year = options.year;
             var day = options.day;
@@ -173,6 +170,7 @@ module.exports = snow_query = {
                     cube : cube
                 }
 
+                // find mask
                 var mask = _.find(cube.masks, function (m) {
                     return m.id == mask_id;
                 });
@@ -195,6 +193,8 @@ module.exports = snow_query = {
             
             async.waterfall(ops, function (err, scfs) {
                 console.log('all done 2', err, _.size(scfs));
+
+                // todo: remove rows?
 
                 // catch errors
                 if (err) return done(err);
@@ -304,9 +304,21 @@ module.exports = snow_query = {
                 // create query with geojson mask
                 if (pg_geojson) {
                  
-                    // with mask
-                    var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
+                    // raster (actually working)
+                    // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A INNER JOIN ' + mask_dataset_id + ' AS B ON ST_Intersects(A.rast, B.rast), LATERAL ST_ValueCount(ST_Clip(A.rast,ST_Polygon(B.rast)), 1) AS pvc) as t;'
+
+
+                    // with mask (current 'working' geojson)
+                    // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
                
+
+                    // debug test, make them similar
+                    // var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B.geom), LATERAL ST_ValueCount(ST_Clip(A.rast, B.geom), 1) AS pvc) as t;"
+                    var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) AS pvc) as t;"
+
+                    // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A INNER JOIN ' + mask_dataset_id + ' AS B ON ST_Intersects(A.rast, B.rast), LATERAL ST_ValueCount(ST_Clip(A.rast,ST_Polygon(B.rast)), 1) AS pvc) as t;'
+
+
                 } else {
                  
                     // without mask
@@ -390,7 +402,7 @@ module.exports = snow_query = {
         retriveGeoJSON : function (geojson) {
             if (!geojson) return false;
             try {
-                return JSON.stringify(geojson.features[0].geometry);
+                return JSON.stringify(geojson.features[0].geometry); // todo: if several features, merge with turf first?
             } catch (e) {
                 return false;
             }
