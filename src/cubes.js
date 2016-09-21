@@ -30,6 +30,9 @@ var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config')
 var store  = require('./store');
 var tools = require('./tools');
 
+// custom query plugin: snow cover fraction
+var snow_query = require('./snow-query');
+
 // register mapnik plugins
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
@@ -40,6 +43,10 @@ var RASTERPATH = '/data/raster_tiles/';
 var CUBEPATH   = '/data/cube_tiles/';
 var GRIDPATH   = '/data/grid_tiles/';
 var PROXYPATH  = '/data/proxy_tiles/';
+
+var util = require('util');
+
+console.log(util.inspect(process.memoryUsage()));
 
 // postgis conn
 var pgsql_options = {
@@ -65,8 +72,6 @@ module.exports = cubes = {
 
         // combine options (latter overrides former)
         var cube = _.extend(options, defaultOptions);
-
-        console.log('\n\n\n\n\n cube -->', cube.title);
 
         // save cube
         cubes.save(cube, function (err) {
@@ -322,11 +327,6 @@ module.exports = cubes = {
         var access_token = options.access_token;
 
         var ops = {};
-
-        // console.log('mask', options);
-        // console.log('################\n\n\n\n\n\n\n');
-        // console.log('mask!');
-        // console.log('################\n\n\n\n\n\n\n');
 
         // get cube
         ops.cube = function (callback) {
@@ -827,8 +827,12 @@ module.exports = cubes = {
         var options = req.body;
         var query_type = options.query_type;
 
-        // snow cover fraction
+        // snow cover fraction (raster mask)
         if (query_type == 'scf') return cubes.queries.scf(req, res);
+
+        // snow cover fraction (geojson mask)
+        if (query_type == 'scf-geojson') return snow_query.vector.geojson(req, res);
+
 
         // return unsupported
         res.status(400).send({error : 'Query type not supported:' + query_type});
@@ -836,6 +840,52 @@ module.exports = cubes = {
     },
 
     queries : {
+
+        scf_geojson : function (req, res) {
+
+            console.log('scf_geosjon');
+            return cubes.queries.scf_single_mask(req, res);
+
+            // query values for current year based on geojson mask
+            var options = req.body;
+            var multi_mask = options.mask ? options.mask.multi_mask : false;
+
+
+            console.log('###################');
+            console.log('###################');
+            console.log('###################');
+            console.log('###################');
+            console.log('query: ', options);
+
+            // ensure params
+            if (!options.cube_id) return res.status(400).send({error : 'Need to provide cube_id.'});
+
+
+            // get cube
+            cubes.find(options.cube_id, function (err, cube) {
+                if (err) return res.status(400).send({error : err.message});
+
+                console.log('cube', cube);
+
+                // ensure mask(s)
+                if (!cube || !cube.masks) return res.status(400).send({error : 'Need to provide valid cube & mask.'});
+
+                // get mask
+                var mask_id = options.mask_id;
+                var mask = _.find(cube.masks, function (m) {
+                    return m.id == mask_id;
+                });
+
+                console.log('mask:', mask);
+
+                // console.log('mask ==>', cube.mask);
+
+                res.status(400).send({error : 'debug'});
+
+            });
+        },
+
+
 
         // snow cover fraction query (red line in client)
         // either get query from cache, or do new query
@@ -1496,7 +1546,8 @@ module.exports = cubes = {
             var options     = req.body;
             var query_type  = options.query_type;
             var cube_id     = options.cube_id;
-            var mask_id     = options.mask ? options.mask.mask_id : false;
+            // var mask_id     = options.mask ? options.mask.mask_id : false;
+            var mask_id     = options.mask_id;
             var year        = options.year;
             var force_query = options.options ? options.options.force_query : false;
             var ops         = [];
@@ -1507,10 +1558,7 @@ module.exports = cubes = {
 
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
-            console.log('query_key:', query_key);
             store.layers.get(query_key, function (err, stored_query) {
-
-                console.log('query_key', query_key, err, _.size(stored_query));
 
                 // return stored query if any
                 if (!err && stored_query && !force_query) return res.end(stored_query);
@@ -1538,8 +1586,6 @@ module.exports = cubes = {
             var day = options.day;
             var ops = [];
 
-            console.log('create single');
-
             // get cube
             ops.push(function (callback) {
                 cubes.find(cube_id, callback);
@@ -1550,8 +1596,6 @@ module.exports = cubes = {
 
                 // get cube datasets
                 var datasets = cube.datasets;
-
-                console.log('cube datasets', _.size(datasets));
 
                 // filter cube's datasets for this year only
                 var withinRange = _.filter(datasets, function (d) {
