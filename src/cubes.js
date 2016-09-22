@@ -31,7 +31,7 @@ var store  = require('./store');
 var tools = require('./tools');
 
 // custom query plugin: snow cover fraction
-var snow_query = require('./snow-query');
+var snow_query = require('./queries/snow-query');
 
 // register mapnik plugins
 mapnik.register_default_fonts();
