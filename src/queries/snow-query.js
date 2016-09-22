@@ -19,16 +19,16 @@ var request = require('request');
 var numCPUs = require('os').cpus().length;
 var exec = require('child_process').exec;
 var sanitize = require("sanitize-filename");
-var mercator = require('./sphericalmercator');
+var mercator = require('../sphericalmercator');
 var geojsonArea = require('geojson-area');
 var geojsonExtent = require('geojson-extent');
 var topojson = require('topojson');
 var moment = require('moment');
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
-var store  = require('./store');
-var tools = require('./tools');
+var config = require(process.env.PILE_CONFIG_PATH || '../../../config/pile-config');
+var store  = require('../store');
+var tools = require('../tools');
 
 // global paths (todo: move to config)
 var VECTORPATH = '/data/vector_tiles/';
@@ -259,7 +259,7 @@ module.exports = snow_query = {
                     var scf_results = {
                         date : moment(cubeDatasetTimestamp).format(),
                         scf : averagePixelValue,
-                        rows : rows
+                        // rows : rows
                     };
 
                     // store in memory
