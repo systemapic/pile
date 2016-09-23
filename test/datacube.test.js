@@ -107,7 +107,7 @@ describe('Cubes', function () {
     // - tiles for different styles, qualities
     // - add cube to project [wu]
     // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
-    // - clean up: delete cubes, datasets that were created during test
+    // - clean up: delete cubes, datasets that were created during test!
 
     context("ain't nuttin to fuck with", function () {
 
@@ -165,7 +165,7 @@ describe('Cubes', function () {
         });
 
 
-        it('create cube with a dataset @ ' + endpoints.cube.create, function (done) {
+        it('should create cube with a dataset @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -192,7 +192,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('get cube by cube_id @ ' + endpoints.cube.get, function (done) {
+        it('should get cube by cube_id @ ' + endpoints.cube.get, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -216,7 +216,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('add dataset @ ' + endpoints.cube.add, function (done) {
+        it('should add dataset @ ' + endpoints.cube.add, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -254,7 +254,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('remove dataset @ ' + endpoints.cube.remove, function (done) {
+        it('should remove dataset @ ' + endpoints.cube.remove, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -285,7 +285,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('update cube @ ' + endpoints.cube.update, function (done) {
+        it('should update cube @ ' + endpoints.cube.update, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -313,7 +313,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('upload dataset @ ' + endpoints.import.post, function (done) {
+        it('should upload dataset @ ' + endpoints.import.post, function (done) {
             token(function (err, access_token) {
                 api.post(endpoints.import.post)
                 .type('form')
@@ -336,7 +336,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('upload second dataset @ ' + endpoints.import.post, function (done) {
+        it('should upload second dataset @ ' + endpoints.import.post, function (done) {
             token(function (err, access_token) {
                 api.post(endpoints.import.post)
                 .type('form')
@@ -359,7 +359,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('add dataset to cube @ ' + endpoints.cube.add, function (done) {
+        it('should add dataset to cube @ ' + endpoints.cube.add, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -392,7 +392,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('add second dataset to cube @ ' + endpoints.cube.add, function (done) {
+        it('should add second dataset to cube @ ' + endpoints.cube.add, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -527,7 +527,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('cube should contain two datasets', function (done) {
+        it('should get cube containing two datasets', function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -556,7 +556,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('should create Wu.CubeLayer on [wu]', function (done) {
+        it('should create CubeLayer on Wu API', function (done) {
             token(function (err, access_token) {
 
                 var layer = {
@@ -689,7 +689,8 @@ describe('Cubes', function () {
                     mask : {
                         type : 'geojson',
                         geometry : {"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]},
-                        title : 'title'
+                        title : 'title', 
+                        description : 'description'
                     },
                     data : {
                         test : 'test'
@@ -709,6 +710,7 @@ describe('Cubes', function () {
                     expect(mask.data).to.exist;
                     expect(mask.title).to.exist;
                     expect(mask.title).to.equal('title');
+                    expect(mask.description).to.equal('description');
                     expect(mask.data.test).to.equal('test');
                     expect(mask.type).to.equal('geojson');
                     expect(cube.timestamp).to.exist;
@@ -991,7 +993,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('update cube @ ' + endpoints.cube.update, function (done) {
+        it('should update cube @ ' + endpoints.cube.update, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -1019,7 +1021,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('add dataset to cube @ ' + endpoints.cube.add, function (done) {
+        it('should add dataset to cube @ ' + endpoints.cube.add, function (done) {
             token(function (err, access_token) {
 
                 // test data
@@ -1078,7 +1080,7 @@ describe('Cubes', function () {
             });
         });
 
-        it('replace dataset in cube @ ' + endpoints.cube.replace, function (done) {
+        it('should replace dataset in cube @ ' + endpoints.cube.replace, function (done) {
             token(function (err, access_token) {
 
                 // test data
