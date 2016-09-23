@@ -343,7 +343,8 @@ module.exports = cubes = {
                 var prepared_mask = {
                     type : 'geojson',
                     geometry : mask.geometry,
-                    title : mask.title
+                    title : mask.title,
+                    description : mask.description
                 }
                 callback(null, prepared_mask);
             }
@@ -399,7 +400,8 @@ module.exports = cubes = {
                 var prepared_mask = {
                     type : 'topojson',
                     geometry : topology,
-                    title : mask.title
+                    title : mask.title,
+                    description : mask.description
                 }
 
                 // return topology
@@ -469,6 +471,7 @@ module.exports = cubes = {
                     dataset_id : dataset_id,
                     layer_id : mask.layer_id,
                     title : mask.title,
+                    description : mask.description
                 }
 
                 // return mask
@@ -725,6 +728,72 @@ module.exports = cubes = {
             postgis_settings.use_overviews = 'true';
             postgis_settings.clip_rasters = 'true';
             postgis_settings.prescale_rasters = 'true';
+
+            console.log('postgis_settings.table', postgis_settings.table);
+
+            // var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) AS pvc) as t;"
+
+            var debug_geojson = {
+              "type": "FeatureCollection",
+              "features": [
+                {
+                  "type": "Feature",
+                  "properties": {},
+                  "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                      [
+                        [
+                          9.019775390625,
+                          61.370409712010435
+                        ],
+                        [
+                          7.998046875,
+                          61.17503266354878
+                        ],
+                        [
+                          8.7890625,
+                          61.16443708638272
+                        ],
+                        [
+                          9.29443359375,
+                          60.62471311568258
+                        ],
+                        [
+                          10.469970703124998,
+                          61.63250678169624
+                        ],
+                        [
+                          9.5361328125,
+                          61.201506036385375
+                        ],
+                        [
+                          9.019775390625,
+                          61.370409712010435
+                        ]
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+           
+            // var pg_geojson = cubes._retriveGeoJSON(debug_geojson);
+            // var pg_geojson = JSON.stringify(options.cube.masks[0].geometry);
+
+
+            // todo: get correct mask
+            var pg_geojson = cubes._retriveGeoJSON(options.cube.masks[0].geometry);
+
+            // var filter_query = "(SELECT A.rid FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) as t) as subquery";
+           
+            // var filter_query = "(SELECT ST_Clip(" + dataset.table_name + ", st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) FROM " + dataset.table_name + ") as subquery";
+            // var filter_query = "(SELECT ST_Clip(" + dataset.table_name + ".rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) FROM " + dataset.table_name + ") as subquery";
+            // var filter_query = "(SELECT * from " + dataset.table_name +" WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
+
+            // works! :)
+            var filter_query = "(SELECT ST_Clip(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) as rast FROM " + dataset.table_name + " WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
+            postgis_settings.table = filter_query;  
 
             try {   
                 map     = new mapnik.Map(256, 256, mercator.proj4);
