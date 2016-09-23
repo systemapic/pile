@@ -360,9 +360,25 @@ module.exports = snow_query = {
         // get PostGIS compatible GeoJSON
         retriveGeoJSON : function (geojson) {
             if (!geojson) return false;
-            try {
-                return JSON.stringify(geojson.features[0].geometry); // todo: if several features, merge with turf first?
-            } catch (e) {
+            // try {
+            //     return JSON.stringify(geojson.features[0].geometry); // todo: if several features, merge with turf first?
+            // } catch (e) {
+            //     return false;
+            // }
+            if (geojson.type == 'FeatureCollection') {
+                try {
+                    return JSON.stringify(geojson.features[0].geometry);
+                } catch (e) {
+                    return false;
+                }
+
+            } else if (geojson.type == 'Feature') {
+                try {
+                    return JSON.stringify(geojson.geometry);
+                } catch (e) {
+                    return false;
+                }  
+            } else {
                 return false;
             }
         },

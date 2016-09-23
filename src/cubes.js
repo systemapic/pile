@@ -44,10 +44,6 @@ var CUBEPATH   = '/data/cube_tiles/';
 var GRIDPATH   = '/data/grid_tiles/';
 var PROXYPATH  = '/data/proxy_tiles/';
 
-var util = require('util');
-
-console.log(util.inspect(process.memoryUsage()));
-
 // postgis conn
 var pgsql_options = {
     dbhost: 'postgis',
@@ -348,10 +344,6 @@ module.exports = cubes = {
                 callback(null, prepared_mask);
             }
 
-            // console.log('debug geojson!');
-            // return;
-
-
             // // convert geojson to topojson
             // ops.mask = function (callback) {
 
@@ -486,8 +478,6 @@ module.exports = cubes = {
             };
         }
 
-
-
         async.series(ops, function (err, result) {
             if (err) return res.status(400).send(err);
 
@@ -617,12 +607,14 @@ module.exports = cubes = {
         // check if tile is outside bounds if dataset
         // todo: add mask bounds also
         var outside_extent = cubes._isOutsideExtent(options);
+        if (outside_extent) return pile.serveEmptyTile(res);
 
-        if (outside_extent) {
-            console.log('Serving empty tile')
+        // check if outside mask extent
+        var outside_mask_extent = cubes._isOutsideMaskExtent(options);
+        if (outside_mask_extent) {
+            console.log('outside_mask_extent');
             return pile.serveEmptyTile(res);
         }
-
         // create unique hash for style
         var style_hash = forge.md.md5.create().update(cube.style + cube.timestamp).digest().toHex();
 
@@ -1791,14 +1783,9 @@ module.exports = cubes = {
             } 
         });
 
-        console.log('dump_values', dump_values);
-        console.log('dump_count', dump_count);
-
         // calculate average
         var average = parseFloat(dump_values) / parseFloat(dump_count);
         var scf = average - 100; // to get %
-
-        console.log('SFC: ', scf);
 
         return scf;
 
@@ -1944,20 +1931,44 @@ module.exports = cubes = {
         } catch (e) { return false; };
     },
 
-    _isOutsideExtent : function (options) {
-        
+    _isOutsideMaskExtent : function (options) {
+
+        var cube = options.cube;
+        var cube_request = options.cube_request;
+        var mask_id = cube_request.mask_id;
+
+        // return false if no mask
+        if (!mask_id || _.isNull(mask_id) || _.isUndefined(mask_id)) return false;
+
+        var mask = _.find(cube.masks, function (m) {
+            return m.id == mask_id;
+        });
+
+        // return false if no mask
+        if (!mask) return false;
+
+        options.mask_geojson = mask.geometry;
+
+         
         try {
 
         // get options
+        var outside = false;
         var dataset = options.dataset;
         var coords = options.cube_request;
-        // var metadata = dataset.metadata;
         var metadata = tools.safeParse(dataset.metadata);
 
         // get extents
-        var extent_geojson = metadata.extent_geojson;
         var bounding_box = mercator.xyz_to_envelope(parseInt(coords.x), parseInt(coords.y), parseInt(coords.z), false);
-        var raster_extent_latlng = geojsonExtent(extent_geojson);
+        var raster_extent_latlng = geojsonExtent(options.mask_geojson);
+        
+        // add 1 degree padding (due to geojson bbox cutting a bit short)
+        var padding = 0.5;
+        raster_extent_latlng[0] -= padding;
+        raster_extent_latlng[1] -= padding;
+        raster_extent_latlng[2] += padding;
+        raster_extent_latlng[3] += padding;
+
         var south_west_corner = Conv.ll2m(raster_extent_latlng[0], raster_extent_latlng[1]);
         var north_east_corner = Conv.ll2m(raster_extent_latlng[2], raster_extent_latlng[3]);
 
@@ -1986,18 +1997,74 @@ module.exports = cubes = {
         };
 
         // check if outside extent
+        if (tile_bounds.north < raster_bounds.south)    outside = true;
+        if (tile_bounds.east  < raster_bounds.west)     outside = true;
+        if (tile_bounds.south > raster_bounds.north)    outside = true;
+        if (tile_bounds.west  > raster_bounds.east)     outside = true;
+
+        } catch (e) {}
+
+        return outside;
+
+    },
+
+    _isOutsideExtent : function (options) {
+        
+        try {
+
+        // get options
+        var dataset = options.dataset;
+        var coords = options.cube_request;
+        var metadata = tools.safeParse(dataset.metadata);
+
+        // get extents
+        var extent_geojson = metadata.extent_geojson;
+        var bounding_box = mercator.xyz_to_envelope(parseInt(coords.x), parseInt(coords.y), parseInt(coords.z), false);
+        var raster_extent_latlng = geojsonExtent(extent_geojson);
+        var south_west_corner = Conv.ll2m(raster_extent_latlng[0], raster_extent_latlng[1]);
+        var north_east_corner = Conv.ll2m(raster_extent_latlng[2], raster_extent_latlng[3]);
+
+
+        // tile is outside raster bounds if:
+        // - - - - - - - - - - - - - - - - - 
+        // tile-north is south of raster-south  (tile_north < raster_south)
+        // OR
+        // tile-east is west of raster-west     (tile-east  < raster-west)
+        // OR
+        // tile-south is north of raster-north  (tile-south > raster-north)
+        // OR
+        // tile-west is east of raster-east,    (tile-west  > raster-east)
+        
+        var raster_bounds = {
+            west    : south_west_corner.x,
+            south   : south_west_corner.y,
+            east    : north_east_corner.x,
+            north   : north_east_corner.y
+        };
+
+        var tile_bounds = {
+            west    : bounding_box[0],
+            south   : bounding_box[1],
+            east    : bounding_box[2],
+            north   : bounding_box[3]
+        };
+
+        // check if outside extent
         var outside = false;
         if (tile_bounds.north < raster_bounds.south)    outside = true;
-        if (tile_bounds.east < raster_bounds.west)      outside = true;
+        if (tile_bounds.east  < raster_bounds.west)     outside = true;
         if (tile_bounds.south > raster_bounds.north)    outside = true;
-        if (tile_bounds.west > raster_bounds.east)      outside = true;
+        if (tile_bounds.west  > raster_bounds.east)     outside = true;
 
         } catch (e) {
+            console.log('e:', e);
             var outside = false;    
         }
 
         return outside;
     },
+
+
 
 }
 
