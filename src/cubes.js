@@ -337,7 +337,6 @@ module.exports = cubes = {
         // geojson string
         if (mask.type == 'geojson') {
 
-
             // debug: keep as geojson
             ops.mask = function (callback) {
                 var prepared_mask = {
@@ -601,7 +600,7 @@ module.exports = cubes = {
             cubes._serveTile({
                 cube : cube,
                 dataset : dataset,
-                cube_request : cube_request
+                cube_request : cube_request,
             }, res);
         
         });
@@ -616,10 +615,10 @@ module.exports = cubes = {
         var cube_request = options.cube_request;
 
         // check if tile is outside bounds if dataset
+        // todo: add mask bounds also
         var outside_extent = cubes._isOutsideExtent(options);
 
         if (outside_extent) {
-            // console.log('Serving empty tile (outside extent)')
             console.log('Serving empty tile')
             return pile.serveEmptyTile(res);
         }
@@ -628,7 +627,7 @@ module.exports = cubes = {
         var style_hash = forge.md.md5.create().update(cube.style + cube.timestamp).digest().toHex();
 
         // define path
-        var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + style_hash + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
+        var keyString = 'cube_tile:' + cube.cube_id + ':' + dataset.file_id + ':' + style_hash + ':' + cube_request.mask_id + ':' + cube_request.z + ':' + cube_request.x + ':' + cube_request.y + '.png';
         var tilePath = CUBEPATH + keyString;
 
         // check for cached tile
@@ -636,7 +635,6 @@ module.exports = cubes = {
             if (!err && tile_buffer) {
 
                 // return cached tile
-                // console.log('Serving cached tile', cube_request.z + ':' + cube_request.x + ':' + cube_request.y);
                 console.log('Serving cached tile');
                 res.writeHead(200, {'Content-Type': pile.headers['png']});
                 res.end(tile_buffer);
@@ -652,7 +650,8 @@ module.exports = cubes = {
                         z : cube_request.z,
                         x : cube_request.x,
                         y : cube_request.y
-                    }, 
+                    },
+                    mask_id : cube_request.mask_id
                 }, res);
             }
         });
@@ -688,6 +687,7 @@ module.exports = cubes = {
         var dataset = options.dataset;
         var cube = options.cube;
         var coords = options.coords;
+        var mask_id = options.mask_id;
         var tilePath = options.tilePath;
         var map;
         var layer;
@@ -695,7 +695,7 @@ module.exports = cubes = {
         var bbox;
         var ops = [];
 
-    
+
         // define settings, xml
         ops.push(function (callback) {
 
@@ -729,71 +729,40 @@ module.exports = cubes = {
             postgis_settings.clip_rasters = 'true';
             postgis_settings.prescale_rasters = 'true';
 
-            console.log('postgis_settings.table', postgis_settings.table);
+            // if mask
+            if (mask_id && !_.isNull(mask_id) && !_.isUndefined(mask_id)) {
 
-            // var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) AS pvc) as t;"
+                // find mask
+                var mask = _.find(options.cube.masks, function (m) {
+                    return m.id == mask_id;
+                });
 
-            var debug_geojson = {
-              "type": "FeatureCollection",
-              "features": [
-                {
-                  "type": "Feature",
-                  "properties": {},
-                  "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [
-                      [
-                        [
-                          9.019775390625,
-                          61.370409712010435
-                        ],
-                        [
-                          7.998046875,
-                          61.17503266354878
-                        ],
-                        [
-                          8.7890625,
-                          61.16443708638272
-                        ],
-                        [
-                          9.29443359375,
-                          60.62471311568258
-                        ],
-                        [
-                          10.469970703124998,
-                          61.63250678169624
-                        ],
-                        [
-                          9.5361328125,
-                          61.201506036385375
-                        ],
-                        [
-                          9.019775390625,
-                          61.370409712010435
-                        ]
-                      ]
-                    ]
-                  }
+                if (mask) {
+
+                    // find geojson (todo: if geojson, not other type)
+                    var pg_geojson = cubes._retriveGeoJSON(mask.geometry);
+
+                    // create sql query
+                    var filter_query = "(SELECT ST_Clip(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) as rast FROM " + dataset.table_name + " WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
+                    
+                    // replace table with query
+                    postgis_settings.table = filter_query;  
+
                 }
-              ]
+
             }
-           
+
             // var pg_geojson = cubes._retriveGeoJSON(debug_geojson);
             // var pg_geojson = JSON.stringify(options.cube.masks[0].geometry);
-
-
             // todo: get correct mask
-            var pg_geojson = cubes._retriveGeoJSON(options.cube.masks[0].geometry);
-
+            // var pg_geojson = cubes._retriveGeoJSON(options.cube.masks[0].geometry);
             // var filter_query = "(SELECT A.rid FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) as t) as subquery";
-           
             // var filter_query = "(SELECT ST_Clip(" + dataset.table_name + ", st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) FROM " + dataset.table_name + ") as subquery";
             // var filter_query = "(SELECT ST_Clip(" + dataset.table_name + ".rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) FROM " + dataset.table_name + ") as subquery";
             // var filter_query = "(SELECT * from " + dataset.table_name +" WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
-
             // works! :)
-            var filter_query = "(SELECT ST_Clip(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) as rast FROM " + dataset.table_name + " WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
-            postgis_settings.table = filter_query;  
+            // var filter_query = "(SELECT ST_Clip(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857)) as rast FROM " + dataset.table_name + " WHERE ST_Intersects(rast, st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857))) as subquery";
+            // postgis_settings.table = filter_query;  
 
             try {   
                 map     = new mapnik.Map(256, 256, mercator.proj4);
@@ -1188,12 +1157,9 @@ module.exports = cubes = {
                 // set query // currently working query:
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(ST_Intersection(A.rast, B.rast, 0),1) AS pvc) as t;'
-
                 // var query = 'select row_to_json(t) from (SELECT A.rid, B.rid, pvc, mask FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id + ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc, ST_ValueCount(B.rast,1) AS mask) as t;'
-                
                 // vector query
                 // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
-                
                 // debug 
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
                 // var query = "select row_to_json(t) from (SELECT A.rid, A.pvc FROM " + dataset.table_name + " AS A, " + mask_dataset_id + " AS B, ST_ValueCount(A.rast,1) AS pvc WHERE st_intersects(A.rast, B.rast) as t;"
@@ -1708,8 +1674,6 @@ module.exports = cubes = {
                     // create geojson from geometry
                     options.mask = cubes.geojsonFromGeometry(geometry);
 
-                    console.log('mask ', options.mask);
-
                     // continue
                     callback(null, options);
                 }
@@ -1722,7 +1686,6 @@ module.exports = cubes = {
                 cubes.queries.query_snow_cover_fraction_single_mask(options, callback);
               
             });
-            
             
             async.waterfall(ops, function (err, scfs) {
                 console.log('all done 2', err, _.size(scfs));
@@ -1750,24 +1713,54 @@ module.exports = cubes = {
 
 
 
-
-
-
-
-
-
-
-
-
-
-    // get PostGIS compatible GeoJSON
+    // get PostGIS query compatible GeoJSON
+    // ie. return only geometry
     _retriveGeoJSON : function (geojson) {
         if (!geojson) return false;
-        try {
-            return JSON.stringify(geojson.features[0].geometry);
-        } catch (e) {
+
+        if (geojson.type == 'FeatureCollection') {
+            try {
+                return JSON.stringify(geojson.features[0].geometry);
+            } catch (e) {
+                return false;
+            }
+
+        } else if (geojson.type == 'Feature') {
+            try {
+                return JSON.stringify(geojson.geometry);
+            } catch (e) {
+                return false;
+            }  
+        } else {
             return false;
         }
+
+    },
+
+    ensureFlat : function (geojson) {
+
+        // combine features of feature collection
+        // todo: may not work with multipolygons
+        if (_.size(geojson.features) > 1 && geojson.type == 'FeatureCollection') {
+            geojson.features = [cubes.mergePolygons(geojson)];
+        }
+        return geojson.features;
+    },
+
+    // merge multifeatured polygon into flat polygon
+    // ---------------------------------------------
+    // geojson can be uploaded with multiple features, they are merged here...
+    // 
+    // see https://github.com/Turfjs/turf/blob/393013ff3f24c71fb7dd9dac99435271d94c0e06/CHANGELOG.md#301
+    // and http://morganherlocker.com/post/Merge-a-Set-of-Polygons-with-turf/
+    mergePolygons : function (polygons) {
+        var merged = _.clone(polygons.features[0]);
+        var features = polygons.features;
+        for (var i = 0, len = features.length; i < len; i++) {
+            var poly = features[i];
+            if (poly.geometry) merged = turf_union(merged, poly);
+        }
+        return merged;
     },
 
     calcSCF : function (rows) {
@@ -1944,7 +1937,8 @@ module.exports = cubes = {
                 dataset : params[1],
                 z : params[2],
                 x : params[3],
-                y : params[4].split('.')[0]
+                y : params[4].split('.')[0],
+                mask_id : req.query.mask_id || null
             }
             return cube_request;
         } catch (e) { return false; };
@@ -1957,7 +1951,7 @@ module.exports = cubes = {
         // get options
         var dataset = options.dataset;
         var coords = options.cube_request;
-        var metadata = dataset.metadata;
+        // var metadata = dataset.metadata;
         var metadata = tools.safeParse(dataset.metadata);
 
         // get extents
