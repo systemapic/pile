@@ -49,47 +49,7 @@ module.exports = snow_query = {
     vector : {
 
         geojson : function (req, res) {
-            console.log('scf_geosjon');
-
             return snow_query.vector.scf_single_mask(req, res);
-
-            // // query values for current year based on geojson mask
-            // var options = req.body;
-            // var multi_mask = options.mask ? options.mask.multi_mask : false;
-
-
-            // console.log('###################');
-            // console.log('###################');
-            // console.log('###################');
-            // console.log('###################');
-            // console.log('query: ', options);
-
-            // // ensure params
-            // if (!options.cube_id) return res.status(400).send({error : 'Need to provide cube_id.'});
-
-
-            // // get cube
-            // cubes.find(options.cube_id, function (err, cube) {
-            //     if (err) return res.status(400).send({error : err.message});
-
-            //     console.log('cube', cube);
-
-            //     // ensure mask(s)
-            //     if (!cube || !cube.masks) return res.status(400).send({error : 'Need to provide valid cube & mask.'});
-
-            //     // get mask
-            //     var mask_id = options.mask_id;
-            //     var mask = _.find(cube.masks, function (m) {
-            //         return m.id == mask_id;
-            //     });
-
-            //     console.log('mask:', mask);
-
-            //     // console.log('mask ==>', cube.mask);
-
-            //     res.status(400).send({error : 'debug'});
-
-
         },
 
         scf_single_mask : function (req, res) {
@@ -175,6 +135,8 @@ module.exports = snow_query = {
                     return m.id == mask_id;
                 });
 
+                if (!mask) return callback('Mask not available: ' + mask_id);
+
                 // create geojson from geometry
                 options.mask = mask.geometry;
 
@@ -193,8 +155,6 @@ module.exports = snow_query = {
             
             async.waterfall(ops, function (err, scfs) {
                 console.log('all done 2', err, _.size(scfs));
-
-                // todo: remove rows?
 
                 // catch errors
                 if (err) return done(err);
