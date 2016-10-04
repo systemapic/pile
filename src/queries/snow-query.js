@@ -24,6 +24,7 @@ var geojsonArea = require('geojson-area');
 var geojsonExtent = require('geojson-extent');
 var topojson = require('topojson');
 var moment = require('moment');
+moment().utc();
 
 // modules
 var config = require(process.env.PILE_CONFIG_PATH || '../../../config/pile-config');
@@ -105,12 +106,25 @@ module.exports = snow_query = {
                 var datasets = cube.datasets;
 
                 // filter cube's datasets for this year only
-                var withinRange = _.filter(datasets, function (d) {
-                    var current = moment(d.timestamp);
-                    var before = moment().year(year).dayOfYear(1);
-                    var after = moment().year(year).dayOfYear(365);
+                var withinRange = _.filter(datasets, function (d, i) {
+
+                    // var current = moment(d.timestamp).hour(12);
+                    var current = moment.utc(d.timestamp).add(12, 'h'); // because original date in dataset is '2016-01-01T00:00:00+01:00' (ie. mindnight, but +1 timezone)
+                   
+                    var before = moment.utc().year(year).dayOfYear(1).hour(1).minutes(0).seconds(0);
+                    // var after = moment.utc().year(year).dayOfYear(-1).hour(23).minutes(59).seconds(59);
+                    var after = moment.utc().year(year).endOf('year');
+                    if (!i) {
+                        console.log('\n\n\n\n current:', current);
+                        console.log('timestamp', d.timestamp)
+                        console.log('\n\n\n\n before:', before);
+                        console.log('\n\n\n\n after:', after);
+                    }
                     return (current.isSameOrAfter(before) && current.isSameOrBefore(after));
                 });
+
+                console.log('length datasets', _.size(datasets));
+                console.log('length withinRange', _.size(withinRange));
 
                 // get details on all datasets
                 pile.POST(pile.routes.base + pile.routes.get_datasets, {
@@ -217,7 +231,7 @@ module.exports = snow_query = {
 
                     // results
                     var scf_results = {
-                        date : moment(cubeDatasetTimestamp).format(),
+                        date : moment.utc(cubeDatasetTimestamp).hour(0).format(),
                         scf : averagePixelValue,
                         // rows : rows
                     };
