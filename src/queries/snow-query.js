@@ -83,7 +83,6 @@ module.exports = snow_query = {
             });
         },
 
-
         create_scf_single_mask_query : function (options, done) {
             var query_type = options.query_type;
             var access_token = options.access_token;
@@ -107,24 +106,11 @@ module.exports = snow_query = {
 
                 // filter cube's datasets for this year only
                 var withinRange = _.filter(datasets, function (d, i) {
-
-                    // var current = moment(d.timestamp).hour(12);
                     var current = moment.utc(d.timestamp).add(12, 'h'); // because original date in dataset is '2016-01-01T00:00:00+01:00' (ie. mindnight, but +1 timezone)
-                   
                     var before = moment.utc().year(year).dayOfYear(1).hour(1).minutes(0).seconds(0);
-                    // var after = moment.utc().year(year).dayOfYear(-1).hour(23).minutes(59).seconds(59);
                     var after = moment.utc().year(year).endOf('year');
-                    if (!i) {
-                        console.log('\n\n\n\n current:', current);
-                        console.log('timestamp', d.timestamp)
-                        console.log('\n\n\n\n before:', before);
-                        console.log('\n\n\n\n after:', after);
-                    }
                     return (current.isSameOrAfter(before) && current.isSameOrBefore(after));
                 });
-
-                console.log('length datasets', _.size(datasets));
-                console.log('length withinRange', _.size(withinRange));
 
                 // get details on all datasets
                 pile.POST(pile.routes.base + pile.routes.get_datasets, {
@@ -168,7 +154,7 @@ module.exports = snow_query = {
             
             
             async.waterfall(ops, function (err, scfs) {
-                console.log('all done 2', err, _.size(scfs));
+                console.log('Processed query:', err, _.size(scfs));
 
                 // catch errors
                 if (err) return done(err);
@@ -176,7 +162,7 @@ module.exports = snow_query = {
                 // save query to redis cache
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
                 store.layers.set(query_key, JSON.stringify(scfs), function (err) {
-                    console.log('saved: ', query_key, err);
+                    console.log('Stored query to disk @ ', query_key, err);
 
                     // done
                     done(null, scfs);
@@ -286,11 +272,8 @@ module.exports = snow_query = {
                     // var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B.geom), LATERAL ST_ValueCount(ST_Clip(A.rast, B.geom), 1) AS pvc) as t;"
                     // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A INNER JOIN ' + mask_dataset_id + ' AS B ON ST_Intersects(A.rast, B.rast), LATERAL ST_ValueCount(ST_Clip(A.rast,ST_Polygon(B.rast)), 1) AS pvc) as t;'
 
-
                     // works
                     var query = "select row_to_json(t) from (SELECT A.rid, pvc FROM " + dataset.table_name + " AS A INNER JOIN st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857) AS B ON ST_Intersects(A.rast, B), LATERAL ST_ValueCount(ST_Clip(A.rast, B), 1) AS pvc) as t;"
-
-
 
                 } else {
                  
@@ -305,6 +288,7 @@ module.exports = snow_query = {
                     // call `pg_done()` to release the client back to the pool
                     pg_done();
 
+                    // return results
                     done(err, pg_result);
                 });
             });
@@ -354,7 +338,6 @@ module.exports = snow_query = {
 
         },
 
-
         geojsonFromGeometry : function (geometry) {
             if (!geometry) return false;
 
@@ -374,11 +357,6 @@ module.exports = snow_query = {
         // get PostGIS compatible GeoJSON
         retriveGeoJSON : function (geojson) {
             if (!geojson) return false;
-            // try {
-            //     return JSON.stringify(geojson.features[0].geometry); // todo: if several features, merge with turf first?
-            // } catch (e) {
-            //     return false;
-            // }
             if (geojson.type == 'FeatureCollection') {
                 try {
                     return JSON.stringify(geojson.features[0].geometry);
