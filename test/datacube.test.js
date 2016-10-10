@@ -689,13 +689,17 @@ describe('Cubes', function () {
                     mask : {
                         type : 'geojson',
                         geometry : {"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[9.2230224609375,58.91031927906605],[9.2230224609375,59.6705145897832],[10.6182861328125,59.6705145897832],[10.6182861328125,58.91031927906605],[9.2230224609375,58.91031927906605]]]}}]},
-                        title : 'title', 
-                        description : 'description'
+                        meta : {
+                            "title" : "hallingdal",
+                            "description" : "description",
+                            "område" : "hallingdal",
+                            "kraftverk" : "mår",
+                            "feltnavn" : "aka title",
+                            "areal" : "338.45 km2",
+                            "årlig tilsig" : "323 mm"
+                        },
+                        data : 'string'
                     },
-                    data : {
-                        test : 'test'
-                    }
-                
                 }
 
                 api.post(endpoints.cube.mask)
@@ -705,13 +709,12 @@ describe('Cubes', function () {
                     if (err) return done(err);
                     var cube = res.body;
                     debugMode && console.log(cube);
-                    var mask = cube.masks[2]; // get first
-                    // expect(mask.type).to.equal('topojson');
+                    var mask = cube.masks[2]; // get second
                     expect(mask.data).to.exist;
-                    expect(mask.title).to.exist;
-                    expect(mask.title).to.equal('title');
-                    expect(mask.description).to.equal('description');
-                    expect(mask.data.test).to.equal('test');
+                    expect(mask.meta).to.exist;
+                    expect(mask.meta.title).to.equal('hallingdal');
+                    expect(mask.meta['årlig tilsig']).to.equal('323 mm');
+                    expect(mask.data).to.equal('string');
                     expect(mask.type).to.equal('geojson');
                     expect(cube.timestamp).to.exist;
                     expect(mask.geometry).to.exist;
@@ -741,7 +744,6 @@ describe('Cubes', function () {
                     assert.equal(result.status, 'Processing');
                     assert.ifError(result.error_code);
                     assert.ifError(result.error_text);
-
                     tmp.cube_postgis_vector_mask_file_id = result.file_id;
                     done();
                 });
