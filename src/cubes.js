@@ -338,8 +338,10 @@ module.exports = cubes = {
                 var prepared_mask = {
                     type : 'geojson',
                     geometry : mask.geometry,
-                    title : mask.title,
-                    description : mask.description
+                    // title : mask.title,
+                    // description : mask.description
+                    meta : mask.meta,
+                    data : mask.data,
                 }
                 callback(null, prepared_mask);
             }
@@ -391,8 +393,10 @@ module.exports = cubes = {
                 var prepared_mask = {
                     type : 'topojson',
                     geometry : topology,
-                    title : mask.title,
-                    description : mask.description
+                    // title : mask.title,
+                    // description : mask.description
+                    meta : mask.meta,
+                    data : mask.data,
                 }
 
                 // return topology
@@ -462,7 +466,8 @@ module.exports = cubes = {
                     dataset_id : dataset_id,
                     layer_id : mask.layer_id,
                     title : mask.title,
-                    description : mask.description
+                    description : mask.description,
+                    // todo: mask.meta, mask.data (see geojson mask above)
                 }
 
                 // return mask
@@ -486,7 +491,7 @@ module.exports = cubes = {
             var finished_mask = result.mask;
 
             // add data if available
-            if (options.data) finished_mask.data = options.data;
+            // if (options.data) finished_mask.data = options.data;
 
             // add mask id
             finished_mask.id = 'mask-' + tools.getRandomChars(8);
