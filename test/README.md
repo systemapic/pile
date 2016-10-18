@@ -8,7 +8,7 @@ nano test/utils/access.private.json # add your credentials and save
 `docker exec -it dev_pile_1 mocha test/datacube.test.js`
 
 
-```javascript
+```
 # example output
 
   Cubes
