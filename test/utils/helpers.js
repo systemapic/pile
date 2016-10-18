@@ -10,6 +10,8 @@ var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
 var endpoints = require('./endpoints.js');
 var testData = require('./helpers.json');
 
+var access = require('./access.private.json');
+
 module.exports = util = {
 
     // variables, todo: move to shared file
@@ -30,12 +32,8 @@ module.exports = util = {
     get_access_token : function (done) {
         api.get(endpoints.users.token.token)
             .query({
-                // username : testData.test_user.username,
-                // password : testData.test_user.password
-                // username : 'knutole@systemapic.com',
-                username : 'knutole@mapic.io',
-                // password : '***REMOVED***'
-                password : '***REMOVED***'
+                username : access.username,
+                password : access.password,
             })
             .send()
             .end(function (err, res) {
