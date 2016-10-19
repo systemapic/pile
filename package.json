@@ -10,6 +10,7 @@
     "body-parser": "^1.13.2",
     "carto": "^0.14.1",
     "chai": "^3.5.0",
+    "coffee-script": "^1.11.1",
     "colors": "^1.1.2",
     "compression": "^1.5.1",
     "cors": "^2.7.1",
