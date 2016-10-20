@@ -26,7 +26,7 @@ if [ "$3" == "" ]; then
 fi
 
 # get config
-source /systemapic/config/env.sh
+source /mapic/config/env.sh
 
 # run query
 # PGPASSWORD=$SYSTEMAPIC_PGSQL_PASSWORD psql -U $SYSTEMAPIC_PGSQL_USERNAME -d $1 -h postgis -c "select row_to_json(t) from (select * from $2 where $3 = $4) t;"

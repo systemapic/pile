@@ -13,7 +13,7 @@ test -n "$4" && S_SRS="-s_srs EPSG:$4"
 
 
 # get config
-. /systemapic/config/env.sh || exit 1
+. /mapic/config/env.sh || exit 1
 
 # env vars
 export PGUSER=$SYSTEMAPIC_PGSQL_USERNAME

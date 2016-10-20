@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # source config
-source /systemapic/config/env.sh || exit 1
+source /mapic/config/env.sh || exit 1
 
 # TODO: find a better way ?
 export SYSTEMAPIC_PGSQL_USERNAME \
