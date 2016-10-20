@@ -22,7 +22,7 @@ var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
+global.config = require('../config.js');
 var server = require('./server');
 var store  = require('./store');
 var proxy = require('./proxy');
@@ -34,14 +34,11 @@ var cubes = require('./cubes');
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
 
-
 // global paths (todo: move to config)
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH    = '/data/proxy_tiles/';
-
-
 
 var pgsql_options = {
     dbhost: 'postgis',
@@ -49,16 +46,14 @@ var pgsql_options = {
     dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
 };
 
-
-
 module.exports = pile = { 
 
-    config : config,
+    config : global.config,
     cubes : cubes,
 
     // todo: move to routes, or share with wu somehow (get routes by querying wu API?)
     routes : {
-        base : 'http://wu:3001',
+        base : 'http://engine:3001',
         upload_status : '/v2/data/import/status',
         create_dataset : '/v2/data/create',
         get_datasets : '/v2/data/several',

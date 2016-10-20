@@ -8,6 +8,8 @@ export SYSTEMAPIC_PGSQL_USERNAME \
        SYSTEMAPIC_PGSQL_PASSWORD \
        SYSTEMAPIC_PGSQL_DBNAME
 
+echo "conig -> $PILE_CONFIG_PATH"
+
 # spin server
 if $SYSTEMAPIC_PRODMODE; then
 	echo 'Pile | PostGIS Tile Server | Production mode'

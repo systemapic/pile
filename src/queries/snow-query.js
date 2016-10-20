@@ -27,7 +27,7 @@ var moment = require('moment');
 moment().utc();
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../../config/pile-config');
+var config = global.config;
 var store  = require('../store');
 var tools = require('../tools');
 

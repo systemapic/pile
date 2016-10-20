@@ -184,7 +184,7 @@ module.exports = tools = {
 	checkAccess : function (req, res, next) {
 		// request wu for checking access tokens
 		var access_token = req.query.access_token || req.body.access_token;
-		var verifyUrl = 'http://wu:3001/v2/users/token/check?access_token=' + access_token;
+		var verifyUrl = 'http://engine:3001/v2/users/token/check?access_token=' + access_token;
 		request(verifyUrl, function (error, response, body) {
 			if (!response) return res.json({access : 'Unauthorized'});
 			

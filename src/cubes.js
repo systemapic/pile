@@ -26,7 +26,7 @@ var topojson = require('topojson');
 var moment = require('moment');
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
+var config = global.config;
 var store  = require('./store');
 var tools = require('./tools');
 
@@ -419,7 +419,7 @@ module.exports = cubes = {
                 }
 
                 // get dataset as geojson from API
-                var url = 'http://wu:3001/v2/data/geojson?dataset_id=' + dataset_id + '&access_token=' + access_token;
+                var url = 'http://engine:3001/v2/data/geojson?dataset_id=' + dataset_id + '&access_token=' + access_token;
                 request(url, function (error, response, body) {
                     if (!response || error) return callback({error : 'Unauthorized', error_code : 3});
 

@@ -6,11 +6,11 @@ var request = require('request');
 var _ = require('lodash');
 var forge = require('node-forge');
 var supertest = require('supertest');
-var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
+var api = supertest('http://' + process.env.SYSTEMAPIC_DOMAIN);
 var endpoints = require('./endpoints.js');
 var testData = require('./helpers.json');
 
-var access = require('./access.private.json');
+var access = require('./access.ignore.json');
 
 module.exports = util = {
 
@@ -111,9 +111,11 @@ module.exports = util = {
     },
 
     ensure_test_user_exists: function (done) {
+        console.log('endpount:', endpoints.users.create);
         api.post(endpoints.users.create)
         .send(testData.test_user)
         .end(function (err, res) {
+            console.log('err:', err);
             assert.ifError(err);
             var user = util.parse(res.text);
             if ( res.status == 200 ) {
