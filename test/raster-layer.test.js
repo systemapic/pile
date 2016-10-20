@@ -6,22 +6,34 @@ var crypto = require('crypto');
 var request = require('request');
 var supertest = require('supertest');
 var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
-var endpoints = require('./endpoints.js');
-var helpers = require('./helpers');
-var token = helpers.token;
+// var endpoints = require('./endpoints.js');
+// var helpers = require('./helpers');
+// var token = helpers.token;
 var path = require('path');
 var httpStatus = require('http-status');
 var chai = require('chai');
 var expect = chai.expect;
-var config = require(
-  process.env.WU_CONFIG_PATH ||
-  '/systemapic/config/wu-config.js'
-).clientConfig;
-var tmp = {};
 var http = require('http-request');
 var assert = require('assert');
+
+
+// helpers
+var endpoints = require(__dirname + '/utils/endpoints');
+var helpers = require(__dirname + '/utils/helpers');
+var token = helpers.token;
+
+// config
+var config = require(process.env.WU_CONFIG_PATH || '/systemapic/config/wu-config.js').clientConfig;
+
+
+// var config = require(
+//   process.env.WU_CONFIG_PATH ||
+//   '/systemapic/config/wu-config.js'
+// ).clientConfig;
+var tmp = {};
+
 // var debugMode = process.env.SYSTEMAPIC_DEBUG;
-var debugMode = true;
+var debugMode = false;
 if (debugMode) {
     console.log('Debug mode!');
 }
