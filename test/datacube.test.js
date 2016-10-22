@@ -5,7 +5,8 @@ var fs = require('fs-extra');
 var crypto = require('crypto');
 var request = require('request');
 var supertest = require('supertest');
-var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
+// var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
+var api = supertest('https://172.17.0.1');
 var path = require('path');
 var httpStatus = require('http-status');
 var chai = require('chai');
@@ -14,27 +15,30 @@ var http = require('http-request');
 var assert = require('assert');
 var moment = require('moment');
 
+// api
+var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
+var api = supertest(domain);
+
 // helpers
 var endpoints = require(__dirname + '/utils/endpoints');
 var helpers = require(__dirname + '/utils/helpers');
 var token = helpers.token;
 
 // config
-var config = require(process.env.WU_CONFIG_PATH || '/mapic/config/wu-config.js').clientConfig;
+var config = require('/mapic/config/wu-config.js').clientConfig;
 
 // logs
-var debugMode = process.env.SYSTEMAPIC_DEBUG;
 var debugMode = false; // override
 
 var tmp = {};
 
 // Avoids DEPTH_ZERO_SELF_SIGNED_CERT error for self-signed certs
 // See https://github.com/systemapic/pile/issues/38
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0;
 
 // helper fn for tile url
 function base_cubes_url() {
-    var subdomain = config.servers.cubes.uri;
+    var subdomain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1/v2/cubes/' : config.servers.cubes.uri;
     var tiles_url = subdomain.replace('{s}', config.servers.cubes.subdomains[0]);
     return tiles_url;
 }
@@ -62,44 +66,18 @@ describe('Cubes', function () {
     this.slow(400);
 
     before(function(done) {
-
         async.series([
             helpers.ensure_test_user_exists,
             helpers.create_project
         ], done);
-
     });
 
     after(function (done) {
-        helpers.delete_project(done);
+         async.series([
+            // helpers.delete_user,
+            helpers.delete_project
+        ], done);
     });
-
-
-    // [pile]
-    // ------
-    // 1. post to API to create an empty datacube
-    // 2. upload dataset (raster) normally
-    // 3. add uploaded dataset uuid to datacube
-    // 4. set styling, png quality, other options to datacube, which will be common for all datasets
-    // 5. request tile from datacube - with correct styling, correct dataset, etc.
-    
-    // [wu]
-    // ----
-    // (in client, showing a datacube means adding each layer in separate overlay and doing anim etc.)
-    // 1. create a Wu.Cubelayer
-    // 2. add pile-cube to wu-cube
-    // 3. request tiles 
-
-    // problems:
-    // - how to decide the order of datasets? update with new order; order of dataset array decides.
-    // - how to add timeseries metadata (like dates) to cube? use a generic text field for metadata + a date field.
-    // - how to use same style on all layers in cube? request tiles at /cube/ with array number
-    // - how to make all of this easy for globesar? create scripts for uploading, adding to cube. simple GUI for choosing style. 
-
-
-    // configs modified:
-    // - nginx (/v2/cubes route)
-    // - wu (cubes tile requests)
 
 
     // TODO:
@@ -113,7 +91,7 @@ describe('Cubes', function () {
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
-                
+
                 // test data, no default options required
                 var data = {access_token : access_token};
 

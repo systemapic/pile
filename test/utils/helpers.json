@@ -1,11 +1,11 @@
 {
   "test_user": {
-    "email": "mocha_test_user_2c2sws22f2223@systemapic.com",
-    "firstName": "mocha",
-    "lastName": "test",
-    "uuid": "uuid-mocha-test-project-4w22s2c2df2",
-    "password": "test-user-password",
-    "username": "test-user-522wsscfd223"
+    "email": "test@mapic.io",
+    "firstName": "test",
+    "lastName": "user",
+    "uuid": "mocha-test-user-uuid-lkzfmlk",
+    "password": "test",
+    "username": "mocha_test_user"
   },
   "test_file": {
     "uuid": "test_file_uuid",

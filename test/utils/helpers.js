@@ -6,11 +6,14 @@ var request = require('request');
 var _ = require('lodash');
 var forge = require('node-forge');
 var supertest = require('supertest');
-var api = supertest('http://' + process.env.SYSTEMAPIC_DOMAIN);
 var endpoints = require('./endpoints.js');
 var testData = require('./helpers.json');
-
 var access = require('./access.ignore.json');
+
+// api
+var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
+var api = supertest(domain);
+
 
 module.exports = util = {
 
@@ -76,34 +79,26 @@ module.exports = util = {
     parse : function (body) {
         try {
             var parsed = JSON.parse(body);
+            return parsed;
         } catch (e) {
             console.log('failed to parse:', body);
             throw e;
             return;
         }
-        return parsed;
     },
 
     delete_user: function (user_id, callback) {
         util.token(function (err, access_token) {
-            console.log('delete_user endpoints', endpoints.users.delete);
-            console.log('ac', access_token);
-            console.log('typeof testdata', typeof testData);
             testData.test_user.access_token = access_token;
+            testData.test_user.user_id = user_id;
             api.post(endpoints.users.delete)
             .send(testData.test_user)
             .end(function (err, res) {
-                console.log('delete_user', err);
-                console.log(typeof res.text);
-                console.log(res.text);
                 assert.ifError(err);
                 assert.equal(res.status, 200);
                 var user = util.parse(res.text);
-                console.log('deleted user:', user);
                 assert.ok(user);
                 assert.ok(user.uuid);
-                // assert.equal(user.uuid, testData.test_user.uuid);
-                // assert.equal(user.firstName, testData.test_user.firstName);
                 done();
             });
         });
@@ -111,11 +106,9 @@ module.exports = util = {
     },
 
     ensure_test_user_exists: function (done) {
-        console.log('endpount:', endpoints.users.create);
         api.post(endpoints.users.create)
         .send(testData.test_user)
         .end(function (err, res) {
-            console.log('err:', err);
             assert.ifError(err);
             var user = util.parse(res.text);
             if ( res.status == 200 ) {
@@ -126,7 +119,7 @@ module.exports = util = {
               assert.ok(user.error);
               assert.equal(user.error.message, 'Username is already taken.');
             } else {
-              assert.fail( user );
+              assert.fail(user);
             }
             done();
         });

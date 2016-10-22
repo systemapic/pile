@@ -11,10 +11,10 @@ export SYSTEMAPIC_PGSQL_USERNAME \
 echo "conig -> $PILE_CONFIG_PATH"
 
 # spin server
-if $SYSTEMAPIC_PRODMODE; then
+if $MAPIC_PRODMODE; then
 	echo 'Pile | PostGIS Tile Server | Production mode'
 	forever src/pile.js production >> log/pile.log
 else
 	echo 'Pile Debug mode (with 8GB memory)'
-	nodemon --max-old-space-size=8192 -i node_modules/ -i tests/ src/pile.js
+	nodemon --max-old-space-size=8192 -i node_modules/ -i test/ src/pile.js
 fi

@@ -55,6 +55,7 @@ module.exports = cubes = {
 
     create : function (req, res) {
         var options = req.body;
+        console.log('cuebs create', options);
 
         // default cube options
         var defaultOptions = {
