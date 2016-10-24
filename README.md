@@ -3,7 +3,7 @@
 # Mapic Tileserver aka `mile`
 
 
-# Install
+## Install
 See [mapic/mapic](https://github.com/mapic/mapic) for installation instructions.
 
 
