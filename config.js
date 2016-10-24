@@ -1,1 +1,1 @@
-/mapic/config/pile-config.js
+/mapic/config/mile.config.js
