@@ -1,8 +1,8 @@
 {
-  "name": "pile",
-  "version": "1.0.0",
-  "description": "postgis tile server",
-  "main": "pile.js",
+  "name": "mapic/mile",
+  "version": "2.0.1",
+  "description": "Mapic Tile Server",
+  "main": "start-server.sh",
   "dependencies": {
     "async": "^1.3.0",
     "bars": "jstrace/bars",
@@ -63,12 +63,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/systemapic/pile.git"
+    "url": "https://github.com/mapic/mile.git"
   },
-  "author": "@kosjoli",
-  "license": "GPLv3",
+  "contributors": [
+    "knutole@mapic.io",
+    "jorgen@systemapic.com",
+    "strk@keybit.net",
+    "icygler@hwdtech.ru",
+    "mgdfot@gmail.com"
+  ],
   "bugs": {
-    "url": "https://github.com/systemapic/pile/issues"
+    "url": "https://github.com/mapic/mile/issues"
   },
-  "homepage": "https://github.com/systemapic/pile"
+  "homepage": "https://github.com/mapic/mile",
+  "license": "GPLv3",
 }
