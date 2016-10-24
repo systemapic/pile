@@ -1,20 +1,9 @@
-# pile
+# Mapic Tileserver aka `mile`
 
-## Environment variables
 
-`PILE_CONFIG_PATH` - full path to pile-config.js, defaults to
-                     [ROOT]/../../config/pile-config
+# Install
+See [mapic/mapic](https://github.com/mapic/mapic) for installation instructions.
 
-`WU_CONFIG_PATH`   - full path to wu-config.js, defaults to
-                     /mapic/config/wu-config.js
-                     only needed for tests
-
-### Database access
-
-Accessed database hostname is hardcoded to be `postgis`.
-
-`SYSTEMAPIC_PGSQL_USERNAME` - username to access db
-`SYSTEMAPIC_PGSQL_PASSWORD` - password to access db
 
 ## Testing
 
@@ -22,7 +11,7 @@ Tests are meant to be run from within the docker appropriately
 started with all links expected from the mapic docker
 configuration.
 
-Inside such docker, tests are run using:
+Inside the Docker container, tests are run using:
 
 ```sh
  npm test
