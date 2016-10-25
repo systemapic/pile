@@ -10,6 +10,7 @@ export SYSTEMAPIC_PGSQL_USERNAME \
 
 
 # ensure node modules are installed
+NODE_MODULES_DIR=/mapic/modules/mile/node_modules
 if [ ! -d "$NODE_MODULES_DIR" ]; then
   echo "Installing node modules..."
   npm install || abort "Failed to install node modules. Quitting!"

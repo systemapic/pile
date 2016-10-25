@@ -22,14 +22,14 @@ module.exports = tools = {
 	tileIsProxy : function (req) {
 		var params = req.params[0].split('/');
 		var provider = params[0];
-		var isProxy = _.contains(pile.proxyProviders, provider);
+		var isProxy = _.includes(pile.proxyProviders, provider);
 		return isProxy;
 	},
 
 	tileIsPostgis : function (req) {
 		var params = req.params[0].split('/');
 		var layer_id = params[0];
-		var isPostgis = _.contains(layer_id, 'layer_id-');
+		var isPostgis = _.includes(layer_id, 'layer_id-');
 		return isPostgis;
 	},
 
