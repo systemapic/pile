@@ -8,13 +8,22 @@ export SYSTEMAPIC_PGSQL_USERNAME \
        SYSTEMAPIC_PGSQL_PASSWORD \
        SYSTEMAPIC_PGSQL_DBNAME
 
-echo "conig -> $PILE_CONFIG_PATH"
+
+# ensure node modules are installed
+if [ ! -d "$NODE_MODULES_DIR" ]; then
+  echo "Installing node modules..."
+  npm install || abort "Failed to install node modules. Quitting!"
+
+  # build mapnik from source
+  # rm node_modules/mapnik -r
+  # npm install --build-from-source mapnik
+fi
 
 # spin server
 if $MAPIC_PRODMODE; then
-	echo 'Pile | PostGIS Tile Server | Production mode'
+	echo 'Mile | PostGIS Tile Server | Production mode'
 	forever src/pile.js production >> log/pile.log
 else
-	echo 'Pile Debug mode (with 8GB memory)'
+	echo 'Mile Debug mode (with 8GB memory)'
 	nodemon --max-old-space-size=8192 -i node_modules/ -i test/ src/pile.js
 fi
