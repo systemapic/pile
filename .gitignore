@@ -1,7 +1,7 @@
 config/*
 .config/*
 node_modules/*
-log/*
 tmp/
 *.private.*
 *.ignore.*
+!log

@@ -8,6 +8,8 @@ export SYSTEMAPIC_PGSQL_USERNAME \
        SYSTEMAPIC_PGSQL_PASSWORD \
        SYSTEMAPIC_PGSQL_DBNAME
 
+# ensure log folder
+mkdir -p /mapic/modules/mile/log
 
 # ensure node modules are installed
 NODE_MODULES_DIR=/mapic/modules/mile/node_modules
