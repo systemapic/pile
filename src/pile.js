@@ -1080,9 +1080,6 @@ module.exports = pile = {
             // add layer to map
             map.add_layer(layer);
 
-            console.log('popstgis_settings', postgis_settings);
-            console.log('storedLayer', storedLayer);
-
             // parse xml from cartocss
             pile.cartoRenderer(storedLayer, layer, callback);
 
