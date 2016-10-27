@@ -5,3 +5,4 @@ tmp/
 *.private.*
 *.ignore.*
 log
+!test/tmp/

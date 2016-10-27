@@ -25,7 +25,7 @@ var helpers = require(__dirname + '/utils/helpers');
 var token = helpers.token;
 
 // config
-var config = require('/mapic/config/wu-config.js').clientConfig;
+var config = require('/mapic/config/engine.config.js').clientConfig;
 
 // logs
 var debugMode = false; // override

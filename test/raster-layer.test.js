@@ -23,7 +23,7 @@ var helpers = require(__dirname + '/utils/helpers');
 var token = helpers.token;
 
 // config
-var config = require(process.env.WU_CONFIG_PATH || '/mapic/config/wu-config.js').clientConfig;
+var config = require('/mapic/config/engine.config.js').clientConfig;
 
 var tmp = {};
 
