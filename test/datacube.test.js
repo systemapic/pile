@@ -64,6 +64,7 @@ function get_default_cartocss() {
 
 describe('Cubes', function () {
     this.slow(400);
+    this.timeout(10000);
 
     before(function(done) {
         async.series([
@@ -291,9 +292,9 @@ describe('Cubes', function () {
             });
         });
 
-        it('should upload dataset @ ' + endpoints.import.post, function (done) {
+        it('should upload dataset @ ' + endpoints.data.import, function (done) {
             token(function (err, access_token) {
-                api.post(endpoints.import.post)
+                api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
                 // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.200.tif')))
@@ -314,9 +315,9 @@ describe('Cubes', function () {
             });
         });
 
-        it('should upload second dataset @ ' + endpoints.import.post, function (done) {
+        it('should upload second dataset @ ' + endpoints.data.import, function (done) {
             token(function (err, access_token) {
-                api.post(endpoints.import.post)
+                api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
                 // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.2.200.tif')))
@@ -409,7 +410,7 @@ describe('Cubes', function () {
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
                     process.stdout.write('.');
-                    api.get(endpoints.import.status)
+                    api.get(endpoints.data.status)
                     .query({ file_id : tmp.uploaded_raster.file_id, access_token : access_token})
                     .end(function (err, res) {
                         if (err) return done(err);
@@ -435,7 +436,7 @@ describe('Cubes', function () {
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
                     process.stdout.write('.');
-                    api.get(endpoints.import.status)
+                    api.get(endpoints.data.status)
                     .query({ file_id : tmp.uploaded_raster_2.file_id, access_token : access_token})
                     .end(function (err, res) {
                         if (err) return done(err);
@@ -707,7 +708,7 @@ describe('Cubes', function () {
 
         it('should upload cube-vector-mask.zip', function (done) {
             token(function (err, access_token) {
-                api.post(endpoints.import.post)
+                api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
                 .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-vector-mask.zip')))
@@ -733,8 +734,8 @@ describe('Cubes', function () {
             this.slow(5000);
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
-                process.stdout.write('.');
-                    api.get(endpoints.import.status)
+                    process.stdout.write('.');
+                    api.get(endpoints.data.status)
                     .query({ file_id : tmp.cube_postgis_vector_mask_file_id, access_token : access_token})
                     .end(function (err, res) {
                         assert.ifError(err);
@@ -783,7 +784,7 @@ describe('Cubes', function () {
 
         it('should upload cube-raster-mask.tif', function (done) {
             token(function (err, access_token) {
-                api.post(endpoints.import.post)
+                api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
                 .field('data', fs.createReadStream(path.resolve(__dirname, 'open-data/cube-raster-mask.tif')))
@@ -810,8 +811,8 @@ describe('Cubes', function () {
             this.slow(5000);
             token(function (err, access_token) {
                 var processingInterval = setInterval(function () {
-                process.stdout.write('.');
-                    api.get(endpoints.import.status)
+                    process.stdout.write('.');
+                    api.get(endpoints.data.status)
                     .query({ file_id : tmp.cube_postgis_raster_mask_file_id, access_token : access_token})
                     .end(function (err, res) {
                         assert.ifError(err);

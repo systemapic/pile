@@ -54,7 +54,7 @@ module.exports = pile = {
     // todo: move to routes, or share with wu somehow (get routes by querying wu API?)
     routes : {
         base : 'http://engine:3001',
-        upload_status : '/v2/data/import/status',
+        upload_status : '/v2/data/status',
         create_dataset : '/v2/data/create',
         get_datasets : '/v2/data/several',
     },
@@ -559,10 +559,6 @@ module.exports = pile = {
 
        
         if (data_type == 'raster') {
-
-            console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
-            console.log('cartocss', cartocss);
-            console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
 
             // raster debug
             var defaultCartocss = '';
@@ -1084,6 +1080,9 @@ module.exports = pile = {
             // add layer to map
             map.add_layer(layer);
 
+            console.log('popstgis_settings', postgis_settings);
+            console.log('storedLayer', storedLayer);
+
             // parse xml from cartocss
             pile.cartoRenderer(storedLayer, layer, callback);
 
@@ -1103,10 +1102,6 @@ module.exports = pile = {
     cartoRenderer : function (storedLayer, layer, callback) {
 
         var css = storedLayer.options.cartocss;
-
-        // console.log('\n\n\n\n\n\n\n\n\n\n\n');
-        // console.log('================== carto renderer ======================');
-        // console.log('css: ', css);
 
         if (!css) {
             console.error( 'cartoRenderer called with undefined or empty css' );
@@ -1141,7 +1136,6 @@ module.exports = pile = {
     },
 
     _debugXML : function (layer_id, xml) {
-        console.log('preparedTile XML: ', xml);
         var xml_filename = 'tmp/' + layer_id + '.debug.xml';
         fs.outputFile(xml_filename, xml, function (err) {
             if (!err) console.log('wrote xml to ', xml_filename);
@@ -1353,19 +1347,6 @@ if (cluster.isMaster) {
             done();
         });
     });
-
-    // // cube tiles
-    // jobs.process('query_scf', 50, function (job, done) {
-    //     var options = job.data.options;
-    //     cubes.queries.snowCoverFractionJob(options, function (err) {
-    //         if (err) console.error({
-    //             err_id : 12,
-    //             err_msg : 'snow cover fraction job',
-    //             error : err
-    //         });
-    //         done();
-    //     });
-    // });
 
     // remove stale jobs
     jobs.on('job complete', function (id) {
