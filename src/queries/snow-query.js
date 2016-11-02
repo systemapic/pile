@@ -1,6 +1,7 @@
 // dependencies
 var _ = require('lodash');
-var pg = require('pg').native;
+var pg = require('pg');
+// var pg = require('pg').native;
 var gm = require('gm');
 var fs = require('fs-extra');
 var kue = require('kue');
@@ -25,6 +26,11 @@ var geojsonExtent = require('geojson-extent');
 var topojson = require('topojson');
 var moment = require('moment');
 moment().utc();
+
+// first run `npm install promise-polyfill --save
+if (typeof Promise == 'undefined') {
+  global.Promise = require('promise-polyfill')
+}
 
 // modules
 var config = global.config;
@@ -256,6 +262,8 @@ module.exports = snow_query = {
 
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
+
+            console.log('conString', conString);
 
             // initialize a connection pool
             pg.connect(conString, function(err, client, pg_done) {
