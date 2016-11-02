@@ -6,6 +6,7 @@ var crypto = require('crypto');
 var request = require('request');
 var supertest = require('supertest');
 // var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
+
 var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
 var api = supertest(domain);
 // var endpoints = require('./endpoints.js');
