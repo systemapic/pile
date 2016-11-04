@@ -14,6 +14,9 @@ var access = require('./access.ignore.json');
 var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
 var api = supertest(domain);
 
+// Avoids DEPTH_ZERO_SELF_SIGNED_CERT error for self-signed certs
+// See https://github.com/systemapic/pile/issues/38
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0;
 
 module.exports = util = {
 
@@ -34,19 +37,19 @@ module.exports = util = {
 
     get_access_token : function (done) {
         api.get(endpoints.users.token.token)
-            .query({
-                username : access.username,
-                password : access.password,
-            })
-            .send()
-            .end(function (err, res) {
-                assert.ifError(err);
-                assert.equal(res.status, 200);
-                var tokens = util.parse(res.text);
-                assert.equal(tokens.token_type, 'multipass');
-                assert.equal(_.size(tokens.access_token), 43);
-                done(err, tokens);
-            });
+        .query({
+            username : testData.test_user.username,
+            password : testData.test_user.password,
+        })
+        .send()
+        .end(function (err, res) {
+            assert.ifError(err);
+            assert.equal(res.status, 200);
+            var tokens = util.parse(res.text);
+            assert.equal(tokens.token_type, 'multipass');
+            assert.equal(_.size(tokens.access_token), 43);
+            done(err, tokens);
+        });
     },
 
     token : function (done) {
