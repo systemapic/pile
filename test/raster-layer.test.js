@@ -56,7 +56,7 @@ describe('Raster', function () {
     });
 
     context('GeoTIFF -> snow.raster.200.tif', function () {
-        this.timeout(11000);
+        this.timeout(30000);
 
         it('should upload', function (done) {
             token(function (err, access_token) {
@@ -117,8 +117,8 @@ describe('Raster', function () {
         });
 
         it('should process', function (done) {
-            this.timeout(10000);
             this.slow(5000);
+            this.timeout(30000);
 
             // check for processing status
             token(function (err, access_token) {
@@ -156,7 +156,7 @@ describe('Raster', function () {
 
     
         it('should create a raster layer', function (done) {
-            this.timeout(40000);
+            this.timeout(30000);
             token(function (err, access_token) {
 
                 var layer = {
@@ -211,7 +211,8 @@ describe('Raster', function () {
 
 
         it.skip('should get expected raster-tile from raster', function (done) {
-            this.timeout(40000);
+            this.timeout(30000);
+            
             token(function (err, access_token) {
 
                 var type = 'png';
