@@ -5,7 +5,6 @@ var fs = require('fs-extra');
 var crypto = require('crypto');
 var request = require('request');
 var supertest = require('supertest');
-// var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
 var api = supertest('https://172.17.0.1');
 var path = require('path');
 var httpStatus = require('http-status');

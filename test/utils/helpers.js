@@ -8,7 +8,7 @@ var forge = require('node-forge');
 var supertest = require('supertest');
 var endpoints = require('./endpoints.js');
 var testData = require('./helpers.json');
-var access = require('./access.ignore.json');
+var access = (process.env.MAPIC_DOMAIN == 'localhost') ? require('./access.localhost.json') : require('./access.ignore.json');
 
 // api
 var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
