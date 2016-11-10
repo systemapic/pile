@@ -63,7 +63,7 @@ function get_default_cartocss() {
 
 describe('Cubes', function () {
     this.slow(400);
-    this.timeout(10000);
+    this.timeout(40000);
 
     before(function(done) {
         async.series([
@@ -87,7 +87,7 @@ describe('Cubes', function () {
     // - get tiles from disk if already exists (problem: what if cube options have changed?? currently same cube_id even if changed options. this won't reflect in cached tiles...)
     // - clean up: delete cubes, datasets that were created during test!
 
-    context("ain't nuttin to fuck with", function () {
+    context("CRUD", function () {
 
         it('should create empty cube @ ' + endpoints.cube.create, function (done) {
             token(function (err, access_token) {
@@ -296,7 +296,6 @@ describe('Cubes', function () {
                 api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
-                // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.200.tif')))
                 .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow_scandinavia_jan.tif')))
                 .expect(httpStatus.OK)
                 .end(function (err, res) {
@@ -319,7 +318,6 @@ describe('Cubes', function () {
                 api.post(endpoints.data.import)
                 .type('form')
                 .field('access_token', access_token)
-                // .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow.raster.2.200.tif')))
                 .field('data', fs.createReadStream(path.resolve(__dirname, './open-data/snow_scandinavia_july.tif')))
                 .expect(httpStatus.OK)
                 .end(function (err, res) {
@@ -942,10 +940,6 @@ describe('Cubes', function () {
                 });
             });
         });
-
-
-
-
 
 
         // date stamp for replacing dataset
