@@ -123,6 +123,11 @@ module.exports = cubes = {
 
             // add datasets to array
             datasets.forEach(function (d) {
+
+                // mark last modified
+                d.lastModified = moment().valueOf();
+
+                // add to cube
                 cube.datasets.push(d);
             });
 
@@ -247,6 +252,7 @@ module.exports = cubes = {
         // todo: security: only be able to replace own cubes
 
         var ops = [];
+        
 
         // get cube
         ops.push(function (callback) {
@@ -263,38 +269,65 @@ module.exports = cubes = {
                 //     id: 'file_ckvuatwfkqpyzjxjpygj',
                 //     description: 'Filename: snow.raster.2.200.tif',
                 //     timestamp: 'Fri May 20 2016 11:33:20 GMT+0000 (UTC)',
-                //     granularity: 'day' 
+                //     granularity: 'day',
+                //     lastModified : 1479343760651
                 // }
 
                 // get moment() datestamp of dataset to add
                 var datestamp = moment(d.timestamp);
 
-                // time resolution
-                var granularity = d.granularity || 'day';
-
                 // check if dataset exists at same time, by resolution
-                var i = _.findIndex(cube.datasets, function (cd) {
-                    return moment(cd.timestamp).isSame(datestamp, granularity);
-                });
+                // todo: make this more pluggable
+                options.replaceKey = options.replaceKey || 'timestamp';
+                var granularity = d.granularity || 'day'; // time resolution
+                var dataset_index = -1; // default
 
-                // already exists a dataset on this day, replace!
-                if (i > -1) {
+                // find dataset to replace based on replaceKey
+                if (options.replaceKey == 'timestamp') {   
+                             
+                    dataset_index = _.findIndex(cube.datasets, function (cd) {
+                        return moment(cd.timestamp).isSame(datestamp, granularity);
+                    });
+                
+                // catch-all
+                } else {
+                    dataset_index = -1;
+                }
+
+                // if exists, replace
+                if (dataset_index > -1) {
 
                     // replace dataset
-                    cube.datasets[i] = d;
+                    cube.datasets[dataset_index] = d;
 
-                    // mark changed
-                    cube.timestamp = moment().valueOf();
+                } else {
 
-                    // log
-                    console.log('Replacing dataset', cube.timestamp);
-
+                    // doesn't exist, so just add 
+                    cube.datasets.push(d);
                 }
+
+                // mark lastModified on dataset
+                d.lastModified = moment().valueOf();
+
+                // mark cube changed
+                cube.timestamp = moment().valueOf();
+                // cube.lastModified = moment().valueOf(); // todo: rename timestamp to lastModified
 
             });
 
+            // sort by sortBy key (can be a function)
+            options.sortBy = function (a) {
+                var sortBy = moment(a.timestamp);
+                return sortBy.valueOf(); // unix time
+            };
+            if (options.sortBy) {
+                // sort datasets by datestamp
+                cube.datasets = _.sortBy(cube.datasets, options.sortBy);
+            }
+
             // save
             cubes.save(cube, callback);
+
         });
            
         // run ops
@@ -303,6 +336,7 @@ module.exports = cubes = {
 
             // return updated cube
             res.send(updated_cube);
+
         });
     },
 
