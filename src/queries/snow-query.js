@@ -160,8 +160,6 @@ module.exports = snow_query = {
             
             
             async.waterfall(ops, function (err, scfs) {
-                console.log('Processed query:', err, _.size(scfs));
-
                 // catch errors
                 if (err) return done(err);
 
@@ -191,7 +189,7 @@ module.exports = snow_query = {
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
 
-                console.log('querying each');
+                console.log('Querying...');
 
                 var timestamp_dataset = _.find(cube.datasets, function (d) {
                     return d.id == dataset.table_name;
@@ -262,8 +260,6 @@ module.exports = snow_query = {
 
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
-
-            console.log('conString', conString);
 
             // initialize a connection pool
             pg.connect(conString, function(err, client, pg_done) {

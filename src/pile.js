@@ -1122,7 +1122,6 @@ module.exports = pile = {
         try  {
             // carto renderer
             var xml = new carto.Renderer().render(options);
-            // console.log('xml:', xml);
             callback(null, xml);
 
         } catch (e) {

@@ -382,14 +382,11 @@ module.exports = queries = {
         var dbpass = pgsql_options.dbpass;
         var conString = 'postgres://'+dbuser+':'+dbpass+'@'+dbhost+'/' + postgis_db;
 
-        console.log('pgquery:', options);
-
         pg.connect(conString, function(err, client, pgcb) {
             if (err) return callback(err);
             
             // do query
             client.query(query, variables, function(err, result) {
-                console.log('pgquery err, res', err, result);
                 // clean up after pg
                 pgcb();
 
