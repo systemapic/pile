@@ -7,13 +7,13 @@
 See [mapic/mapic](https://github.com/mapic/mapic) for installation instructions.
 
 ## Data formats
-Mapic Tileserver uses `PostGIS` under the hood for data storage. It can therefore can accept almost any input format, and can be easily modified to support any output format.
+Mapic Tileserver uses [PostGIS](http://www.postgis.net/) under the hood for data storage. It can therefore can accept any PostGIS supported format, and can be easily modified to support other output formats.
 
-#### Input
-- [x] `PostGIS`
+#### Input sources
+- [x] PostGIS
 - [ ] Any format, incl. `GeoTIFF`, `GeoJSON`, `TopoJSON`, `Shapefile`
 
-#### Output
+#### Output formats
 - [x] Raster tiles (combined with [CartoCSS](https://carto.com/docs/carto-engine/cartocss/) stylesheet)
 - [ ] Vector tiles (under development)
 - [ ] Untiled vector formats (`GeoJSON`, `TopoJSON`, `Shapefile`)
@@ -25,7 +25,7 @@ Tests are meant to be run from within the docker appropriately
 started with all links expected from the mapic docker
 configuration.
 
-Inside the Docker container, tests are run using:
+Inside the Docker container (enter with `./shell-to.sh`), tests are run using:
 
 ```sh
  npm test
