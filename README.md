@@ -21,8 +21,8 @@ Mapic Tileserver uses [PostGIS](http://www.postgis.net/) under the hood for data
 
 ## Testing
 
-Tests are meant to be run from within the docker appropriately
-started with all links expected from the mapic docker
+Tests are meant to be run from within the Docker appropriately
+started with all links expected from the [mapic/mapic](https://github.com/mapic/mapic)
 configuration.
 
 Inside the Docker container (enter with `./shell-to.sh`), tests are run using:
