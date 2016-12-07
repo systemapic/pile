@@ -15,11 +15,7 @@ mkdir -p /mapic/modules/mile/log
 NODE_MODULES_DIR=/mapic/modules/mile/node_modules
 if [ ! -d "$NODE_MODULES_DIR" ]; then
   echo "Installing node modules..."
-  npm install || abort "Failed to install node modules. Quitting!"
-
-  # build mapnik from source
-  # rm node_modules/mapnik -r
-  # npm install --build-from-source mapnik
+  npm install --silent || abort "Failed to install node modules. Quitting!"
 fi
 
 # spin server
