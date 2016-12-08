@@ -20,6 +20,7 @@ install:
   - git clone git://github.com/mapic/mapic.git
   - cd mapic
   - ./install-to-localhost.sh travis
+  - sleep 30
 
 script:
   - cd scripts
