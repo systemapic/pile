@@ -1,0 +1,28 @@
+language: node_js
+
+services:
+  - docker
+
+sudo: required
+
+node_js:
+  - 6
+
+notifications:
+  email: false
+  slack: mapic-io:NKaii0z3tRkeDyXaDbRauRFp
+
+branches:
+  only:
+    - master
+
+install:
+  - ./install-to-localhost.sh travis
+
+script:
+  - cd scripts
+  - ./run-mile-tests.sh
+
+cache:
+  directories:
+    - $HOME/.yarn-cache
