@@ -173,9 +173,9 @@ module.exports = proxy = {
 		// set url, headers
 		options.url = url;
 		options.headers = {
-			'User-Agent' : 'Systemapic Tile Proxy',
-			'Referer' : 'https://dev.systemapic.com/',
-			'X-Message-For-Google' : 'Hi Google! This is perhaps in violation of TOS. However, we are a young Norwegian startup without revenue. We cannot use your JS api, it breaks our Leaflet.js based platform. We will fix this asap, but in the meantime I hope you wont mind us too much. We are working hard to become your paying customers! Have a great day! Sincerely Yours, knutole@systemapic.com',
+			'User-Agent' : 'Mapic Tile Proxy',
+			'Referer' : 'https://mapic.io',
+			'X-Message-For-Google' : 'Hi Google!',
 			'X-Google-Server-API-Key' : 'AIzaSyA-aG1H1KYHOYE-as-dxIqqSLr1RJZJs-g'
 		}
 
@@ -196,9 +196,9 @@ module.exports = proxy = {
 		var url = 'https://www.webatlas.no/maptiles/tiles/' + norkart_types[options.type] + '/wa_grid/' + options.z + '/' + options.x + '/' + options.y + '.' + options.format;
 		options.url = url;
 		options.headers = {
-			'User-Agent' : 'Systemapic Tile Proxy',
-			'Referer' : 'https://dev.systemapic.com/',
-			'X-Message-For-Norkart' : 'We are proxying because we need four subdomains for speedy tile requests. Logging is done as normal in browser! – knutole@systemapic.com'
+			'User-Agent' : 'Mapic Tile Proxy',
+			'Referer' : 'https://mapic.io/',
+			'X-Message-For-Norkart' : 'We are proxying because we need four subdomains for speedy tile requests.'
 		}
 
 		// fetch
