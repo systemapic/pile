@@ -18,6 +18,9 @@ var exec = require('child_process').exec;
 var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
+// plugin: deformation query
+var defo = require('./queries/deformation-query');
+
 
 var pgsql_options = {
     dbhost: 'postgis',
@@ -27,6 +30,9 @@ var pgsql_options = {
 
 module.exports = queries = { 
 
+    fetchRasterDeformation : function () {
+        return defo.fetchRasterDeformation(arguments);
+    },
 
     fetchData : function (req, res) {
 

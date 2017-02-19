@@ -68,6 +68,12 @@ module.exports = pile = {
 
     proxyProviders : ['google', 'norkart'],
 
+    fetchDataArea : queries.fetchDataArea,
+    fetchData : queries.fetchData,
+    fetchHistogram : queries.fetchHistogram,
+    getVectorPoints : queries.getVectorPoints,
+    fetchRasterDeformation : queries.fetchRasterDeformation,
+    
     jobs : function () {
         return jobs;
     },
@@ -201,15 +207,6 @@ module.exports = pile = {
         });
     },
 
-    // pipe to queries
-    // TODO: in server.js: pile.queries.fetchDataArea
-    fetchDataArea : queries.fetchDataArea,
-    fetchData : queries.fetchData,
-    fetchHistogram : queries.fetchHistogram,
-    getVectorPoints : queries.getVectorPoints,
-
-
-    
     // this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
     createLayer : function (req, res) {
         var options = req.body;
