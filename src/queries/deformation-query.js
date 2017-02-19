@@ -117,7 +117,7 @@ module.exports = snow_query = {
 
                     // int16 half: 32767
                     
-                    var value = data[0].st_value;
+                    var value = (_.isArray(data) && !_.isUndefined(data[0])) ? data[0].st_value : null;
                     deformation_values.push({
                         value : value,
                         date : date
