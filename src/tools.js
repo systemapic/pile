@@ -58,12 +58,12 @@ module.exports = tools = {
 		return averages;
 	},
 
-	safeParse : function (string) {
+	safeParse : function (string, quiet) {
 		try {
 			var o = JSON.parse(string);
 			return o;
 		} catch (e) {
-			console.log('JSON.parse error of string:', string, e);
+			if (!quiet) console.log('JSON.parse error of string:', string, e);
 			return false;
 		}
 	},

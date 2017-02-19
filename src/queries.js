@@ -30,10 +30,8 @@ var pgsql_options = {
 
 module.exports = queries = { 
 
-    fetchRasterDeformation : function () {
-        return defo.fetchRasterDeformation(arguments);
-    },
-
+    fetchRasterDeformation : defo.fetchRasterDeformation,
+    
     fetchData : function (req, res) {
 
         var options = req.body;
