@@ -6,3 +6,5 @@ tmp/
 *.ignore.*
 log
 !test/tmp/
+.yarn/*
+yarn-error.log
