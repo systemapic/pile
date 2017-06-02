@@ -73,6 +73,7 @@ module.exports = pile = {
     fetchHistogram : queries.fetchHistogram,
     getVectorPoints : queries.getVectorPoints,
     fetchRasterDeformation : queries.fetchRasterDeformation,
+    queryRasterPoint : queries.queryRasterPoint,
     
     jobs : function () {
         return jobs;

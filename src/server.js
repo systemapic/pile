@@ -107,6 +107,11 @@ module.exports = function (pile) {
 		pile.fetchRasterDeformation(req, res);
 	});
 
+	// get data from area
+	app.post('/v2/query/raster/point', pile.checkAccess, function (req, res) {
+		pile.queryRasterPoint(req, res);
+	});
+
 	// get data from area for cube
 	app.post('/v2/cubes/query', pile.checkAccess, function (req, res) {
 		pile.cubes.query(req, res);
