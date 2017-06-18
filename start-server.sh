@@ -9,19 +9,14 @@ export SYSTEMAPIC_PGSQL_USERNAME \
        SYSTEMAPIC_PGSQL_DBNAME
 
 # ensure log folder
-mkdir -p /mapic/modules/mile/log
+mkdir -p /mapic/mile/log
 
-# # ensure node modules are installed
-# NODE_MODULES_DIR=/mapic/modules/mile/node_modules
-# if [ ! -d "$NODE_MODULES_DIR" ]; then
-#   echo "Installing node modules..."
-#   npm install --silent || abort "Failed to install node modules. Quitting!"
-# fi
-
-echo "YARNIN'"
-yarn config set cache-folder /mapic/modules/mile/.yarn
+# yarn
+yarn config set cache-folder /mapic/mile/.yarn
 yarn install
-echo "yarn done"
+
+# ensure 
+cd /mapic/mile
 
 # spin server
 if $MAPIC_PRODMODE; then
