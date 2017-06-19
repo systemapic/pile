@@ -1,4 +1,4 @@
-language: node_js
+language: nodejs
 
 services:
   - docker
@@ -17,15 +17,17 @@ branches:
     - master
 
 install:
-  - git clone git://github.com/mapic/mapic.git
+  - curl -sSL https://get.mapic.io  | sh
   - cd mapic
-  - ./install-to-localhost.sh travis
-  - sleep 30
+  - mapic domain localhost
+  - mapic install stable
+  - mapic start
+  - mapic logs &
+  - sleep 240
 
 script:
-  - cd scripts
-  - ./run-mile-tests.sh
-
+  - mapic test mile
+  
 cache:
   directories:
     - $HOME/.yarn-cache
