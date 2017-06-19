@@ -3,11 +3,12 @@ language: nodejs
 services:
   - docker
 
-sudo: required
-
 node_js:
   - 6
-  
+
+sudo: required
+dist: trusty
+group: edge  # Add this
 
 notifications:
   email:
