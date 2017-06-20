@@ -8,7 +8,7 @@ node_js:
 
 sudo: required
 dist: trusty
-group: edge  # Add this
+group: edge
 
 notifications:
   email:
@@ -38,6 +38,3 @@ install:
 script:
   - mapic test mile
   
-cache:
-  directories:
-    - $HOME/.yarn-cache
