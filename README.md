@@ -1,5 +1,5 @@
-# Mapic Tileserver [![Build Status](https://travis-ci.org/mapic/mile.png)](https://travis-ci.org/mapic/mile)
-
+# Mapic Tileserver 
+[![Build Status](https://travis-ci.org/mapic/mile.svg)](https://travis-ci.org/mapic/mile)
 
 ## Install
 See [mapic/mapic](https://github.com/mapic/mapic) for installation instructions.
@@ -9,24 +9,18 @@ Mapic Tileserver uses [PostGIS](http://www.postgis.net/) under the hood for data
 
 #### Input sources
 - [x] PostGIS
-- [ ] Any format, incl. `GeoTIFF`, `GeoJSON`, `TopoJSON`, `Shapefile`
+- [x] Any format, incl. `GeoTIFF`, `GeoJSON`, `TopoJSON`, `Shapefile`
 
 #### Output formats
 - [x] Raster tiles (combined with [CartoCSS](https://carto.com/docs/carto-engine/cartocss/) stylesheet)
+- [x] Untiled vector formats (`GeoJSON`, `TopoJSON`, `Shapefile`)
 - [ ] Vector tiles (under development)
-- [ ] Untiled vector formats (`GeoJSON`, `TopoJSON`, `Shapefile`)
 - [ ] Untiled raster formats (`GeoTIFF`, `ECW`, `JPEG200`, etc.)
 
 ## Tests
 
-Tests are meant to be run from within the Docker appropriately
-started with all links expected from the [mapic/mapic](https://github.com/mapic/mapic)
-configuration.
-
-Inside the Docker container (enter with `./shell-to.sh`), tests are run using:
-
-```sh
- npm test
+```bash
+ mapic test mile
 ````
 
 
@@ -35,10 +29,5 @@ Mapic is built entirely open source. We believe in a collaborative environment f
 
 Mapic is licenced under the [AGPL licence](https://github.com/mapic/mapic/blob/master/LICENCE).
 
-## Contributors
-- [Jørgen Evil Ekvoll](https://github.com/jorgenevil)
-- [Magdalini Fotiadou](https://github.com/mft74)
-- [Sandro Santilli](https://github.com/strk)
-- [Knut Ole Sjøli](https://github.com/knutole)
-- [Shahjada Talukdar](https://github.com/destromas1)
-- [Igor Ziegler](https://github.com/igorziegler)
+## Project contributors
+Contributors listed on [mapic/mapic](https://github.com/mapic/mapic#project-contributors).
