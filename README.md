@@ -17,12 +17,9 @@ Mapic Tileserver uses [PostGIS](http://www.postgis.net/) under the hood for data
 - [ ] Vector tiles (under development)
 - [ ] Untiled raster formats (`GeoTIFF`, `ECW`, `JPEG200`, etc.)
 
-## Tests
+## Test
 
-```bash
- mapic test mile
-````
-
+Run your own tests with `mapic test mile`, or see [Travis](https://travis-ci.org/mapic/mile).
 
 ## Licence
 Mapic is built entirely open source. We believe in a collaborative environment for creating strong solutions for an industry that is constantly moving. The Mapic platform is open for anyone to use and contribute to, which makes it an ideal platform for government organisations as well as NGO's and for-profit businesses.

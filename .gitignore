@@ -1,7 +1,8 @@
 config/*
 .config/*
 node_modules/*
-tmp/
+tmp/*
+tmp
 *.private.*
 *.ignore.*
 log
