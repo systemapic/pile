@@ -37,4 +37,4 @@ install:
 
 script:
   - mapic test mile
-  
+
