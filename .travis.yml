@@ -30,7 +30,7 @@ install:
   - curl -sSL https://get.mapic.io  | sh
   - cd mapic
   - mapic domain localhost
-  - mapic install stable
+  - mapic install travis
   - mapic start
   - mapic logs &
   - sleep 240
