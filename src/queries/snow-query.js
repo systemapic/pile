@@ -1,6 +1,7 @@
 // dependencies
 var _ = require('lodash');
-var pg = require('pg').native;
+var pg = require('pg');
+// var pg = require('pg').native;
 var gm = require('gm');
 var fs = require('fs-extra');
 var kue = require('kue');
@@ -26,8 +27,13 @@ var topojson = require('topojson');
 var moment = require('moment');
 moment().utc();
 
+// first run `npm install promise-polyfill --save
+if (typeof Promise == 'undefined') {
+  global.Promise = require('promise-polyfill')
+}
+
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../../config/pile-config');
+var config = global.config;
 var store  = require('../store');
 var tools = require('../tools');
 
@@ -154,8 +160,6 @@ module.exports = snow_query = {
             
             
             async.waterfall(ops, function (err, scfs) {
-                console.log('Processed query:', err, _.size(scfs));
-
                 // catch errors
                 if (err) return done(err);
 
@@ -185,7 +189,7 @@ module.exports = snow_query = {
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
 
-                console.log('querying each');
+                console.log('Querying...');
 
                 var timestamp_dataset = _.find(cube.datasets, function (d) {
                     return d.id == dataset.table_name;

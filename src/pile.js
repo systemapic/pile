@@ -22,7 +22,7 @@ var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
+global.config = require('../config.js');
 var server = require('./server');
 var store  = require('./store');
 var proxy = require('./proxy');
@@ -34,14 +34,11 @@ var cubes = require('./cubes');
 mapnik.register_default_fonts();
 mapnik.register_default_input_plugins();
 
-
 // global paths (todo: move to config)
 var VECTORPATH   = '/data/vector_tiles/';
 var RASTERPATH   = '/data/raster_tiles/';
 var GRIDPATH     = '/data/grid_tiles/';
 var PROXYPATH    = '/data/proxy_tiles/';
-
-
 
 var pgsql_options = {
     dbhost: 'postgis',
@@ -49,17 +46,15 @@ var pgsql_options = {
     dbpass: process.env.SYSTEMAPIC_PGSQL_PASSWORD || 'docker'
 };
 
-
-
 module.exports = pile = { 
 
-    config : config,
+    config : global.config,
     cubes : cubes,
 
     // todo: move to routes, or share with wu somehow (get routes by querying wu API?)
     routes : {
-        base : 'http://wu:3001',
-        upload_status : '/v2/data/import/status',
+        base : 'http://engine:3001',
+        upload_status : '/v2/data/status',
         create_dataset : '/v2/data/create',
         get_datasets : '/v2/data/several',
     },
@@ -73,6 +68,13 @@ module.exports = pile = {
 
     proxyProviders : ['google', 'norkart'],
 
+    fetchDataArea : queries.fetchDataArea,
+    fetchData : queries.fetchData,
+    fetchHistogram : queries.fetchHistogram,
+    getVectorPoints : queries.getVectorPoints,
+    fetchRasterDeformation : queries.fetchRasterDeformation,
+    queryRasterPoint : queries.queryRasterPoint,
+    
     jobs : function () {
         return jobs;
     },
@@ -206,15 +208,6 @@ module.exports = pile = {
         });
     },
 
-    // pipe to queries
-    // TODO: in server.js: pile.queries.fetchDataArea
-    fetchDataArea : queries.fetchDataArea,
-    fetchData : queries.fetchData,
-    fetchHistogram : queries.fetchHistogram,
-    getVectorPoints : queries.getVectorPoints,
-
-
-    
     // this layer is only a postgis layer. a Wu Layer Model must be created by client after receiving this postgis layer
     createLayer : function (req, res) {
         var options = req.body;
@@ -564,10 +557,6 @@ module.exports = pile = {
 
        
         if (data_type == 'raster') {
-
-            console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
-            console.log('cartocss', cartocss);
-            console.log('\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n');
 
             // raster debug
             var defaultCartocss = '';
@@ -1109,10 +1098,6 @@ module.exports = pile = {
 
         var css = storedLayer.options.cartocss;
 
-        // console.log('\n\n\n\n\n\n\n\n\n\n\n');
-        // console.log('================== carto renderer ======================');
-        // console.log('css: ', css);
-
         if (!css) {
             console.error( 'cartoRenderer called with undefined or empty css' );
             css = "#layer {}";
@@ -1135,7 +1120,6 @@ module.exports = pile = {
         try  {
             // carto renderer
             var xml = new carto.Renderer().render(options);
-            // console.log('xml:', xml);
             callback(null, xml);
 
         } catch (e) {
@@ -1146,7 +1130,6 @@ module.exports = pile = {
     },
 
     _debugXML : function (layer_id, xml) {
-        console.log('preparedTile XML: ', xml);
         var xml_filename = 'tmp/' + layer_id + '.debug.xml';
         fs.outputFile(xml_filename, xml, function (err) {
             if (!err) console.log('wrote xml to ', xml_filename);
@@ -1358,19 +1341,6 @@ if (cluster.isMaster) {
             done();
         });
     });
-
-    // // cube tiles
-    // jobs.process('query_scf', 50, function (job, done) {
-    //     var options = job.data.options;
-    //     cubes.queries.snowCoverFractionJob(options, function (err) {
-    //         if (err) console.error({
-    //             err_id : 12,
-    //             err_msg : 'snow cover fraction job',
-    //             error : err
-    //         });
-    //         done();
-    //     });
-    // });
 
     // remove stale jobs
     jobs.on('job complete', function (id) {

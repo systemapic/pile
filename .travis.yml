@@ -1,0 +1,40 @@
+language: nodejs
+
+services:
+  - docker
+
+node_js:
+  - 6
+
+sudo: required
+dist: trusty
+group: edge
+
+notifications:
+  email:
+    recipients:
+      - knutole@mapic.io
+    on_success: change
+    on_failure: change
+  slack:
+    rooms:
+      - mapic-io:NKaii0z3tRkeDyXaDbRauRFp
+    on_success: change
+    on_failure: change
+    
+branches:
+  only:
+    - master
+
+install:
+  - curl -sSL https://get.mapic.io  | sh
+  - cd mapic
+  - mapic domain localhost
+  - mapic install travis
+  - mapic start
+  - mapic logs &
+  - sleep 240
+
+script:
+  - mapic test mile
+

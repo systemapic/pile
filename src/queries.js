@@ -18,6 +18,9 @@ var exec = require('child_process').exec;
 var mercator = require('./sphericalmercator');
 var geojsonArea = require('geojson-area');
 
+// plugin: deformation query
+var defo = require('./queries/deformation-query');
+
 
 var pgsql_options = {
     dbhost: 'postgis',
@@ -27,7 +30,88 @@ var pgsql_options = {
 
 module.exports = queries = { 
 
+    fetchRasterDeformation : defo.fetchRasterDeformation,
 
+    queryRasterPoint : function (req, res) {
+
+        console.log('queryRasterDefault', req.body);
+
+        var options = req.body;
+        var layer_id = options.layer_id;
+        var lngLat = options.point;
+
+        var ops = [];
+
+        ops.push(function (callback) {
+
+            // retrieve layer and return it to client
+            store.layers.get(layer_id, function (err, layer) {
+                if (err || !layer) return callback(err || 'no layer');
+                callback(null, tools.safeParse(layer));
+            });
+        });
+
+        ops.push(function (layerObject, callback) {
+
+            var layer = layerObject.options;
+
+            // set postgis options
+            var pg_username = process.env.SYSTEMAPIC_PGSQL_USERNAME;
+            var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
+            var pg_database = layer.database_name;
+
+            // set connection string
+            var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
+
+            // initialize a connection pool
+            pg.connect(conString, function(err, client, pg_done) {
+                if (err) return console.error('error fetching client from pool', err);
+
+                var lng = lngLat.lng;
+                var lat = lngLat.lat;
+
+                // works
+                var query = 'SELECT ST_Value(rast, ST_Transform(ST_SetSRID(ST_MakePoint(' + lng + ', ' + lat +'), 4326),3857)) AS val FROM ' + layer.table_name + ' WHERE ST_Intersects(rast, ST_Transform(ST_SetSRID(ST_MakePoint(' + lng + ', ' + lat +'),4326),3857),1);';
+                
+                // query postgis
+                client.query(query, function(err, pg_result) {
+                   
+                    // call `pg_done()` to release the client back to the pool
+                    pg_done();
+
+                    // return results
+                    callback(err, pg_result);
+                });
+            });
+
+        });
+
+
+        async.waterfall(ops, function (err, results) {
+            console.log('waterfall err, results', err, results);
+            if (err) return res.send({err : err});
+
+            try {
+            var value = results.rows[0].val;
+            } catch (e) {
+                return res.send({err : e});
+            };
+
+            console.log('value: ', value);
+
+            res.send({
+                err : null,
+                data : {
+                    lngLat : lngLat,
+                    value : value
+                }
+            });            
+        })
+
+
+
+    },
+    
     fetchData : function (req, res) {
 
         var options = req.body;
@@ -382,14 +466,11 @@ module.exports = queries = {
         var dbpass = pgsql_options.dbpass;
         var conString = 'postgres://'+dbuser+':'+dbpass+'@'+dbhost+'/' + postgis_db;
 
-        console.log('pgquery:', options);
-
         pg.connect(conString, function(err, client, pgcb) {
             if (err) return callback(err);
             
             // do query
             client.query(query, variables, function(err, result) {
-                console.log('pgquery err, res', err, result);
                 // clean up after pg
                 pgcb();
 

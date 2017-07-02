@@ -26,7 +26,7 @@ var topojson = require('topojson');
 var moment = require('moment');
 
 // modules
-var config = require(process.env.PILE_CONFIG_PATH || '../../config/pile-config');
+var config = global.config;
 var store  = require('./store');
 var tools = require('./tools');
 
@@ -122,6 +122,11 @@ module.exports = cubes = {
 
             // add datasets to array
             datasets.forEach(function (d) {
+
+                // mark last modified
+                d.lastModified = moment().valueOf();
+
+                // add to cube
                 cube.datasets.push(d);
             });
 
@@ -246,6 +251,7 @@ module.exports = cubes = {
         // todo: security: only be able to replace own cubes
 
         var ops = [];
+        
 
         // get cube
         ops.push(function (callback) {
@@ -262,38 +268,65 @@ module.exports = cubes = {
                 //     id: 'file_ckvuatwfkqpyzjxjpygj',
                 //     description: 'Filename: snow.raster.2.200.tif',
                 //     timestamp: 'Fri May 20 2016 11:33:20 GMT+0000 (UTC)',
-                //     granularity: 'day' 
+                //     granularity: 'day',
+                //     lastModified : 1479343760651
                 // }
 
                 // get moment() datestamp of dataset to add
                 var datestamp = moment(d.timestamp);
 
-                // time resolution
-                var granularity = d.granularity || 'day';
-
                 // check if dataset exists at same time, by resolution
-                var i = _.findIndex(cube.datasets, function (cd) {
-                    return moment(cd.timestamp).isSame(datestamp, granularity);
-                });
+                // todo: make this more pluggable
+                options.replaceKey = options.replaceKey || 'timestamp';
+                var granularity = d.granularity || 'day'; // time resolution
+                var dataset_index = -1; // default
 
-                // already exists a dataset on this day, replace!
-                if (i > -1) {
+                // find dataset to replace based on replaceKey
+                if (options.replaceKey == 'timestamp') {   
+                             
+                    dataset_index = _.findIndex(cube.datasets, function (cd) {
+                        return moment(cd.timestamp).isSame(datestamp, granularity);
+                    });
+                
+                // catch-all
+                } else {
+                    dataset_index = -1;
+                }
+
+                // if exists, replace
+                if (dataset_index > -1) {
 
                     // replace dataset
-                    cube.datasets[i] = d;
+                    cube.datasets[dataset_index] = d;
 
-                    // mark changed
-                    cube.timestamp = moment().valueOf();
+                } else {
 
-                    // log
-                    console.log('Replacing dataset', cube.timestamp);
-
+                    // doesn't exist, so just add 
+                    cube.datasets.push(d);
                 }
+
+                // mark lastModified on dataset
+                d.lastModified = moment().valueOf();
+
+                // mark cube changed
+                cube.timestamp = moment().valueOf();
+                // cube.lastModified = moment().valueOf(); // todo: rename timestamp to lastModified
 
             });
 
+            // sort by sortBy key (can be a function)
+            options.sortBy = function (a) {
+                var sortBy = moment(a.timestamp);
+                return sortBy.valueOf(); // unix time
+            };
+            if (options.sortBy) {
+                // sort datasets by datestamp
+                cube.datasets = _.sortBy(cube.datasets, options.sortBy);
+            }
+
             // save
             cubes.save(cube, callback);
+
         });
            
         // run ops
@@ -302,6 +335,7 @@ module.exports = cubes = {
 
             // return updated cube
             res.send(updated_cube);
+
         });
     },
 
@@ -419,7 +453,7 @@ module.exports = cubes = {
                 }
 
                 // get dataset as geojson from API
-                var url = 'http://wu:3001/v2/data/geojson?dataset_id=' + dataset_id + '&access_token=' + access_token;
+                var url = 'http://engine:3001/v2/data/geojson?dataset_id=' + dataset_id + '&access_token=' + access_token;
                 request(url, function (error, response, body) {
                     if (!response || error) return callback({error : 'Unauthorized', error_code : 3});
 
@@ -617,7 +651,6 @@ module.exports = cubes = {
         // check if outside mask extent
         var outside_mask_extent = cubes._isOutsideMaskExtent(options);
         if (outside_mask_extent) {
-            console.log('outside_mask_extent');
             return pile.serveEmptyTile(res);
         }
         // create unique hash for style
@@ -878,19 +911,12 @@ module.exports = cubes = {
 
         scf_geojson : function (req, res) {
 
-            console.log('scf_geosjon');
+            // refactored. todo: clean up!
             return cubes.queries.scf_single_mask(req, res);
 
             // query values for current year based on geojson mask
             var options = req.body;
             var multi_mask = options.mask ? options.mask.multi_mask : false;
-
-
-            console.log('###################');
-            console.log('###################');
-            console.log('###################');
-            console.log('###################');
-            console.log('query: ', options);
 
             // ensure params
             if (!options.cube_id) return res.status(400).send({error : 'Need to provide cube_id.'});
@@ -900,8 +926,6 @@ module.exports = cubes = {
             cubes.find(options.cube_id, function (err, cube) {
                 if (err) return res.status(400).send({error : err.message});
 
-                console.log('cube', cube);
-
                 // ensure mask(s)
                 if (!cube || !cube.masks) return res.status(400).send({error : 'Need to provide valid cube & mask.'});
 
@@ -910,10 +934,6 @@ module.exports = cubes = {
                 var mask = _.find(cube.masks, function (m) {
                     return m.id == mask_id;
                 });
-
-                console.log('mask:', mask);
-
-                // console.log('mask ==>', cube.mask);
 
                 res.status(400).send({error : 'debug'});
 
@@ -928,13 +948,6 @@ module.exports = cubes = {
             var options = req.body;
             var multi_mask = options.mask ? options.mask.multi_mask : false;
 
-
-            console.log('###################');
-            console.log('###################');
-            console.log('###################');
-            console.log('###################');
-            console.log('query: ', options);
-
             // ensure params
             if (!options.cube_id) return res.status(400).send({error : 'Need to provide cube_id.'});
 
@@ -945,8 +958,6 @@ module.exports = cubes = {
 
                 // ensure mask
                 if (!cube || !cube.mask || !cube.mask.type) return res.status(400).send({error : 'Need to provide valid cube & mask.'});
-
-                console.log('mask ==>', cube.mask);
 
                 // mask type postgis-raster
                 if (cube.mask.type == 'postgis-raster') {
@@ -965,18 +976,6 @@ module.exports = cubes = {
                 res.status(400).send({error : 'Mask type not supported.'});
 
             });
-
-            // if (multi_mask) {
-                
-            //     // multi mask query
-            //     cubes.queries.scf_multi_mask(req, res);
-            
-            // } else {
-
-            //     // single mask query
-            //     cubes.queries.scf_single_mask(req, res);
-
-            // }
 
         },
 
@@ -1140,10 +1139,6 @@ module.exports = cubes = {
             var pg_password = process.env.SYSTEMAPIC_PGSQL_PASSWORD;
             var pg_database = dataset.database_name;
 
-            console.log('pg_database', pg_database);
-            console.log('dataset.table_name', dataset.table_name);
-            console.log('dataset;', dataset);
-
             // set connection string
             var conString = 'postgres://' + pg_username + ':' + pg_password + '@postgis/' + pg_database;
 
@@ -1151,21 +1146,15 @@ module.exports = cubes = {
             pg.connect(conString, function(err, client, pg_done) {
                 if (err) return done(err);
 
-                // set query // currently working query:
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(ST_Intersection(A.rast, B.rast, 0),1) AS pvc) as t;'
                 // var query = 'select row_to_json(t) from (SELECT A.rid, B.rid, pvc, mask FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id + ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc, ST_ValueCount(B.rast,1) AS mask) as t;'
-                // vector query
                 // var query = "select row_to_json(t) from (SELECT rid, pvc FROM " + dataset.table_name + ", ST_ValueCount(rast,1) AS pvc WHERE st_intersects(st_transform(st_setsrid(ST_geomfromgeojson('" + pg_geojson + "'), 4326), 3857), rast)) as t;"
-                // debug 
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' A JOIN ' + mask_dataset_id+ ' B ON ST_Intersects(A.rast, B.rast), ST_ValueCount(A.rast,1) AS pvc) as t;'
                 // var query = "select row_to_json(t) from (SELECT A.rid, A.pvc FROM " + dataset.table_name + " AS A, " + mask_dataset_id + " AS B, ST_ValueCount(A.rast,1) AS pvc WHERE st_intersects(A.rast, B.rast) as t;"
                 // var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A, ' + mask_dataset_id + ' AS B, ST_ValueCount(A.rast,1) AS pvc WHERE st_intersects(A.rast, 1, B.rast, 1)) as t;'
-                
 
                 var query = 'select row_to_json(t) from (SELECT A.rid, pvc FROM ' + dataset.table_name + ' AS A INNER JOIN ' + mask_dataset_id + ' AS B ON ST_Intersects(A.rast, B.rast), LATERAL ST_ValueCount(ST_Clip(A.rast,ST_Polygon(B.rast)), 1) AS pvc) as t;'
-
-                console.log('query: ', query);
 
                 // query postgis
                 client.query(query, function(err, pg_result) {
@@ -1192,8 +1181,6 @@ module.exports = cubes = {
 
             // query each dataset
             async.eachSeries(datasets, function (dataset, callback) {
-
-                console.log('querying each');
 
                 var timestamp_dataset = _.find(cube.datasets, function (d) {
                     return d.id == dataset.table_name;
@@ -1311,8 +1298,6 @@ module.exports = cubes = {
             var force_query = options.options ? options.options.force_query : false;
             var ops         = [];
 
-            console.log('scf_multi_mask', options);
-
             // check for already stored query
             var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
             store.layers.get(query_key, function (err, stored_query) {
@@ -1344,13 +1329,11 @@ module.exports = cubes = {
 
             // get cube
             ops.push(function (callback) {
-                console.log('find cube');
                 cubes.find(cube_id, callback);
             });
 
             // get relevant datasets to query, from [wu]
             ops.push(function (cube, callback) {
-                console.log('get relevant datasets');
 
                 // get cube datasets
                 var datasets = cube.datasets;
@@ -1375,7 +1358,6 @@ module.exports = cubes = {
 
             // fix mask
             ops.push(function (dataset_details, cube, callback) {
-                console.log('fix mask', _.size(dataset_details));
 
                 var options = {
                     datasets : dataset_details,
@@ -1492,9 +1474,6 @@ module.exports = cubes = {
                     mask : mask,
                 }
 
-                // console.log('dataset_date', dataset_date);
-                // console.log('dataset:', dataset);
-
                 // create query
                 cubes.queries.postgis_snowcover(queryOptions, function (err, pg_result) {
                     
@@ -1528,8 +1507,6 @@ module.exports = cubes = {
 
         
         _calculateSnowCoverFraction : function (all_dates) {
-
-            // console.log('_calculateSnowCoverFraction', all_dates);
 
             // '2016-02-23T23:00:00+00:00': { 
             //     '20': 90425,
@@ -1662,7 +1639,6 @@ module.exports = cubes = {
                     var topo_mask = cube.mask;
 
                     // todo: add to options??
-                    console.log('geom all');
                     
                     callback(null, options);
 
@@ -1685,7 +1661,6 @@ module.exports = cubes = {
             });
             
             async.waterfall(ops, function (err, scfs) {
-                console.log('all done 2', err, _.size(scfs));
 
                 // catch errors
                 if (err) return done(err);
@@ -1693,7 +1668,6 @@ module.exports = cubes = {
                 // save query to redis cache
                 var query_key = 'query:type' + query_type + ':' + cube_id + ':year-' + year + ':mask_id-' + mask_id;
                 store.layers.set(query_key, JSON.stringify(scfs), function (err) {
-                    console.log('saved: ', query_key, err);
 
                     // done
                     done(null, scfs);
@@ -1762,13 +1736,6 @@ module.exports = cubes = {
 
     calcSCF : function (rows) {
 
-        // console.log('#############');
-        // console.log('#############');
-        // console.log('#############');
-        // console.log('  calc SCF   ')
-        // console.log('#############');
-        // console.log('#############');
-
         var dump_values = 0.0;
         var dump_count = 0.0;
 
@@ -1795,53 +1762,6 @@ module.exports = cubes = {
         return scf;
 
     },
-
-    // calcSCF : function (rows) {
-
-    //     console.log('#############');
-    //     console.log('#############');
-    //     console.log('#############');
-    //     console.log('  calc SCF   ')
-    //     console.log('#############');
-    //     console.log('#############');
-
-    //     // clean up 
-    //     var pixelValues = {};
-
-    //     // get values, count
-    //     rows.forEach(function (r) {
-
-    //         var data = r.row_to_json.pvc; // {"value":156,"count":3}
-    //         var value = data.value;
-    //         var count = data.count;
-
-    //         // only include values between 101-200
-    //         if (value >= 100 && value <= 200) {
-    //             if (pixelValues[value]) {
-    //                 pixelValues[value] += count;
-    //             } else {
-    //                 pixelValues[value] = count;
-    //             }
-    //         }
-    //     });
-
-    //     // sum averages
-    //     var avg_sum = 0;
-    //     var tot_count = 0;
-    //     _.forEach(pixelValues, function (p, v) {
-    //         avg_sum += p * v;
-    //         tot_count += p;
-    //     });
-
-    //     // calculate average
-    //     var average = avg_sum / tot_count;
-    //     var scf = average - 100; // to get %
-
-    //     console.log('SFC: ', scf);
-
-    //     return scf;
-
-    // },
 
 
     _getSnowCoverFraction : function (rows) {

@@ -1,18 +1,28 @@
 #!/bin/bash
 
 # source config
-source /systemapic/config/env.sh || exit 1
+source /mapic/config/env.sh || exit 1
 
 # TODO: find a better way ?
 export SYSTEMAPIC_PGSQL_USERNAME \
        SYSTEMAPIC_PGSQL_PASSWORD \
        SYSTEMAPIC_PGSQL_DBNAME
 
+# ensure log folder
+mkdir -p /mapic/mile/log
+
+# yarn
+yarn config set cache-folder /mapic/mile/.yarn
+yarn install
+
+# ensure 
+cd /mapic/mile
+
 # spin server
-if $SYSTEMAPIC_PRODMODE; then
-	echo 'Pile | PostGIS Tile Server | Production mode'
+if $MAPIC_PRODMODE; then
+	echo 'Mile | PostGIS Tile Server | Production mode'
 	forever src/pile.js production >> log/pile.log
 else
-	echo 'Pile Debug mode (with 8GB memory)'
-	nodemon --max-old-space-size=8192 -i node_modules/ -i tests/ src/pile.js
+	echo 'Mile Debug mode (with 8GB memory)'
+	nodemon --max-old-space-size=8192 -i node_modules/ -i test/ src/pile.js
 fi

@@ -22,14 +22,14 @@ module.exports = tools = {
 	tileIsProxy : function (req) {
 		var params = req.params[0].split('/');
 		var provider = params[0];
-		var isProxy = _.contains(pile.proxyProviders, provider);
+		var isProxy = _.includes(pile.proxyProviders, provider);
 		return isProxy;
 	},
 
 	tileIsPostgis : function (req) {
 		var params = req.params[0].split('/');
 		var layer_id = params[0];
-		var isPostgis = _.contains(layer_id, 'layer_id-');
+		var isPostgis = _.includes(layer_id, 'layer_id-');
 		return isPostgis;
 	},
 
@@ -58,12 +58,12 @@ module.exports = tools = {
 		return averages;
 	},
 
-	safeParse : function (string) {
+	safeParse : function (string, quiet) {
 		try {
 			var o = JSON.parse(string);
 			return o;
 		} catch (e) {
-			console.log('JSON.parse error of string:', string, e);
+			if (!quiet) console.log('JSON.parse error of string:', string, e);
 			return false;
 		}
 	},
@@ -184,7 +184,7 @@ module.exports = tools = {
 	checkAccess : function (req, res, next) {
 		// request wu for checking access tokens
 		var access_token = req.query.access_token || req.body.access_token;
-		var verifyUrl = 'http://wu:3001/v2/users/token/check?access_token=' + access_token;
+		var verifyUrl = 'http://engine:3001/v2/users/token/check?access_token=' + access_token;
 		request(verifyUrl, function (error, response, body) {
 			if (!response) return res.json({access : 'Unauthorized'});
 			

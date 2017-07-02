@@ -1,6 +1,12 @@
 config/*
 .config/*
 node_modules/*
-log/*
-tmp/
+tmp/*
+tmp
 *.private.*
+*.ignore.*
+log
+!test/tmp/
+.yarn/*
+yarn-error.log
+test/open-data

@@ -6,11 +6,17 @@ var request = require('request');
 var _ = require('lodash');
 var forge = require('node-forge');
 var supertest = require('supertest');
-var api = supertest('https://' + process.env.SYSTEMAPIC_DOMAIN);
 var endpoints = require('./endpoints.js');
 var testData = require('./helpers.json');
+var access = (process.env.MAPIC_DOMAIN == 'localhost') ? require('./access.localhost.json') : require('./access.ignore.json');
 
-var access = require('./access.private.json');
+// api
+var domain = (process.env.MAPIC_DOMAIN == 'localhost') ? 'https://172.17.0.1' : 'https://' + process.env.MAPIC_DOMAIN;
+var api = supertest(domain);
+
+// Avoids DEPTH_ZERO_SELF_SIGNED_CERT error for self-signed certs
+// See https://github.com/systemapic/pile/issues/38
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0;
 
 module.exports = util = {
 
@@ -31,19 +37,19 @@ module.exports = util = {
 
     get_access_token : function (done) {
         api.get(endpoints.users.token.token)
-            .query({
-                username : access.username,
-                password : access.password,
-            })
-            .send()
-            .end(function (err, res) {
-                assert.ifError(err);
-                assert.equal(res.status, 200);
-                var tokens = util.parse(res.text);
-                assert.equal(tokens.token_type, 'multipass');
-                assert.equal(_.size(tokens.access_token), 43);
-                done(err, tokens);
-            });
+        .query({
+            username : testData.test_user.username,
+            password : testData.test_user.password,
+        })
+        .send()
+        .end(function (err, res) {
+            assert.ifError(err);
+            assert.equal(res.status, 200);
+            var tokens = util.parse(res.text);
+            assert.equal(tokens.token_type, 'multipass');
+            assert.equal(_.size(tokens.access_token), 43);
+            done(err, tokens);
+        });
     },
 
     token : function (done) {
@@ -76,34 +82,26 @@ module.exports = util = {
     parse : function (body) {
         try {
             var parsed = JSON.parse(body);
+            return parsed;
         } catch (e) {
             console.log('failed to parse:', body);
             throw e;
             return;
         }
-        return parsed;
     },
 
     delete_user: function (user_id, callback) {
         util.token(function (err, access_token) {
-            console.log('delete_user endpoints', endpoints.users.delete);
-            console.log('ac', access_token);
-            console.log('typeof testdata', typeof testData);
             testData.test_user.access_token = access_token;
+            testData.test_user.user_id = user_id;
             api.post(endpoints.users.delete)
             .send(testData.test_user)
             .end(function (err, res) {
-                console.log('delete_user', err);
-                console.log(typeof res.text);
-                console.log(res.text);
                 assert.ifError(err);
                 assert.equal(res.status, 200);
                 var user = util.parse(res.text);
-                console.log('deleted user:', user);
                 assert.ok(user);
                 assert.ok(user.uuid);
-                // assert.equal(user.uuid, testData.test_user.uuid);
-                // assert.equal(user.firstName, testData.test_user.firstName);
                 done();
             });
         });
@@ -124,7 +122,7 @@ module.exports = util = {
               assert.ok(user.error);
               assert.equal(user.error.message, 'Username is already taken.');
             } else {
-              assert.fail( user );
+              assert.fail(user);
             }
             done();
         });

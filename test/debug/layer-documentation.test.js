@@ -15,7 +15,7 @@ var chai = require('chai');
 var expect = chai.expect;
 var config = require(
   process.env.WU_CONFIG_PATH ||
-  '/systemapic/config/wu-config.js'
+  '/mapic/config/wu-config.js'
 ).clientConfig;
 
 var tmp = {};

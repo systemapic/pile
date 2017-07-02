@@ -25,7 +25,7 @@ echo $2
 echo $3
 
 # get config
-source /systemapic/config/env.sh
+source /mapic/config/env.sh
 
 # PGPASSWORD=docker psql -U docker -d $1 -h postgis -c "select row_to_json(t) from (select MAX($3), MIN($3), AVG($3) from $2) t;"
 PGPASSWORD=$SYSTEMAPIC_PGSQL_PASSWORD psql -U $SYSTEMAPIC_PGSQL_USERNAME -d $1 -h postgis -c "SELECT val, geom INTO $2 FROM (SELECT (ST_DumpAsPolygons(rast)).* FROM $3) As foo ORDER BY val;"

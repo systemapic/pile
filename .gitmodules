@@ -1,3 +1,0 @@
-[submodule "open-data"]
-	path = test/open-data
-	url = https://github.com/systemapic/open-data.git
